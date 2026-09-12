@@ -32,7 +32,9 @@ Each queue record is 128 bytes, 32 little-endian unsigned 32-bit words:
 | 30–31 | Version `0x00010000`, reserved zero |
 
 Qualified geometries are `(rate, samples, phases)` = `(2500000,3300,4)`,
-`(15000000,19800,1)`, `(30000000,39600,1)`, `(60000000,79200,1)`.
+`(5000000,6600,1)`, `(15000000,19800,1)`, `(30000000,39600,1)`,
+`(60000000,79200,1)`. These are component-qualified geometries; the integrated
+board restriction described below remains in force.
 At 2.5 MS/s the bank discriminator is `dc509401`; other profiles use `b04a2fab`.
 The full reference hash must separately match the attested firmware manifest
 and the solver profile before establishing a source epoch. This short field

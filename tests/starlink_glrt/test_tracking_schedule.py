@@ -10,7 +10,7 @@ from .test_native_schedule_port import Batch
 from .test_native_schedule_rtl import BENCH, CANCEL, WAIT, config, simulate, tick
 from .test_native_solver import ROOT
 
-RATES = (2500000, 15000000, 30000000, 60000000)
+RATES = (2500000, 5000000, 15000000, 30000000, 60000000)
 
 
 class TrackingBatch(c.Structure):
@@ -64,13 +64,14 @@ def test_c_keeps_high_indexes_fractional_reference_and_carrier_exact(port, rate)
             assert (job.start, job.phase_step, job.reference_phase) == oracle(b, n)
 
 
-def test_2500000_fractional_repeats_do_not_accumulate_whole_sample_drift(port):
-    b = descriptor(2500000, start=10000)
+@pytest.mark.parametrize("rate,phases", [(2500000, 4), (5000000, 1)])
+def test_fractional_repeats_do_not_accumulate_whole_sample_drift(port, rate, phases):
+    b = descriptor(rate, start=10000)
     for n in range(64):
         job = Job()
         assert port.glrt_tracking_prediction(c.byref(b), n, c.byref(job)) == 0
-        origin = Fraction(job.start*4+job.reference_phase, 4)
-        assert abs(origin-Fraction(10000)-Fraction(n*2500000, 750)) <= Fraction(1, 8)
+        origin = Fraction(job.start*phases+job.reference_phase, phases)
+        assert abs(origin-Fraction(10000)-Fraction(n*rate, 750)) <= Fraction(1, 2*phases)
 
 
 @pytest.mark.parametrize("rate", RATES)

@@ -160,7 +160,7 @@ def test_text_parse_failure_is_atomic(transport, damage):
 
 
 @pytest.mark.parametrize("rate,phase", [(2500000, n) for n in range(4)]+[
-    (15000000, 0), (30000000, 0), (60000000, 0)])
+    (5000000, 0), (15000000, 0), (30000000, 0), (60000000, 0)])
 def test_associated_pinned_pilot_reaches_solver_with_correct_rate_and_reference(
         transport, models, rate, phase):
     basis, raw = models[rate, phase]

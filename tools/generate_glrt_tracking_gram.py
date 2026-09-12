@@ -9,7 +9,8 @@ from pathlib import Path
 from tools.starlink_glrt_native_replay import BANK_SHA256, coefficients
 
 DIRECT_SHA256 = "dc509401673128c8f8d88cc8bd86790e11d783b354cb2d8316f386e2c94176e5"
-PROFILES = tuple((2500000,phase) for phase in range(4)) + ((15000000,0),(30000000,0),(60000000,0))
+PROFILES = tuple((2500000,phase) for phase in range(4)) + (
+    (5000000,0),(15000000,0),(30000000,0),(60000000,0))
 
 
 def reference_rows(cubic: bytes, direct: bytes, rate: int, phase: int):

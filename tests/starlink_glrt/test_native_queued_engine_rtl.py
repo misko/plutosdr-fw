@@ -22,7 +22,7 @@ def signed(words):
 
 
 @pytest.mark.parametrize("fault_mode", [0, 1, 2], ids=["full-750hz", "cancel", "source-loss"])
-@pytest.mark.parametrize("tracking_rate", [None, 2500000, 15000000, 30000000, 60000000])
+@pytest.mark.parametrize("tracking_rate", [None, 2500000, 5000000, 15000000, 30000000, 60000000])
 def test_scheduled_engine_queue_preserves_results_and_accounts_for_missing_repeats(
         tmp_path, fault_mode, tracking_rate):
     stride = 60000000//tracking_rate if tracking_rate else 1
@@ -43,7 +43,7 @@ def test_scheduled_engine_queue_preserves_results_and_accounts_for_missing_repea
                               for c in direct).encode()
         direct_path.write_bytes(pack_phase_rom(phase_major, phases=phases, samples=count))
     bench = BENCH[:BENCH.index("integer fd,rc;")]
-    bench = bench.replace(".SERIAL_ROTATE(0)", f".SERIAL_ROTATE({int(tracking_rate == 2500000)})")
+    bench = bench.replace(".SERIAL_ROTATE(0)", f".SERIAL_ROTATE({int(tracking_rate in (2500000, 5000000))})")
     bench = bench.replace("job_valid=0,", "").replace(",result_ready=1;", ";")
     bench = bench.replace("reg [63:0] job_start=0,input_index=0;",
         "wire job_valid,result_ready; wire [63:0] job_start; reg [63:0] input_index=0;")

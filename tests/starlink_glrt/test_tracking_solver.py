@@ -125,14 +125,14 @@ def test_controls_do_not_produce_supported_multirate_updates(solver,models,rate,
     assert rc == 0 and out.rejection & (4 if kind=="zero" else 64)
 
 
-@pytest.mark.parametrize("rate,phase", [(0,0),(25000000,0),(2500000,4),(15000000,1)])
+@pytest.mark.parametrize("rate,phase", [(0,0),(25000000,0),(2500000,4),(5000000,1),(15000000,1)])
 def test_unknown_profile_never_leaves_a_stale_fit(solver,rate,phase):
     assert not solver.glrt_tracking_profile_get(rate,phase)
     rc,out = call(solver,rate,phase,Moments())
     assert rc == -1 and out.rejection == 1 and out.delay == out.residual == out.cfo == 0
 
 
-@pytest.mark.parametrize("rate", [2500000,15000000,30000000,60000000])
+@pytest.mark.parametrize("rate", [2500000,5000000,15000000,30000000,60000000])
 @pytest.mark.parametrize("negative", [False,True])
 @pytest.mark.parametrize("offset", [-1,0,1])
 def test_centered_prefix_preserves_low_bits_at_each_accumulator_width(solver,rate,negative,offset):

@@ -21,7 +21,7 @@ together with C99 and `-lm`. The shared trend implementation now also exposes
 internal multirate entry points. The default executable mode speaks fixed-60-MS/s
 GLS1; `--tracking` explicitly selects GLT1.
 The controller's `glrt_tracking_controller_init` entry point accepts explicit
-2.5/15/30/60-MS/s GLT1 batches and uses `tracking_*` attributes. It checks the
+2.5/5/15/30/60-MS/s GLT1 batches and uses `tracking_*` attributes. It checks the
 entire bootstrap horizon before I/O, binds snapshots to that rate, associates
 heads with the exact prediction/reference phase, and preserves a 100-microsecond
 submission lead before and after descriptor retention. Trend observations add
