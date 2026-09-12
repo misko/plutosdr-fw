@@ -2,6 +2,20 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-12, registered product output capacity: **2,229 scoped tests
+and all 82 actual FFT fault/reset/stall cases pass**. With no added replay
+queue, exact numerical results take 4,689 clocks, within the unchanged
+5,215-clock limit. Routing has fewer failing endpoints but remains unclosed:
+**WNS -1.222 ns / TNS -323.774 ns / 802 endpoints**, 2,735 LUT / 5,915 FF.
+The refill bubble costs 511 clocks and does not improve worst slack over the
+lean parent; retain it as an alternative, not a mandatory new baseline.
+The worst path is now held metadata through preflight preparation-fault
+reporting into a guard diagnostic register. Next investigate that path while
+preserving immediate publication/admission vetoes. Source FW `e3c218cb3`,
+HDL `10f773c29`, on `codex/starlink-rx-only-do-not-merge-replay-capacity-buffer`.
+No primary HDL, radio, PPU or main-branch changes.
+See [registered product capacity proof](reports/experiments/20260912-product-registered-capacity-actual-route.md).
+
 Update 2026-09-12, registered replay capacity and cancellation partition:
 **2,181 scoped regression tests plus eight recorder tests pass; all 82 actual
 FFT fault/reset/stall cases pass** for the partitioned ring. Numerical words
