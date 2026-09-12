@@ -69,6 +69,24 @@ void live_stop(struct test_live *t)
     if(pthread_mutex_unlock(&t->live.mutex)) abort();
 }
 void live_close_source(struct test_live *t) { if(glrt_tracking_iq_owner_close(&t->live.owner,1)) abort(); }
+int live_rank(struct test_live *t,const int16_t *iq,const unsigned *epochs,unsigned count,
+              double *scores,unsigned *selected)
+{
+    struct live *s=&t->live;
+    memcpy(s->scan_iq,iq,sizeof(s->scan_iq));s->coarse.count=count;
+    for(unsigned k=0;k<count && k<8;k++) s->coarse.peaks[k].epoch=epochs[k];
+    s->deadline_ns=clock_ns(NULL)+UINT64_C(3000000000);
+    return rank_candidates(s,scores,selected);
+}
+void live_free_unstarted(struct test_live *t)
+{
+    struct live *s=&t->live;
+    if(glrt_tracking_iq_owner_close(&s->owner,0) || glrt_tracking_iq_owner_destroy(&s->owner)) abort();
+    fclose(s->journal);fclose(s->worker_iq);fclose(s->grids);
+    fftw_destroy_plan(s->fft);fftw_free(t->fft);free(t->ring);
+    if(pthread_mutex_destroy(&s->mutex)) abort();
+    free(t);
+}
 void live_finish(struct test_live *t,uint64_t out[5])
 {
     void *result=NULL;struct live *s=&t->live;
@@ -106,6 +124,8 @@ def live_api(tmp_path_factory):
     lib.live_new.argtypes = [c.c_void_p, c.c_void_p, c.c_char_p, c.POINTER(Ports), c.c_uint]
     lib.live_new.restype = c.c_void_p
     lib.live_publish.argtypes = [c.c_void_p, c.c_void_p, c.c_size_t]
+    lib.live_rank.argtypes = [c.c_void_p,c.c_void_p,c.c_void_p,c.c_uint,c.c_void_p,c.c_void_p]
+    lib.live_free_unstarted.argtypes = [c.c_void_p]
     for name in ("live_start", "live_done", "live_stop", "live_close_source"):
         getattr(lib, name).argtypes = [c.c_void_p]
     lib.live_finish.argtypes = [c.c_void_p, c.c_void_p]
@@ -116,7 +136,43 @@ def live_api(tmp_path_factory):
     return lib, refs
 
 
+@pytest.mark.parametrize('mode', ['secondary_pilot', 'noise', 'zero', 'cancel', 'invalid_epoch'])
+def test_original_pilot_order_matches_independent_fft(live_api, tmp_path, mode):
+    lib, refs = live_api
+    coefficients = bank()
+    ports = Ports()
+    handle = lib.live_new(refs.ctypes.data, coefficients.ctypes.data, os.fsencode(tmp_path), c.byref(ports), 60000000)
+    iq = np.random.default_rng(982).integers(-100,101,(14000,2),dtype=np.int16)
+    epochs = np.array([500,1023,1800,2200,2600,3000,50,3250],dtype=np.uint32)
+    if mode == 'secondary_pilot':
+        ref = refs[0,:,0].astype(float)+1j*refs[0,:,1]
+        pilot = ref*np.exp(2j*np.pi*464356*np.arange(3300)/2500000)
+        iq[1045:4345] = np.rint(np.column_stack((pilot.real,pilot.imag)))
+    if mode == 'zero': iq[:]=0
+    if mode == 'cancel': lib.live_stop(handle)
+    if mode == 'invalid_epoch': epochs[7]=3333
+    scores = np.full(8,999.,dtype=np.float64);selected=c.c_uint(999)
+    try:
+        rc = lib.live_rank(handle,iq.ctypes.data,epochs.ctypes.data,8,scores.ctypes.data,c.byref(selected))
+    finally:
+        lib.live_free_unstarted(handle)
+    if mode in ('cancel','invalid_epoch'):
+        assert rc == -1 and selected.value == 0 and not scores.any()
+        return
+    ref = refs[0,:,0].astype(float)+1j*refs[0,:,1]
+    expected=[]
+    for epoch in epochs:
+        cut=iq[int(epoch)+22:int(epoch)+3322].astype(float)
+        z=cut[:,0]+1j*cut[:,1]
+        expected.append(max(abs(np.fft.fft(z*np.conj(ref),16384))**2)/
+                        max(float(np.vdot(z,z).real*np.vdot(ref,ref).real),1))
+    assert rc == 0 and selected.value == np.argmax(expected)
+    np.testing.assert_allclose(scores,expected,rtol=2e-12,atol=2e-15)
+    if mode == 'secondary_pilot': assert selected.value == 1
+
+
 @pytest.mark.parametrize("rate,mode", [(30000000,"signal"),(60000000,"signal"),
+    (60000000,"publication_lag"),(60000000,"handoff_horizon_expired"),
     (30000000,"zero"),(30000000,"cancel"),(30000000,"source_loss"),
     (30000000,"native_rejection"),(30000000,"native_retention"),(30000000,"late_handoff")])
 def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilot_moments, tmp_path, rate, mode):
@@ -131,6 +187,8 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
     def read(context, name, output, size):
         # Explicit simulated source clock; generated native heads remain port-fixture data.
         latest = radio.origin+int((time.monotonic()-initial)*rate)
+        if mode == 'publication_lag': latest += rate//125
+        if mode == 'handoff_horizon_expired': latest += rate//10
         radio.advance(max(0, latest-radio.latest))
         return radio.read(context, name, output, size)
 
@@ -138,7 +196,7 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
     coefficients = bank()
     handle = lib.live_new(refs.ctypes.data, coefficients.ctypes.data, os.fsencode(tmp_path), c.byref(ports), rate)
     iq = np.zeros((10_000_000, 2), dtype=np.int16)
-    if mode in ("signal", "native_rejection", "native_retention", "late_handoff"):
+    if mode in ("signal", "publication_lag", "handoff_horizon_expired", "native_rejection", "native_retention", "late_handoff"):
         for frame in range(3000):
             start = 22+(frame*10000+1)//3
             if start+3300 <= len(iq): iq[start:start+3300] = refs[0, :, :2]
@@ -165,7 +223,7 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
         out = (c.c_uint64*5)();lib.live_finish(handle, out)
     assert not radio.errors, radio.errors
     rows = [json.loads(s) for s in (tmp_path/"worker.jsonl").read_text().splitlines()]
-    if mode == "signal":
+    if mode in ("signal", "publication_lag"):
         assert list(out)[0] == 0, (list(out), rows[-3:])
         assert list(out)[2:] == [1,1500,1500]
         assert len(radio.writes("submit")) > 1 and len(radio.writes("pop")) == 1500
@@ -173,6 +231,12 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
         first = next(row for row in rows if row["kind"] == "scan")
         terminal = next(row for row in rows if row["kind"] == "worker_terminal")
         assert terminal["source"]["source_now"] > first["source"]["source_now"]
+        if mode == 'publication_lag':
+            proposal = next(row for row in rows if row['kind'] == 4)
+            assert radio.descriptors[0].start > proposal['start']*(rate//2500000)
+    elif mode == 'handoff_horizon_expired':
+        assert c.c_int64(out[0]).value == -5 and list(out)[2:] == [0,0,0]
+        assert not radio.writes('submit') and not radio.writes('command')
     elif mode in ("native_rejection", "native_retention", "late_handoff"):
         result = c.c_int64(out[0]).value
         assert result == {"native_rejection":-4,"native_retention":-6,"late_handoff":-5}[mode]

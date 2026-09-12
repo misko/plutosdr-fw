@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <inttypes.h>
 #include <limits.h>
+#include <math.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -141,15 +142,69 @@ static int scan(struct live *s)
     s->coarse.completed_epochs=p[0].completed+p[1].completed;
     return glrt_cpu_coarse_select(&s->coarse,cancelled,s);
 }
+/* Cheap ordering only: one original full pilot per coarse basin, with CFO
+ * searched by FFT. The selected proposal must still pass the unchanged
+ * four-pilot resolver, retained-history gates and live source deadlines. */
+static int rank_candidates(struct live *s,double scores[8],unsigned *selected)
+{
+    double pending[8]={0},energy=0;
+    double (*bins)[2]=s->worker.fft_workspace.bins;
+    unsigned best=0,n,k;
+    memset(scores,0,8*sizeof(*scores));*selected=0;
+    if(!s->coarse.count || s->coarse.count>8 || cancelled(s)) return -1;
+    for(n=0;n<3300;n++) {
+        double i=s->refs[4*n],q=s->refs[4*n+1];energy+=i*i+q*q;
+    }
+    if(!energy) return -1;
+    for(k=0;k<s->coarse.count;k++) {
+        unsigned start=s->coarse.peaks[k].epoch+22;
+        double observed=0,peak=0,denominator;
+        if(s->coarse.peaks[k].epoch>=3333 || cancelled(s)) return -1;
+        memset(bins,0,sizeof(s->worker.fft_workspace.bins));
+        for(n=0;n<3300;n++) {
+            double i=s->scan_iq[2*(start+n)],q=s->scan_iq[2*(start+n)+1];
+            double ri=s->refs[4*n],rq=s->refs[4*n+1];
+            bins[n][0]=i*ri+q*rq;bins[n][1]=q*ri-i*rq;observed+=i*i+q*q;
+        }
+        if(fft(s,bins,GLRT_RESOLVER_FFT) || cancelled(s)) return -1;
+        denominator=fmax(observed*energy,1);
+        for(n=0;n<GLRT_RESOLVER_FFT;n++) {
+            double power=(bins[n][0]*bins[n][0]+bins[n][1]*bins[n][1])/denominator;
+            if(!isfinite(power)) return -1;
+            if(power>peak) peak=power;
+        }
+        pending[k]=peak;
+        if(peak>pending[best]) best=k;
+    }
+    if(cancelled(s)) return -1;
+    memcpy(scores,pending,sizeof(pending));*selected=best;return 0;
+}
 static int run_feedback(struct live *s)
 {
     struct glrt_tracking_trend native;
     struct glrt_tracking_batch batch;
-    double slope;int rc;
+    struct glrt_tracking_job job;
+    char raw[4096];uint32_t words[24];uint64_t earliest;
+    double slope;int rc,n;
     uint32_t frame=s->worker.trace.frame;
-    if(glrt_tracking_trend_from_coarse(&s->worker.live.core.trend,s->rate,frame,1500,&native) ||
-       glrt_tracking_trend_batch(&native,frame,8,s->attempts,0,&batch,&slope) ||
-       glrt_tracking_controller_init_handoff(&s->controller,&s->native,&batch,&native,frame,1500,3)) return -1;
+    if(glrt_tracking_trend_from_coarse(&s->worker.live.core.trend,s->rate,frame,1500,&native)) return -1;
+    n=s->native.read(s->native.context,"tracking_snapshot",raw,sizeof(raw));
+    if(n<=0 || (size_t)n>sizeof(raw)) return GLRT_NATIVE_IO_ERROR;
+    if(s->native.retain(s->native.context,"handoff_source",raw,(size_t)n)) return GLRT_NATIVE_RETENTION_ERROR;
+    if(glrt_tracking_snapshot_parse(raw,(size_t)n,words) || words[20]!=s->rate ||
+       words[2]!=s->epoch || (words[5]&48)!=48 || words[6] || words[7] ||
+       words[18] || words[19] || !glrt_tracking_snapshot_drained(words)) return GLRT_NATIVE_SOURCE_LOST;
+    if(wide(words+3)>UINT64_MAX-s->rate/200) return GLRT_NATIVE_DEADLINE;
+    earliest=wide(words+3)+s->rate/200;
+    /* Publication can lag the live native clock by a refill interval. Choose
+     * a fresh batch from the SAME supported history and its existing horizon;
+     * the controller still rereads hardware after descriptor retention. */
+    for(;frame<=native.history.last_supported+25;frame++) {
+        if(!glrt_tracking_trend_batch(&native,frame,8,s->attempts,0,&batch,&slope) &&
+           !glrt_tracking_prediction(&batch,0,&job) && job.start>=earliest) break;
+    }
+    if(frame>native.history.last_supported+25) return GLRT_NATIVE_DEADLINE;
+    if(glrt_tracking_controller_init_handoff(&s->controller,&s->native,&batch,&native,frame,1500,3)) return -1;
     do {
         struct timespec pause={0,100000};
         if(cancelled(s)) glrt_native_controller_request_stop(&s->controller);
@@ -191,7 +246,18 @@ static void *worker_thread(void *pointer)
         if(ferror(s->journal) || fflush(s->journal) ||
            fwrite(s->coarse.grid,sizeof(s->coarse.grid),1,s->grids)!=1 || fflush(s->grids)) { result=-1;break; }
         if(!s->coarse.count) continue;
-        candidate.peak=s->coarse.peaks[0];
+        {
+            double scores[8];unsigned selected;
+            uint64_t rank_started=clock_ns(NULL);
+            if(rank_candidates(s,scores,&selected)) { result=cancelled(s) ? GLRT_WORKER_CANCELLED : -1;break; }
+            fprintf(s->journal,"{\"kind\":\"candidate_order\",\"attempt\":%u,\"selected_rank\":%u,"
+                "\"started_ns\":%" PRIu64 ",\"completed_ns\":%" PRIu64 ",\"single_pilot_power\":[",
+                s->attempts,selected,rank_started,clock_ns(NULL));
+            for(unsigned n=0;n<s->coarse.count;n++) fprintf(s->journal,"%s%.17g",n ? "," : "",scores[n]);
+            fputs("]}\n",s->journal);
+            if(ferror(s->journal) || fflush(s->journal)) { result=-1;break; }
+            candidate.peak=s->coarse.peaks[selected];
+        }
         if(candidate.window_start>UINT64_MAX-5000000) { result=-1;break; }
         cfg.source_deadline=candidate.window_start+5000000;
         /* A fast scanner can finish before 64 repeats exist after its input.

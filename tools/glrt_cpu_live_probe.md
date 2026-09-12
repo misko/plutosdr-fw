@@ -11,7 +11,7 @@ not an installed autonomous service.
 | --- | --- | --- |
 | FPGA DDC and native source counter | 30 or 60 MS/s | Exports 2.5-MS/s GLI1 IQ and its original source coordinates |
 | ARM capture thread | 2.5 MS/s | Attests each 16384-sample refill; retains full IQ and a two-second ring |
-| ARM coarse search | 2.5-MS/s IQ windows | Two threads evaluate each complete 14000-sample window; proposes one best peak per attempt |
+| ARM coarse search | 2.5-MS/s IQ windows | Two threads evaluate each complete 14000-sample window; a full-pilot FFT orders eight basins before one proposal is resolved |
 | ARM resolver/catch-up | 2.5-MS/s retained IQ | Four full 3300-sample pilots, 17 timing hypotheses; then supported past pilots every nine frames |
 | FPGA scheduled measurements | 30 or 60 MS/s | 39600 or 79200 samples per 1.32-ms pilot, scheduled from supported history |
 | ARM native feedback | Native-rate coordinates, 750-Hz pilot cadence | Retains and associates each GLT1 head, updates history and submits finite future descriptors |
@@ -37,6 +37,22 @@ Supported coarse history is converted to the native rate and passed through
 after retaining a descriptor and before SUBMIT. `handoffs` counts runs with
 at least one completed descriptor write, not local initialization. It still
 does not claim that returned native measurements were supported.
+
+Candidate ordering uses one original 3300-sample pilot per basin, at its
+unrefined timing. The journal retains all eight powers and the selected coarse
+rank without modifying the integer grid. This is an ordering heuristic, not a
+support gate; it can miss signals needing timing refinement and does not establish
+continuity. Four-pilot resolution and causal-history support remain mandatory.
+It responds to a saved 60-MS/s candidate at coarse rank one whose original
+pilot coherence was much stronger than rank zero.
+
+Before controller initialization, a retained native snapshot selects the next
+batch at least five milliseconds beyond the observed hardware counter. Selection
+stays within the same history's existing last-supported-plus-32-frame horizon,
+including all eight repeats. It does not extend that horizon or reset frame
+ordinals. Descriptor retention and the final hardware deadline check remain
+inside the native controller. This handles a still-valid history when a previous
+proposal has aged during IQ publication or handoff.
 
 ## Tests and physical evidence
 
