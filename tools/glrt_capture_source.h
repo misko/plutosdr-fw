@@ -19,6 +19,9 @@ struct glrt_capture_source {
 /* Text length excludes a C terminator; embedded NULs and extra fields fail.
  * Failed decoding leaves output unchanged. Source-health checks are separate. */
 int glrt_capture_snapshot_parse(const char *, size_t, struct glrt_capture_snapshot *);
+/* GLI1 has a separate decoder. Native coordinates remain untouched in words;
+ * this does not admit GLI1 to the original direct-rate cursor API. */
+int glrt_iq_tracking_snapshot_parse(const char *, size_t, struct glrt_capture_snapshot *);
 int glrt_capture_source_begin(struct glrt_capture_source *, uint32_t visit,
     uint64_t samples, const struct glrt_capture_snapshot *baseline);
 /* Bind one contiguous delivered CI16 block to the attested original source.

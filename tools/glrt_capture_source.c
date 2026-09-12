@@ -28,7 +28,8 @@ static int number(const char *text, unsigned base, uint64_t maximum, uint64_t *o
     return 0;
 }
 
-int glrt_capture_snapshot_parse(const char *data, size_t size, struct glrt_capture_snapshot *out)
+static int parse_snapshot(const char *data, size_t size, struct glrt_capture_snapshot *out,
+    int iq_tracking)
 {
     char raw[4096], *fields[78], *save, *token;
     struct glrt_capture_snapshot s;
@@ -41,7 +42,7 @@ int glrt_capture_snapshot_parse(const char *data, size_t size, struct glrt_captu
         if (!token) return -1;
         fields[i]=token;token=strtok_r(NULL," \t\r\n",&save);
     }
-    if (token || strcmp(fields[0],"GLA1") || strcmp(fields[1],"00010000")) return -1;
+    if (token || strcmp(fields[0],iq_tracking ? "GLI1" : "GLA1") || strcmp(fields[1],"00010000")) return -1;
     for (i=2;i<14;i++) {
         if (i==7) {
             const char *digits=fields[i]+(fields[i][0]=='-');
@@ -50,7 +51,8 @@ int glrt_capture_snapshot_parse(const char *data, size_t size, struct glrt_captu
         } else if (number(fields[i],10,i>=8 && i<=12 ? UINT64_MAX : UINT32_MAX,&header[i-2]))
             return -1;
     }
-    if (header[0]!=RATE || header[1]!=RATE || !header[2] || header[3]>1) return -1;
+    if ((iq_tracking ? (header[0]!=30000000 && header[0]!=60000000) : header[0]!=RATE) ||
+        header[1]!=RATE || !header[2] || header[3]>1) return -1;
     memset(&s,0,sizeof(s));
     s.generation=(uint32_t)header[2];s.recovery_failed=(uint32_t)header[3];
     s.readback_rate=(uint32_t)header[4];s.dma_error=(int32_t)-(int64_t)header[5];
@@ -60,7 +62,8 @@ int glrt_capture_snapshot_parse(const char *data, size_t size, struct glrt_captu
         if (strlen(fields[14+i])!=8 || number(fields[14+i],16,UINT32_MAX,&value)) return -1;
         s.words[i]=(uint32_t)value;
     }
-    if (s.words[62]!=RATE || s.words[63] || s.words[19]>>12 || s.words[23]>1 ||
+    if (s.words[62]!=header[0] || s.words[63]!=(iq_tracking ? header[0]/30000000*636 : 0) ||
+        s.words[19]>>12 || s.words[23]>1 ||
         s.words[48]>>16 || s.words[49]>>14 || s.words[52]>>11 || s.words[61]>>4 ||
         s.words[57]>65536 || s.words[58]>65536 || s.words[59]>65536 || s.words[60]>1) return -1;
     if (!(s.cpu_fault&1)) {
@@ -72,6 +75,16 @@ int glrt_capture_snapshot_parse(const char *data, size_t size, struct glrt_captu
     }
     *out=s;
     return 0;
+}
+
+int glrt_capture_snapshot_parse(const char *data, size_t size, struct glrt_capture_snapshot *out)
+{
+    return parse_snapshot(data,size,out,0);
+}
+
+int glrt_iq_tracking_snapshot_parse(const char *data, size_t size, struct glrt_capture_snapshot *out)
+{
+    return parse_snapshot(data,size,out,1);
 }
 
 static int healthy(const struct glrt_capture_snapshot *s, uint32_t visit)

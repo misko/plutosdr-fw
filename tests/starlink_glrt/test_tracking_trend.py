@@ -28,6 +28,8 @@ def core(native_core):
         c.c_uint32, c.c_uint32, c.POINTER(TrackingBatch), c.POINTER(c.c_double)]
     lib.glrt_tracking_prediction.argtypes = [c.POINTER(TrackingBatch), c.c_uint, c.POINTER(Job)]
     lib.glrt_tracking_solve.argtypes = [c.c_uint32, c.c_uint32, c.POINTER(Moments), c.POINTER(Estimate)]
+    lib.glrt_tracking_trend_from_coarse.argtypes = [c.POINTER(TrackingTrend),c.c_uint32,
+        c.c_uint32,c.c_uint32,c.POINTER(TrackingTrend)]
     return lib
 
 
@@ -49,6 +51,54 @@ def predict(core, t, first, repeats=16):
     b, rate = TrackingBatch(), c.c_double()
     rc = core.glrt_tracking_trend_batch(c.byref(t), first, repeats, 99, 17, c.byref(b), c.byref(rate))
     return rc, b, rate.value
+
+
+@pytest.mark.parametrize("native_rate", [30000000,60000000])
+@pytest.mark.parametrize("alias", [False,True])
+def test_coarse_handoff_preserves_physical_time_and_cfo_without_filter_delay_added_twice(core, native_rate, alias):
+    coarse = fresh(core,2500000)
+    anchor = 2**56+3
+    period = Fraction(2500000,750)+Fraction(1,400)
+    delay = Fraction(37,400)
+    for frame in range(128):
+        assert observe(core,coarse,frame,anchor+frame*period+delay,-100000+4000*frame/750) == 1
+    saved = bytes(coarse)
+    native = coarse if alias else TrackingTrend()
+    assert core.glrt_tracking_trend_from_coarse(c.byref(coarse),native_rate,128,16,c.byref(native)) == 0
+    if not alias: assert bytes(coarse) == saved
+    assert native.rate == native_rate
+    ratio = native_rate//2500000
+    rc,b,slope = predict(core,native,128)
+    assert rc == 0
+    target = (anchor+128*period+delay)*ratio
+    actual = Fraction(b.prediction.start*65536+b.prediction.fraction,65536)
+    assert abs(actual-target) <= Fraction(1,65536)
+    assert b.prediction.period == round(period*ratio*65536)
+    assert slope == pytest.approx(4000*float(Fraction(2500000,750)/period),abs=1e-6)
+    job = Job()
+    assert core.glrt_tracking_prediction(c.byref(b),0,c.byref(job)) == 0
+    assert job.start == round(target)
+    signed_step = job.phase_step if job.phase_step<2**31 else job.phase_step-2**32
+    assert signed_step*native_rate/2**32 == pytest.approx(-100000+4000*128/750,abs=native_rate/2**33)
+
+
+@pytest.mark.parametrize("damage", ["few","stale_frame","wrong_source_rate","wrong_target_rate",
+                                     "anchor_overflow","nonfinite","fenced"])
+def test_invalid_coarse_handoff_cannot_create_native_prediction(core, damage):
+    coarse = fresh(core,2500000)
+    for frame in range(7 if damage == "few" else 16):
+        assert observe(core,coarse,frame,Fraction(100000)+Fraction(frame*2500000,750),1000) == 1
+    target_rate,first = 60000000,16
+    if damage == "stale_frame": first = 15
+    elif damage == "wrong_source_rate": coarse.rate = 5000000
+    elif damage == "wrong_target_rate": target_rate = 15000000
+    elif damage == "anchor_overflow": coarse.history.anchor = 2**64//24+1
+    elif damage == "nonfinite": coarse.history.observations[0].offset = float("nan")
+    elif damage == "fenced": coarse.history.valid = 0
+    result = TrackingTrend()
+    c.memset(c.byref(result),0xa5,c.sizeof(result))
+    assert core.glrt_tracking_trend_from_coarse(c.byref(coarse),target_rate,first,16,c.byref(result)) == -1
+    assert bytes(result) == bytes(c.sizeof(result))
 
 
 @pytest.mark.parametrize("rate", RATES)

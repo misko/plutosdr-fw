@@ -225,3 +225,25 @@ int glrt_tracking_trend_handoff_valid(const struct glrt_tracking_trend *t,
     }
     return previous==h->last_supported && recent>=8;
 }
+
+int glrt_tracking_trend_from_coarse(const struct glrt_tracking_trend *coarse, uint32_t rate,
+    uint32_t first, uint32_t frames, struct glrt_tracking_trend *out)
+{
+    struct glrt_tracking_trend pending;
+    uint32_t ratio;
+    unsigned i;
+    if(!out) return -1;
+    if(!coarse) { memset(out,0,sizeof(*out)); return -1; }
+    pending=*coarse;
+    memset(out,0,sizeof(*out));
+    if(pending.rate!=2500000 || (rate!=30000000 && rate!=60000000) ||
+       !glrt_tracking_trend_handoff_valid(&pending,first,frames)) return -1;
+    ratio=rate/2500000;
+    if(pending.history.anchor>UINT64_MAX/ratio) return -1;
+    pending.rate=rate;
+    pending.history.anchor*=ratio;
+    for(i=0;i<pending.history.count;i++) pending.history.observations[i].offset_samples*=ratio;
+    if(!glrt_tracking_trend_handoff_valid(&pending,first,frames)) return -1;
+    *out=pending;
+    return 0;
+}

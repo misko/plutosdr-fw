@@ -26,4 +26,13 @@ int glrt_tracking_trend_batch(const struct glrt_tracking_trend *,
  * RF support or replace the batch predictor's quality/forecast checks. */
 int glrt_tracking_trend_handoff_valid(const struct glrt_tracking_trend *,
     uint32_t first_frame, uint32_t frames);
+/* Internal proposal conversion for GLI1: the input history uses attested
+ * 2.5-MS/s signal-center coordinates, after FIR delay removal. Multiply
+ * integer anchor and local sample offsets by native/coarse rate; physical
+ * CFO and frame chronology stay unchanged. This does not create FPGA
+ * observations or establish native RF support. Retain the software origin,
+ * validate source freshness, then require native results for feedback.
+ * Output clears on failure; input/output may alias. */
+int glrt_tracking_trend_from_coarse(const struct glrt_tracking_trend *, uint32_t native_rate,
+    uint32_t first_frame, uint32_t frames, struct glrt_tracking_trend *);
 #endif
