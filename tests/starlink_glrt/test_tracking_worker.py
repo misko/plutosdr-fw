@@ -8,6 +8,7 @@ import pytest
 
 from tools.generate_glrt_tracking_gram import reference_rows
 from . import test_tracking_seed as t
+from .test_cpu_seed import proposal
 
 CLOCK = c.CFUNCTYPE(c.c_uint64, c.c_void_p)
 ACTION = c.CFUNCTYPE(c.c_int, c.c_void_p)
@@ -28,9 +29,25 @@ int worker_test(struct glrt_tracking_worker *w, struct glrt_tracking_iq_owner *o
         .source_deadline=deadline,.wall_budget_ns=budget,.maximum_seed_age=2500000,.lead_samples=lead};
     return glrt_tracking_worker_run(w,&config,event);
 }
+int worker_test_cpu(struct glrt_tracking_worker *w, struct glrt_tracking_iq_owner *owner,
+    const struct glrt_cpu_candidate *candidate,const int16_t *refs,glrt_resolver_fft fft,
+    uint64_t (*clock)(void *),int (*cancel)(void *),int (*wait)(void *),
+    int (*retain)(void *,enum glrt_tracking_worker_record,const struct glrt_tracking_worker *),
+    void *context,uint64_t deadline,uint64_t budget,uint32_t lead)
+{
+    struct glrt_tracking_worker_config config={.owner=owner,.references=refs,.fft=fft,
+        .fft_context=context,.ports={context,clock,cancel,wait,retain},
+        .source_deadline=deadline,.wall_budget_ns=budget,.maximum_seed_age=2500000,.lead_samples=lead};
+    int rc=glrt_tracking_worker_run_cpu(w,&config,candidate);
+    const struct glrt_tracking_seed_window empty={0};
+    assert(w->software_candidate==1 && !memcmp(&w->seed,&empty,sizeof(empty)));
+    return rc;
+}
 void worker_summary(const struct glrt_tracking_worker *w,uint64_t out[16])
 {
-    out[0]=w->seed.first;out[1]=w->seed.seed_start;out[2]=w->seed.seed_fraction;
+    out[0]=w->software_candidate ? w->cpu_seed.first : w->seed.first;
+    out[1]=w->software_candidate ? w->cpu_seed.start : w->seed.seed_start;
+    out[2]=w->software_candidate ? w->cpu_seed.fraction : w->seed.seed_fraction;
     out[3]=w->fft_calls;out[4]=w->retained_past;out[5]=w->waits;
     out[6]=w->live.core.trend.history.count;out[7]=w->live.core.valid;
     out[8]=w->live.core.pending;out[9]=w->live.core.ready;
@@ -41,16 +58,17 @@ int worker_status(const struct glrt_tracking_worker *w) { return w->status; }
 const int16_t *worker_iq(const struct glrt_tracking_worker *w, int kind)
 { return kind==GLRT_WORKER_SEED_IQ ? w->seed_iq : w->scratch; }
 const struct glrt_tracking_iq_view *worker_view(const struct glrt_tracking_worker *w, int kind)
-{ return kind==GLRT_WORKER_SEED_IQ ? &w->seed.copied : &w->trace.source; }
+{ return kind==GLRT_WORKER_SEED_IQ ?
+    (w->software_candidate ? &w->cpu_seed.copied : &w->seed.copied) : &w->trace.source; }
 '''
 
 
-@pytest.fixture(scope="module")
-def worker(tmp_path_factory):
+@pytest.fixture(scope="module", params=["gla", "cpu"])
+def worker(tmp_path_factory, request):
     root = Path(__file__).resolve().parents[2]
     out = tmp_path_factory.mktemp("tracking-worker")
-    (out/"wrapper.c").write_text(WRAPPER)
-    sources = t.SOURCES+["glrt_tracking_worker.c", "glrt_tracking_live_bootstrap.c", "glrt_tracking_iq.c"]
+    (out/"wrapper.c").write_text('#include <string.h>\n'+WRAPPER)
+    sources = t.SOURCES+["glrt_cpu_seed.c", "glrt_tracking_worker.c", "glrt_tracking_live_bootstrap.c", "glrt_tracking_iq.c"]
     subprocess.run(["cc", "-std=c99", "-O2", "-Wall", "-Wextra", "-Werror", "-pthread", "-shared",
                     "-fPIC", "-I", str(root/"tools"), str(out/"wrapper.c"),
                     *(str(root/"tools"/name) for name in sources), "-lm", "-o", str(out/"worker.so")], check=True)
@@ -63,6 +81,8 @@ def worker(tmp_path_factory):
     lib.glrt_tracking_iq_owner_close.argtypes = [c.c_void_p, c.c_int]
     lib.worker_test.argtypes = [c.c_void_p, c.c_void_p, c.c_void_p, c.c_void_p, t.FFT_PORT,
                                CLOCK, ACTION, ACTION, RETAIN, c.c_void_p, c.c_uint64, c.c_uint64, c.c_uint32]
+    lib.worker_test_cpu.argtypes = lib.worker_test.argtypes
+    lib.software = request.param == "cpu"
     lib.worker_summary.argtypes = [c.c_void_p, c.c_void_p]
     lib.worker_status.argtypes = [c.c_void_p]
     lib.worker_iq.argtypes = lib.worker_view.argtypes = [c.c_void_p, c.c_int]
@@ -82,8 +102,10 @@ def summary(lib, work):
 def run(worker, mode):
     lib, refs = worker
     first = 2**60+17 if mode == "large" else 1_000_000
-    words = t.event(first, 0)
-    if mode == "ignored": words[5] &= ~1
+    words = proposal(first, 0) if lib.software else t.event(first, 0)
+    if mode == "ignored":
+        if lib.software: words.peak.score = 0
+        else: words[5] &= ~1
     iq = np.zeros((1_000_000, 2), dtype=np.int16)
     if mode != "zero":
         for offset in range(230022, len(iq)-t.N+1, 30000):
@@ -167,7 +189,8 @@ def run(worker, mode):
             len(block), first+len(block)+lag, state['now']) == 0
         if mode == "cancelled": state['cancelled'] = True
         if mode == "source_deadline": deadline = first+state['end']+1000
-        rc = lib.worker_test(work, owner, words, refs.ctypes.data, fft, clock, cancel, wait, retain,
+        invoke = lib.worker_test_cpu if lib.software else lib.worker_test
+        rc = invoke(work, owner, c.byref(words), refs.ctypes.data, fft, clock, cancel, wait, retain,
                              None, deadline, budget, 0 if mode == "bad_lead" else 2500)
         final = summary(lib, work)
         assert not state['errors'], state['errors']
@@ -199,6 +222,7 @@ def test_owned_seed_resolves_builds_real_history_and_retains_future_proposal(wor
     ("handoff_cancel", -4, 68),
 ])
 def test_failure_cancellation_or_stale_retained_proposal_cannot_authorize_handoff(worker, mode, expected, calls):
+    if mode == "ignored" and worker[0].software: expected = -1
     rc, final, state = run(worker, mode)
     assert rc == expected and final[3] == state['calls'] == calls
     assert final[7:10] == [0, 0, 0] and final[12] == 0

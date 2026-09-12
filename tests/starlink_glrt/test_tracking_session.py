@@ -46,7 +46,7 @@ def session(tmp_path_factory):
     root = Path(__file__).resolve().parents[2]
     out = tmp_path_factory.mktemp("tracking-session")
     (out/"wrapper.c").write_text(WRAPPER)
-    names = t.SOURCES+["glrt_tracking_worker.c", "glrt_tracking_live_bootstrap.c",
+    names = t.SOURCES+["glrt_cpu_seed.c", "glrt_tracking_worker.c", "glrt_tracking_live_bootstrap.c",
                        "glrt_tracking_iq.c", "glrt_tracking_session.c"]
     subprocess.run(["cc", "-std=c99", "-O2", "-Wall", "-Wextra", "-Werror", "-pthread", "-shared",
         "-fPIC", "-I", str(root/"tools"), str(out/"wrapper.c"),

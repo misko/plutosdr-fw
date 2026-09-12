@@ -51,7 +51,8 @@ static int source(struct execution *e, int handoff)
     const struct glrt_tracking_worker_config *cfg=e->config;
     struct glrt_tracking_worker *w=e->work;
     struct glrt_tracking_iq_view v={0};
-    int rc=glrt_tracking_iq_owner_copy(cfg->owner,w->seed.event[1],0,NULL,0,&v);
+    uint32_t epoch=w->software_candidate ? w->cpu_seed.candidate.epoch : w->seed.event[1];
+    int rc=glrt_tracking_iq_owner_copy(cfg->owner,epoch,0,NULL,0,&v);
     w->checked_source=v;w->source_checked_ns=0;
     if(poll(e)) return w->status;
     w->source_checked_ns=w->last_ns;
@@ -63,14 +64,16 @@ static int source(struct execution *e, int handoff)
     return 0;
 }
 
-int glrt_tracking_worker_run(struct glrt_tracking_worker *w,
-    const struct glrt_tracking_worker_config *cfg, const uint32_t event[16])
+static int run(struct glrt_tracking_worker *w,
+    const struct glrt_tracking_worker_config *cfg, const uint32_t event[16],
+    const struct glrt_cpu_candidate *candidate, unsigned software)
 {
     struct execution execution={w,cfg};
     unsigned n;
     int rc;
     if(!w) return GLRT_WORKER_INVALID;
     memset(w,0,sizeof(*w));
+    w->software_candidate=software;
     if(!cfg || !cfg->owner || !cfg->references || !cfg->fft || !cfg->ports.clock_ns ||
         !cfg->ports.cancelled || !cfg->ports.wait || !cfg->ports.retain ||
         !cfg->wall_budget_ns || cfg->wall_budget_ns>UINT64_C(5000000000) ||
@@ -82,7 +85,11 @@ int glrt_tracking_worker_run(struct glrt_tracking_worker *w,
         return stop(w,GLRT_WORKER_PORT);
     w->deadline_ns=w->started_ns+cfg->wall_budget_ns;w->status=GLRT_WORKER_RUNNING;
     if(poll(&execution)) return w->status;
-    rc=glrt_tracking_seed_copy(cfg->owner,event,cfg->maximum_seed_age,w->seed_iq,
+    if(software) {
+        rc=glrt_cpu_seed_copy(cfg->owner,candidate,cfg->maximum_seed_age,w->seed_iq,
+            GLRT_SEED_WINDOW_SAMPLES,&w->cpu_seed);
+        if(!rc) rc=GLRT_SEED_READY;
+    } else rc=glrt_tracking_seed_copy(cfg->owner,event,cfg->maximum_seed_age,w->seed_iq,
         GLRT_SEED_WINDOW_SAMPLES,&w->seed);
     if(rc==GLRT_SEED_IGNORE) return stop(w,GLRT_WORKER_IGNORED);
     if(rc!=GLRT_SEED_READY)
@@ -91,7 +98,11 @@ int glrt_tracking_worker_run(struct glrt_tracking_worker *w,
     for(n=0;n<3300;n++) {
         w->reference[2*n]=cfg->references[4*n];w->reference[2*n+1]=cfg->references[4*n+1];
     }
-    rc=glrt_tracking_seed_resolve(&w->seed,&w->fft_workspace,w->reference,w->seed_iq,
+    if(software) {
+        rc=glrt_cpu_seed_resolve(&w->cpu_seed,&w->fft_workspace,w->reference,w->seed_iq,
+            guarded_fft,&execution,cfg->source_deadline,&w->resolved,&w->live);
+        if(!rc) rc=GLRT_SEED_READY;
+    } else rc=glrt_tracking_seed_resolve(&w->seed,&w->fft_workspace,w->reference,w->seed_iq,
         guarded_fft,&execution,cfg->source_deadline,&w->resolved,&w->live);
     if(rc!=GLRT_SEED_READY)
         return stop(w,w->status<0 ? w->status : GLRT_WORKER_INVALID);
@@ -113,4 +124,16 @@ int glrt_tracking_worker_run(struct glrt_tracking_worker *w,
         } else return stop(w,w->live.core.failure==GLRT_BOOTSTRAP_SOURCE_LOSS ? GLRT_WORKER_SOURCE :
             w->live.core.failure==GLRT_BOOTSTRAP_BUDGET ? GLRT_WORKER_DEADLINE : GLRT_WORKER_HISTORY);
     }
+}
+
+int glrt_tracking_worker_run(struct glrt_tracking_worker *w,
+    const struct glrt_tracking_worker_config *cfg, const uint32_t event[16])
+{
+    return run(w,cfg,event,NULL,0);
+}
+
+int glrt_tracking_worker_run_cpu(struct glrt_tracking_worker *w,
+    const struct glrt_tracking_worker_config *cfg, const struct glrt_cpu_candidate *candidate)
+{
+    return run(w,cfg,NULL,candidate,1);
 }

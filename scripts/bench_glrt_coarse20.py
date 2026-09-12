@@ -22,6 +22,8 @@ def main():
     parser.add_argument('--source',type=Path,required=True)
     parser.add_argument('--binary',type=Path,required=True)
     parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--tracking-references',type=Path,
+                        help='Run the saved-IQ scan/resolver/catch-up benchmark with frozen receiver time')
     args=parser.parse_args()
     receipt=json.loads((args.source/'independent-review.json').read_text())
     iq=(args.source/'iq.ci16').read_bytes()
@@ -29,6 +31,11 @@ def main():
         raise ValueError('saved IQ differs from reviewed physical source')
     payload={'bench':args.binary.read_bytes(),'iq':iq[:4*14000*4],
              'bank':(EVIDENCE/'coarse-bank.ci16').read_bytes()}
+    if args.tracking_references:
+        payload['iq']=iq
+        payload['references']=args.tracking_references.read_bytes()
+        if len(iq)!=2621440*4 or len(payload['references'])!=105600:
+            raise ValueError('tracking benchmark requires the complete reviewed capture and four phase banks')
     plan,profile=g.deployment_identity(args.deployment,serial=ENDPOINT[0],host=ENDPOINT[1])
     args.output.mkdir(parents=True,exist_ok=False)
     evidence={'scope':'saved_iq_only','rf_samples':0,'source':str(args.source),
@@ -56,8 +63,10 @@ def main():
                 if check.stdout.decode().split()[0]!=evidence['payload_sha256'][key]:
                     raise ValueError('staged payload differs')
             run('chmod 700 '+shlex.quote(remote+'/bench')).check_returncode()
-            result=run(shlex.join([remote+'/'+x for x in ('bench','bank','iq','grid')]))
-            (args.output/'coarse-benchmark.json').write_bytes(result.stdout)
+            command=['bench','bank','iq','grid']
+            if args.tracking_references: command.append('references')
+            result=run(shlex.join([remote+'/'+x for x in command]))
+            (args.output/('tracking-benchmark.jsonl' if args.tracking_references else 'coarse-benchmark.json')).write_bytes(result.stdout)
             (args.output/'stderr.txt').write_bytes(result.stderr)
             evidence['exit_code']=result.returncode
             result.check_returncode()
@@ -67,7 +76,7 @@ def main():
         finally:
             try:
                 if staged:
-                    run('rm -f '+shlex.join([remote+'/'+x for x in ('bench','bank','iq','grid')])+
+                    run('rm -f '+shlex.join([remote+'/'+x for x in (*payload,'grid')])+
                         ' && rmdir '+shlex.quote(remote)).check_returncode()
                 evidence['after']=g.attest_tx_safe_idle(transport,plan,serial=ENDPOINT[0],
                     host=ENDPOINT[1],layout=profile.return_iio_layout)

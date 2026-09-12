@@ -2,6 +2,7 @@
 #ifndef GLRT_TRACKING_WORKER_H
 #define GLRT_TRACKING_WORKER_H
 #include "glrt_tracking_seed.h"
+#include "glrt_cpu_seed.h"
 #include "glrt_tracking_live_bootstrap.h"
 
 enum glrt_tracking_worker_status {
@@ -21,6 +22,8 @@ struct glrt_tracking_worker {
     struct glrt_resolver_workspace fft_workspace;
     int16_t seed_iq[2*GLRT_SEED_WINDOW_SAMPLES], scratch[6600], reference[6600];
     struct glrt_tracking_seed_window seed;
+    struct glrt_cpu_seed cpu_seed;
+    unsigned software_candidate;
     struct glrt_resolver_result resolved;
     struct glrt_tracking_bootstrap_live live;
     struct glrt_tracking_bootstrap_trace trace;
@@ -36,6 +39,8 @@ struct glrt_tracking_worker_ports {
     int (*wait)(void *);          /* wait for publication/cancellation, <=10 ms */
     /* Synchronous retention: 0 only after the exact evidence is retained.
      * SEED_IQ: seed + seed_iq; RESOLVED: seed + resolved; PAST: trace + scratch;
+     * For software_candidate==1, retain cpu_seed instead of seed. The GLA
+     * event storage remains zero: software proposals are not FPGA decisions.
      * HANDOFF: trace + live history + checked_source (a proposal). Copy fields, not padded native structs,
      * into an explicit retained format. These are internal callback tags, not
      * a new public wire contract. No callback runs under the IQ-owner mutex. */
@@ -63,4 +68,10 @@ struct glrt_tracking_worker_config {
  * No thread, IIO context, file, radio lease or hardware submission is created. */
 int glrt_tracking_worker_run(struct glrt_tracking_worker *, const struct glrt_tracking_worker_config *,
     const uint32_t event[16]);
+/* Same bounded resolution/history/retention path for an explicitly SOFTWARE
+ * proposal. The caller retains its coarse input, grid and selected peak and
+ * attests the capture-visit to GLT-epoch binding before invoking this port.
+ * READY still requires supported past observations and native admission. */
+int glrt_tracking_worker_run_cpu(struct glrt_tracking_worker *, const struct glrt_tracking_worker_config *,
+    const struct glrt_cpu_candidate *);
 #endif

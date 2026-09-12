@@ -26,7 +26,7 @@ def bootstrap_probe(tmp_path_factory):
     includes = ['-I', str(Path(prefix)/'include')] if prefix else []
     libraries = ['-L', str(Path(prefix)/'lib'), '-Wl,-rpath,'+str(Path(prefix)/'lib')] if prefix else []
     names = ['glrt_radio_iio_probe.c', 'glrt_capture_source.c', 'glrt_tracking_session.c',
-             'glrt_tracking_worker.c', 'glrt_tracking_seed.c', 'glrt_tracking_resolver.c',
+             'glrt_tracking_worker.c', 'glrt_tracking_seed.c', 'glrt_cpu_seed.c', 'glrt_tracking_resolver.c',
              'glrt_tracking_iq_owner.c', 'glrt_tracking_recent_iq.c', 'glrt_tracking_live_bootstrap.c',
              'glrt_tracking_bootstrap.c', 'glrt_tracking_iq.c', 'glrt_native_trend.c',
              'glrt_native_schedule.c', 'glrt_tracking_schedule.c', 'glrt_native_solver.c']
