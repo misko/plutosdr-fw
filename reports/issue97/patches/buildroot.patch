@@ -1,0 +1,37 @@
+From a3752330bc286c49edf681cf4874a9524c61bfda Mon Sep 17 00:00:00 2001
+From: misko <misko@cs.toronto.edu>
+Date: Sat, 12 Sep 2026 21:37:25 +0000
+Subject: [PATCH] Pin explicit single-RX counter metadata provider
+
+---
+ package/libiio/libiio.hash | 3 +++
+ package/libiio/libiio.mk   | 2 +-
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/package/libiio/libiio.hash b/package/libiio/libiio.hash
+index 3519d6794..b67d542f5 100644
+--- a/package/libiio/libiio.hash
++++ b/package/libiio/libiio.hash
+@@ -37,3 +37,6 @@ sha256 eb179eef9e4ee2accbd9e5d1fdc5e4a6d7f0a76675ac0669e8b128e88bb9933b  libiio-
+ sha256 66ccc7230ebe75c477c4dfc147aa86289c3f896c0a0d6b3b6c964e152d89c266  libiio-0d323080a0a1067da8c7adbadfd03ee186a40ec2.tar.gz
+ sha256 1f38c05259c846b9f6ef327eb8feab293564a615d940336a8b4491c79e403212  libiio-5cb2389719d46d12463daa0371d1fda19eb25fa7.tar.gz
+ sha256 102900208eef27b766380135906d431dba87edaa7ec6aa72e6ebd3dd67f3a97b  COPYING.txt
++
++# Issue-97 local candidate archive (scripts/issue97/build.sh stages this exact archive).
++sha256 ea57455d7c1e4b66f02e50cf1de7be09421f28f1c281803958c836a208922867  libiio-47a75cbc5e7d24a063b8b54eb531fdba6602b85c.tar.gz
+diff --git a/package/libiio/libiio.mk b/package/libiio/libiio.mk
+index 27a0034dc..352f32390 100644
+--- a/package/libiio/libiio.mk
++++ b/package/libiio/libiio.mk
+@@ -8,7 +8,7 @@
+ #LIBIIO_VERSION = 0.25
+ #LIBIIO_SITE = $(call github,analogdevicesinc,libiio,v$(LIBIIO_VERSION))
+ 
+-LIBIIO_VERSION = 5cb2389719d46d12463daa0371d1fda19eb25fa7
++LIBIIO_VERSION = 47a75cbc5e7d24a063b8b54eb531fdba6602b85c
+ LIBIIO_SITE = $(call github,misko,libiio,$(LIBIIO_VERSION))
+ 
+ LIBIIO_INSTALL_STAGING = YES
+-- 
+2.53.0
+

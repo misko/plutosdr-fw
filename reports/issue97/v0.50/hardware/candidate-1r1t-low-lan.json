@@ -1,0 +1,179 @@
+{
+  "serial": "1040007c4a94000211000b009186843ef2",
+  "uri": "ip:192.168.1.18",
+  "native_version": [
+    0,
+    25,
+    "47a75cb"
+  ],
+  "native_sha256": "ff608ac8e97fbb6d3ef67db40ef8fd96a0a93b9580188560013de1a4c865c711",
+  "binding_sha256": "d8986bae5d550549cf5428fd8f6339e2454648b2c105ba6aa4b43c068166ffe1",
+  "counter_only": true,
+  "cells": [
+    {
+      "requested_rate": 2500000,
+      "frames": [
+        {
+          "first": 1408567319,
+          "end": 1409567319,
+          "missing": 0,
+          "flags": 2097168,
+          "shape": [
+            1,
+            1000000
+          ],
+          "iq_sha256": "fdd97bd606b8578481dfe1fc0ac315a56045d3cefb4c6d704207370cd079f0b3"
+        },
+        {
+          "first": 1409567319,
+          "end": 1410567319,
+          "missing": 0,
+          "flags": 2097168,
+          "shape": [
+            1,
+            1000000
+          ],
+          "iq_sha256": "abebc42f3d80d2fe6fbe8e33ea353e649013b2c6255ab7a8f3263a60b3b5e9b1"
+        },
+        {
+          "first": 1410567319,
+          "end": 1411567319,
+          "missing": 0,
+          "flags": 2097168,
+          "shape": [
+            1,
+            1000000
+          ],
+          "iq_sha256": "f67991dc53e8219935759058b85d5b64c5a4cc73998c8011db6995af0f2a9289"
+        },
+        {
+          "first": 1411567319,
+          "end": 1412567319,
+          "missing": 0,
+          "flags": 2097168,
+          "shape": [
+            1,
+            1000000
+          ],
+          "iq_sha256": "5afec436a756a0a0b3fc1708d74843139449aa63415375a935f538c6ee6c983a"
+        },
+        {
+          "first": 1412567319,
+          "end": 1413567319,
+          "missing": 0,
+          "flags": 2097168,
+          "shape": [
+            1,
+            1000000
+          ],
+          "iq_sha256": "6fd1ce38c988f9380b101a6b932e118f4ee42a1b95f1937a245c8288395eac6d"
+        }
+      ],
+      "requested_kernel_buffers": 50,
+      "sample_rate": 2500000,
+      "rf_bandwidth": 2500000,
+      "timestamp_control_before": 0,
+      "allocated_kernel_buffers": 50,
+      "elapsed_seconds": 3.3736306990031153,
+      "outcome": "completed",
+      "timestamp_control_after": 0
+    },
+    {
+      "requested_rate": 5000000,
+      "frames": [
+        {
+          "first": 1420281073,
+          "end": 1421281073,
+          "missing": 0,
+          "flags": 2097168,
+          "shape": [
+            1,
+            1000000
+          ],
+          "iq_sha256": "2fe3b81cb68fa741176de799e34c2ffcb3ba83d5c6bf32acbfd4c3e0a64f72d4"
+        },
+        {
+          "first": 1421281073,
+          "end": 1422281073,
+          "missing": 0,
+          "flags": 2097168,
+          "shape": [
+            1,
+            1000000
+          ],
+          "iq_sha256": "7a0337ec87d8912225bd3ef2137030e7f533f85fcc26ff3e58ce239506b120d8"
+        },
+        {
+          "first": 1422281073,
+          "end": 1423281073,
+          "missing": 0,
+          "flags": 2097168,
+          "shape": [
+            1,
+            1000000
+          ],
+          "iq_sha256": "8c63848feea7f40eca74003fdf889193bcd8257a62159249a8aa1426b499f3a5"
+        },
+        {
+          "first": 1423281073,
+          "end": 1424281073,
+          "missing": 0,
+          "flags": 2097168,
+          "shape": [
+            1,
+            1000000
+          ],
+          "iq_sha256": "a9191cded2170b894236c8e8027dad3b6a7c1735a8b4a741c511d93a7dadf4b6"
+        },
+        {
+          "first": 1424281073,
+          "end": 1425281073,
+          "missing": 0,
+          "flags": 2097168,
+          "shape": [
+            1,
+            1000000
+          ],
+          "iq_sha256": "c555123e310614cd39b571854390ed50a60f02dab7fb60cc9fbca461df6a7783"
+        }
+      ],
+      "requested_kernel_buffers": 50,
+      "sample_rate": 5000000,
+      "rf_bandwidth": 5000000,
+      "timestamp_control_before": 0,
+      "allocated_kernel_buffers": 50,
+      "elapsed_seconds": 1.9777200589887798,
+      "outcome": "completed",
+      "timestamp_control_after": 0
+    }
+  ],
+  "firmware": "v0.50-plutoplus-spf-counter-rx-v1",
+  "scan_channels": [
+    "voltage0",
+    "voltage1"
+  ],
+  "original": {
+    "sample_rate": 30720000,
+    "rx_rf_bandwidth": 18000000,
+    "rx_lo": 2400000000,
+    "rx_enabled_channels": [
+      0
+    ]
+  },
+  "original_gain": [
+    [
+      "voltage0",
+      {
+        "gain_control_mode": "slow_attack",
+        "hardwaregain": "71.000000 dB"
+      }
+    ],
+    [
+      "voltage2",
+      {}
+    ]
+  ],
+  "restored": true,
+  "restored_gain": true,
+  "restored_queue": true
+}

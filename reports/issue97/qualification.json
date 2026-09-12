@@ -1,0 +1,784 @@
+{
+  "serial": "1040007c4a94000211000b009186843ef2",
+  "firmware": "v0.49-plutoplus-spf-counter-rx-v1-rc1",
+  "deployment": "persistent QSPI; reboot and stored FIT hash verified",
+  "physical_mode": "AD9361 1R1T RX0",
+  "artifact": {
+    "firmware": "v0.49-plutoplus-spf-counter-rx-v1-rc1",
+    "serial": "1040007c4a94000211000b009186843ef2",
+    "baseline_fit_sha256": "77f899610548d486aab2c83c4dc7170532d470b115d2bd0e8fc43e72b3bfca67",
+    "fit_sha256": "d1f5782d1a72c75383b6f8bfde340f144426723afe933cce6e7a20cad1f252b5",
+    "fit_size": 14058587,
+    "asset_sha256": "1543ff8da28c22692cd44cc1e7220f69afc4142d5712b04b57a81c79f41b30fb",
+    "asset_path": "/home/mouse9911/gits/plutosdr-fw-issue-97/build/counter-rx-v1-rc1.dfu",
+    "changed_rootfs_files": {
+      "opt/VERSIONS": {
+        "before": "e0a9fab893a14efbcaa6dcb1c91216f71139e8afaf7f3e512113f5694985a134",
+        "after": "b0a6bd967f6a75683c2ad3453f22740fbbe8c4dd61716c91750f994b58e133d3"
+      },
+      "usr/lib/libiio.so.0.25": {
+        "before": "dba9f27623e39a78336c6c7556ac071f501c00af8652815b5c52e95612cf45c3",
+        "after": "1f838f3b2a5d5312b694f513454e8fa0f130cdaff52b5f337cd953b58ec1a490"
+      },
+      "usr/sbin/iiod": {
+        "before": "495c2508747ffe1375fcd947ee5825dde2c497072c53b9f5390fffa2fe5b318c",
+        "after": "e97bbcf026984010deeecf62d8851c751162b033f6cc016b4fc942f1d94a6d63"
+      }
+    },
+    "components": {
+      "zImage": "a9d59473ea1e243356b3823184e3000dad6b9f10b73f34669187e3503fd257b0",
+      "system_top.bit": "035358f94622c10b9a0052f15ecbd1f751fa21b89c1b931cd89dff5c1d88360c",
+      "rootfs.cpio.gz": "d3c63eef31e740e7be3e255357a8f02f26469699f9ec7425080f1a4f2d1e2131",
+      "zynq-pluto-sdr.dtb": "1bd2357dbb7e871a13824dedb6761d74c871083dbfc97c9c36c22bda929dcea8",
+      "zynq-pluto-sdr-revb.dtb": "b1ab5370a427f642039ce2061ff38c341a6a78f9e8f0a8b7e59757b143ada640",
+      "zynq-pluto-sdr-revc.dtb": "45055fd15fc200881464a91fbcd8deb3d0756a4e368a8be27cf67d6e5c863646"
+    },
+    "sources": {
+      "firmware_base": "bc00edb8c340dd4f9b04361398cbd2c8edcc9cae",
+      "linux": "4683cd2e3556448295e03a216a3a7fc6e8bbc474",
+      "libiio": "47a75cbc5e7d24a063b8b54eb531fdba6602b85c",
+      "metadata": "3294365ff44da26b261be4a2ccb241b7896d23ad"
+    }
+  },
+  "native_test_suites": 12,
+  "python_tests": 162,
+  "captures": {
+    "baseline-2r2t": {
+      "firmware": "v0.49-plutoplus-spf-iq-direct-async-v4",
+      "scan_channels": [
+        "voltage0",
+        "voltage1",
+        "voltage2",
+        "voltage3"
+      ],
+      "restored": true,
+      "restored_gain": true,
+      "restored_queue": true,
+      "cells": [
+        {
+          "rate": 2500000,
+          "bandwidth": 2500000,
+          "outcome": "completed",
+          "errno": null,
+          "frames": 5,
+          "missing_samples": 0,
+          "allocated_kernel_buffers": 50
+        },
+        {
+          "rate": 5000000,
+          "bandwidth": 5000000,
+          "outcome": "completed",
+          "errno": null,
+          "frames": 5,
+          "missing_samples": 0,
+          "allocated_kernel_buffers": 50
+        }
+      ]
+    },
+    "baseline-1r1t-ad9361": {
+      "firmware": "v0.49-plutoplus-spf-iq-direct-async-v4",
+      "scan_channels": [
+        "voltage0",
+        "voltage1"
+      ],
+      "restored": true,
+      "restored_gain": true,
+      "restored_queue": true,
+      "cells": [
+        {
+          "rate": 2500000,
+          "bandwidth": 2500000,
+          "outcome": "error",
+          "errno": 95,
+          "frames": 0,
+          "missing_samples": 0,
+          "allocated_kernel_buffers": null
+        },
+        {
+          "rate": 5000000,
+          "bandwidth": 5000000,
+          "outcome": "error",
+          "errno": 95,
+          "frames": 0,
+          "missing_samples": 0,
+          "allocated_kernel_buffers": null
+        }
+      ]
+    },
+    "candidate-1r1t-low-lan": {
+      "firmware": "v0.49-plutoplus-spf-counter-rx-v1-rc1",
+      "scan_channels": [
+        "voltage0",
+        "voltage1"
+      ],
+      "restored": true,
+      "restored_gain": true,
+      "restored_queue": true,
+      "cells": [
+        {
+          "rate": 2500000,
+          "bandwidth": 2500000,
+          "outcome": "completed",
+          "errno": null,
+          "frames": 5,
+          "missing_samples": 0,
+          "allocated_kernel_buffers": 50
+        },
+        {
+          "rate": 5000000,
+          "bandwidth": 5000000,
+          "outcome": "completed",
+          "errno": null,
+          "frames": 5,
+          "missing_samples": 0,
+          "allocated_kernel_buffers": 50
+        }
+      ]
+    },
+    "candidate-1r1t-high": {
+      "firmware": "v0.49-plutoplus-spf-counter-rx-v1-rc1",
+      "scan_channels": [
+        "voltage0",
+        "voltage1"
+      ],
+      "restored": true,
+      "restored_gain": true,
+      "restored_queue": true,
+      "cells": [
+        {
+          "rate": 30000000,
+          "bandwidth": 30000000,
+          "outcome": "completed",
+          "errno": null,
+          "frames": 30,
+          "missing_samples": 0,
+          "allocated_kernel_buffers": 50
+        },
+        {
+          "rate": 60000000,
+          "bandwidth": 50000000,
+          "outcome": "completed",
+          "errno": null,
+          "frames": 30,
+          "missing_samples": 0,
+          "allocated_kernel_buffers": 50
+        }
+      ]
+    },
+    "candidate-1r1t-loss": {
+      "firmware": "v0.49-plutoplus-spf-counter-rx-v1-rc1",
+      "scan_channels": [
+        "voltage0",
+        "voltage1"
+      ],
+      "restored": true,
+      "restored_gain": true,
+      "restored_queue": true,
+      "cells": [
+        {
+          "rate": 60000000,
+          "bandwidth": 50000000,
+          "outcome": "completed",
+          "errno": null,
+          "frames": 100,
+          "missing_samples": 229000000,
+          "allocated_kernel_buffers": 50
+        }
+      ]
+    },
+    "paired-0-hold": {
+      "firmware": "v0.49-plutoplus-spf-counter-rx-v1-rc1",
+      "scan_channels": [
+        "voltage0",
+        "voltage1",
+        "voltage2",
+        "voltage3"
+      ],
+      "restored": true,
+      "restored_gain": true,
+      "restored_queue": true,
+      "cells": [
+        {
+          "rate": 5000000,
+          "bandwidth": 5000000,
+          "outcome": "completed",
+          "errno": null,
+          "frames": 5,
+          "missing_samples": 0,
+          "allocated_kernel_buffers": 0
+        }
+      ]
+    },
+    "paired-0-auto": {
+      "firmware": "v0.49-plutoplus-spf-counter-rx-v1-rc1",
+      "scan_channels": [
+        "voltage0",
+        "voltage1",
+        "voltage2",
+        "voltage3"
+      ],
+      "restored": true,
+      "restored_gain": true,
+      "restored_queue": true,
+      "cells": [
+        {
+          "rate": 5000000,
+          "bandwidth": 5000000,
+          "outcome": "completed",
+          "errno": null,
+          "frames": 5,
+          "missing_samples": 0,
+          "allocated_kernel_buffers": 0
+        }
+      ]
+    },
+    "paired-1-hold": {
+      "firmware": "v0.49-plutoplus-spf-counter-rx-v1-rc1",
+      "scan_channels": [
+        "voltage0",
+        "voltage1",
+        "voltage2",
+        "voltage3"
+      ],
+      "restored": true,
+      "restored_gain": true,
+      "restored_queue": true,
+      "cells": [
+        {
+          "rate": 5000000,
+          "bandwidth": 5000000,
+          "outcome": "completed",
+          "errno": null,
+          "frames": 5,
+          "missing_samples": 0,
+          "allocated_kernel_buffers": 0
+        }
+      ]
+    },
+    "paired-1-auto": {
+      "firmware": "v0.49-plutoplus-spf-counter-rx-v1-rc1",
+      "scan_channels": [
+        "voltage0",
+        "voltage1",
+        "voltage2",
+        "voltage3"
+      ],
+      "restored": true,
+      "restored_gain": true,
+      "restored_queue": true,
+      "cells": [
+        {
+          "rate": 5000000,
+          "bandwidth": 5000000,
+          "outcome": "completed",
+          "errno": null,
+          "frames": 5,
+          "missing_samples": 0,
+          "allocated_kernel_buffers": 0
+        }
+      ]
+    },
+    "paired-01-hold": {
+      "firmware": "v0.49-plutoplus-spf-counter-rx-v1-rc1",
+      "scan_channels": [
+        "voltage0",
+        "voltage1",
+        "voltage2",
+        "voltage3"
+      ],
+      "restored": true,
+      "restored_gain": true,
+      "restored_queue": true,
+      "cells": [
+        {
+          "rate": 5000000,
+          "bandwidth": 5000000,
+          "outcome": "completed",
+          "errno": null,
+          "frames": 5,
+          "missing_samples": 0,
+          "allocated_kernel_buffers": 0
+        }
+      ]
+    },
+    "paired-01-auto": {
+      "firmware": "v0.49-plutoplus-spf-counter-rx-v1-rc1",
+      "scan_channels": [
+        "voltage0",
+        "voltage1",
+        "voltage2",
+        "voltage3"
+      ],
+      "restored": true,
+      "restored_gain": true,
+      "restored_queue": true,
+      "cells": [
+        {
+          "rate": 5000000,
+          "bandwidth": 5000000,
+          "outcome": "completed",
+          "errno": null,
+          "frames": 5,
+          "missing_samples": 0,
+          "allocated_kernel_buffers": 0
+        }
+      ]
+    }
+  },
+  "lifecycle": {
+    "wrong_rate": 95,
+    "automatic_gain": 95,
+    "decimation_enabled": 95,
+    "paired_hold_on_1r1t": 95,
+    "rate_write": 16,
+    "lo_write": 16,
+    "bandwidth_write": 16,
+    "gain_mode_write": 16,
+    "gain_write": 16,
+    "timestamp_write": 16,
+    "second_counter_owner": 16,
+    "normal_close_restores_timestamp": true,
+    "iiod_death_releases_and_recaptures": true,
+    "timestamp_restored": true,
+    "settings_restored": true
+  },
+  "disconnect_and_timeout": {
+    "killed_client_releases_and_recaptures": true,
+    "forced_timeout": {
+      "type": "BrokenPipeError",
+      "errno": 32,
+      "owned_timestamp_control": 1000000
+    },
+    "timeout_releases_and_recaptures": true,
+    "settings_restored": true,
+    "timestamp_restored": true
+  },
+  "persistent_receipt": {
+    "receipt_id": "c746c0b3-3368-4ef4-8bb9-97d1363232a6",
+    "outcome": "success",
+    "phases": [
+      "preflight_revalidated",
+      "remote_preflight_attested",
+      "source_tx_quiesced",
+      "remote_tx_safe_read_only_attested",
+      "pluto_frm_staged",
+      "staged_hash_verified",
+      "updater_reported_done",
+      "mtd3_fit_verified",
+      "remote_stage_removed",
+      "reboot_dispatched",
+      "lan_iio_disappeared",
+      "lan_iio_reappeared",
+      "return_attested",
+      "tx_safe_attested",
+      "lan_ssh_host_key_rotated",
+      "remote_return_tx_safe_read_only_attested"
+    ],
+    "receipt_path": "/home/mouse9911/gits/plutosdr-fw-issue-97/evidence/flash-receipts/c746c0b3-3368-4ef4-8bb9-97d1363232a6.json",
+    "returned_serial": "1040007c4a94000211000b009186843ef2",
+    "returned_firmware": "v0.49-plutoplus-spf-counter-rx-v1-rc1",
+    "returned_phy": "ad9361",
+    "error": null,
+    "failure_phase": null,
+    "failure_classification": null,
+    "retryable": null,
+    "remediation": null
+  },
+  "persistent_return_attestation": {
+    "all_buffer_enable": "0,0",
+    "boot_id": "b3c3f28d-a6f2-42df-9160-ada06be6837d",
+    "dds_dt_state": "enabled",
+    "dds_present": "1",
+    "firmware": "v0.49-plutoplus-spf-counter-rx-v1-rc1",
+    "fit_sha256": "d1f5782d1a72c75383b6f8bfde340f144426723afe933cce6e7a20cad1f252b5",
+    "qspi_bytes": "31457280",
+    "qspi_sha256": "64f66df61ebaa297de6a422ba6237f34a7cfe5d30451f339877b2299f54f9815",
+    "root_marker_present": "0",
+    "rx_dma_dt_state": "enabled",
+    "serial": "1040007c4a94000211000b009186843ef2",
+    "tandem_dt_state": "enabled",
+    "tandem_present": "1",
+    "tx_buffer_enable": "0",
+    "tx_dds_raw": "0,0,0,0",
+    "tx_dds_scale": "0.000000,0.000000,0.000000,0.000000",
+    "tx_dma_dt_state": "enabled",
+    "tx_hardwaregain_db": "-80.000000",
+    "tx_lo_powerdown": "1",
+    "tx_scan_enable": "0,0"
+  },
+  "public_api_capture": {
+    "serial": "1040007c4a94000211000b009186843ef2",
+    "identity": {
+      "radio_id": "1040007c4a94000211000b009186843ef2",
+      "serial": "1040007c4a94000211000b009186843ef2",
+      "uri": "ip:192.168.1.18",
+      "transport": "iio_ip",
+      "model": "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)",
+      "firmware_version": "v0.49-plutoplus-spf-counter-rx-v1-rc1",
+      "usb_path": "/sys/bus/usb/devices/3-11"
+    },
+    "original": {
+      "center_frequency_hz": 2400000000.0,
+      "sample_rate_hz": 30720000.0,
+      "bandwidth_hz": 18000000.0,
+      "gain_mode": "slow_attack",
+      "gain_db": null,
+      "channels": [
+        0
+      ]
+    },
+    "cells": [
+      {
+        "rate": 5000000,
+        "source": {
+          "requested_rate_hz": 5000000,
+          "phy_rate_hz": 5000000,
+          "capture_rate_hz": 5000000,
+          "capture_rates_available_hz": [
+            5000000,
+            625000
+          ],
+          "fpga_decimation_factor": 1,
+          "fpga_decimation_bypass": true,
+          "adc_gp_control": 0
+        },
+        "frames": [
+          {
+            "first": 2559846870,
+            "end": 2560846870,
+            "missing": 0
+          },
+          {
+            "first": 2560846870,
+            "end": 2561846870,
+            "missing": 0
+          },
+          {
+            "first": 2561846870,
+            "end": 2562846870,
+            "missing": 0
+          },
+          {
+            "first": 2562846870,
+            "end": 2563846870,
+            "missing": 0
+          },
+          {
+            "first": 2563846870,
+            "end": 2564846870,
+            "missing": 0
+          },
+          {
+            "first": 2564846870,
+            "end": 2565846870,
+            "missing": 0
+          },
+          {
+            "first": 2565846870,
+            "end": 2566846870,
+            "missing": 0
+          },
+          {
+            "first": 2566846870,
+            "end": 2567846870,
+            "missing": 0
+          },
+          {
+            "first": 2567846870,
+            "end": 2568846870,
+            "missing": 0
+          },
+          {
+            "first": 2568846870,
+            "end": 2569846870,
+            "missing": 0
+          },
+          {
+            "first": 2569846870,
+            "end": 2570846870,
+            "missing": 0
+          },
+          {
+            "first": 2570846870,
+            "end": 2571846870,
+            "missing": 0
+          },
+          {
+            "first": 2571846870,
+            "end": 2572846870,
+            "missing": 0
+          },
+          {
+            "first": 2572846870,
+            "end": 2573846870,
+            "missing": 0
+          },
+          {
+            "first": 2573846870,
+            "end": 2574846870,
+            "missing": 0
+          },
+          {
+            "first": 2574846870,
+            "end": 2575846870,
+            "missing": 0
+          },
+          {
+            "first": 2575846870,
+            "end": 2576846870,
+            "missing": 0
+          },
+          {
+            "first": 2576846870,
+            "end": 2577846870,
+            "missing": 0
+          },
+          {
+            "first": 2577846870,
+            "end": 2578846870,
+            "missing": 0
+          },
+          {
+            "first": 2578846870,
+            "end": 2579846870,
+            "missing": 0
+          },
+          {
+            "first": 2579846870,
+            "end": 2580846870,
+            "missing": 0
+          },
+          {
+            "first": 2580846870,
+            "end": 2581846870,
+            "missing": 0
+          },
+          {
+            "first": 2581846870,
+            "end": 2582846870,
+            "missing": 0
+          },
+          {
+            "first": 2582846870,
+            "end": 2583846870,
+            "missing": 0
+          },
+          {
+            "first": 2583846870,
+            "end": 2584846870,
+            "missing": 0
+          },
+          {
+            "first": 2584846870,
+            "end": 2585846870,
+            "missing": 0
+          },
+          {
+            "first": 2585846870,
+            "end": 2586846870,
+            "missing": 0
+          },
+          {
+            "first": 2586846870,
+            "end": 2587846870,
+            "missing": 0
+          },
+          {
+            "first": 2587846870,
+            "end": 2588846870,
+            "missing": 0
+          },
+          {
+            "first": 2588846870,
+            "end": 2589846870,
+            "missing": 0
+          }
+        ],
+        "allocated_kernel_buffers": 50
+      },
+      {
+        "rate": 60000000,
+        "source": {
+          "requested_rate_hz": 60000000,
+          "phy_rate_hz": 60000000,
+          "capture_rate_hz": 60000000,
+          "capture_rates_available_hz": [
+            60000000,
+            7500000
+          ],
+          "fpga_decimation_factor": 1,
+          "fpga_decimation_bypass": true,
+          "adc_gp_control": 0
+        },
+        "frames": [
+          {
+            "first": 2650492018,
+            "end": 2651492018,
+            "missing": 0
+          },
+          {
+            "first": 2651492018,
+            "end": 2652492018,
+            "missing": 0
+          },
+          {
+            "first": 2652492018,
+            "end": 2653492018,
+            "missing": 0
+          },
+          {
+            "first": 2653492018,
+            "end": 2654492018,
+            "missing": 0
+          },
+          {
+            "first": 2654492018,
+            "end": 2655492018,
+            "missing": 0
+          },
+          {
+            "first": 2655492018,
+            "end": 2656492018,
+            "missing": 0
+          },
+          {
+            "first": 2656492018,
+            "end": 2657492018,
+            "missing": 0
+          },
+          {
+            "first": 2657492018,
+            "end": 2658492018,
+            "missing": 0
+          },
+          {
+            "first": 2658492018,
+            "end": 2659492018,
+            "missing": 0
+          },
+          {
+            "first": 2659492018,
+            "end": 2660492018,
+            "missing": 0
+          },
+          {
+            "first": 2660492018,
+            "end": 2661492018,
+            "missing": 0
+          },
+          {
+            "first": 2661492018,
+            "end": 2662492018,
+            "missing": 0
+          },
+          {
+            "first": 2662492018,
+            "end": 2663492018,
+            "missing": 0
+          },
+          {
+            "first": 2663492018,
+            "end": 2664492018,
+            "missing": 0
+          },
+          {
+            "first": 2664492018,
+            "end": 2665492018,
+            "missing": 0
+          },
+          {
+            "first": 2665492018,
+            "end": 2666492018,
+            "missing": 0
+          },
+          {
+            "first": 2666492018,
+            "end": 2667492018,
+            "missing": 0
+          },
+          {
+            "first": 2667492018,
+            "end": 2668492018,
+            "missing": 0
+          },
+          {
+            "first": 2668492018,
+            "end": 2669492018,
+            "missing": 0
+          },
+          {
+            "first": 2669492018,
+            "end": 2670492018,
+            "missing": 0
+          },
+          {
+            "first": 2670492018,
+            "end": 2671492018,
+            "missing": 0
+          },
+          {
+            "first": 2671492018,
+            "end": 2672492018,
+            "missing": 0
+          },
+          {
+            "first": 2672492018,
+            "end": 2673492018,
+            "missing": 0
+          },
+          {
+            "first": 2673492018,
+            "end": 2674492018,
+            "missing": 0
+          },
+          {
+            "first": 2674492018,
+            "end": 2675492018,
+            "missing": 0
+          },
+          {
+            "first": 2675492018,
+            "end": 2676492018,
+            "missing": 0
+          },
+          {
+            "first": 2676492018,
+            "end": 2677492018,
+            "missing": 0
+          },
+          {
+            "first": 2677492018,
+            "end": 2678492018,
+            "missing": 0
+          },
+          {
+            "first": 2678492018,
+            "end": 2679492018,
+            "missing": 0
+          },
+          {
+            "first": 2679492018,
+            "end": 2680492018,
+            "missing": 0
+          }
+        ],
+        "allocated_kernel_buffers": 50
+      }
+    ],
+    "restored": true,
+    "queue_restored": true
+  },
+  "final_state": {
+    "serial": "1040007c4a94000211000b009186843ef2",
+    "firmware": "v0.49-plutoplus-spf-counter-rx-v1-rc1",
+    "usb_path": "/sys/bus/usb/devices/3-11",
+    "attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.18's  \nb3c3f28d-a6f2-42df-9160-ada06be6837d\n5.15.0-counter-rx-v1\ndevice-fw v0.49-plutoplus-spf-counter-rx-v1-rc1\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot iq-direct-async-v4-source/buildroot-v1\nlinux 4683cd2e3556448295e03a216a3a7fc6e8bbc474\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 47a75cbc5e7d24a063b8b54eb531fdba6602b85c\nmode=1r1t\ncompatible=ad9361\nattr_name=compatible\nattr_val=ad9361\n0\n0\n"
+  },
+  "ppu_commit": "4e560749aac96b6c53a3fa69c9e4c3893babd306",
+  "limitations": [
+    "Finite 60 MS/s bursts and loss accounting; not sustained lossless 240 MB/s Ethernet.",
+    "No analog RF stimulus/quality qualification.",
+    "Vendor XPM simulation has startup/reset assertion warnings; functional scoreboard passes after startup.",
+    "Existing FunctionFS USB binding needs manual rebind after iiOD SIGKILL; LAN and counter lease recover automatically."
+  ]
+}

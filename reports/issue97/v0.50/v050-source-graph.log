@@ -1,0 +1,37 @@
+Source graph check: manifests/counter-rx-v1-source.yaml
+
+1. every pinned commit exactly matches its declared source ref
+  ok    buildroot fedd002ca16d == refs/tags/counter-rx-v1-source/buildroot-v2
+  ok    hdl 145bd47e55d5 == refs/tags/ddr-burst-v1-rc4-source/hdl-v1
+  ok    hdl-quantulum 364b3dc7e770 == refs/tags/ddr-burst-v1-rc5-source/hdl-quantulum-v1
+  ok    linux 4683cd2e3556 == refs/tags/counter-rx-v1-source/linux-v1
+  ok    u-boot-xlnx 1ff0468e9bea == refs/tags/gain-series-v4-rc2-source/u-boot-xlnx
+  ok    gadget 1bbe9f0ee4a7 == refs/tags/libiio-metadata-v6-rc4-source/gadget-v4
+  ok    ip-gadget b066059e5481 == refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
+  ok    metadata 3294365ff44d == refs/tags/iio-throughput-sampler-wake-v5-source/metadata-v1
+  ok    libiio-0.25 47a75cbc5e7d == refs/tags/counter-rx-v1-source/libiio-v1
+
+2. packed component identities exactly match their source-lock tags
+  ok    hdl packed identity ddr-burst-v1-rc4-source/hdl-v1
+  ok    buildroot packed identity counter-rx-v1-source/buildroot-v2
+  ok    linux packed identity counter-rx-v1-source/linux-v1
+  ok    u-boot-xlnx packed identity gain-series-v4-rc2-source/u-boot-xlnx
+
+3. the release tag labels the commit that actually built the release
+  warn  candidate source manifest has no release tag (expected before promotion)
+
+4. .gitmodules hygiene
+  ok    all submodule urls are absolute
+  ok    gitlink buildroot fedd002ca16d
+  ok    gitlink hdl 145bd47e55d5
+  ok    gitlink hdl-quantulum 364b3dc7e770
+  ok    gitlink linux 4683cd2e3556
+  ok    gitlink u-boot-xlnx 1ff0468e9bea
+  ok    Buildroot libiio recipe 47a75cbc5e7d
+  ok    Buildroot libiio archive hash a6676eee9318
+  ok    Buildroot metadata recipe 3294365ff44d
+
+5. no local source overrides
+  ok    no Buildroot local.mk override
+
+SOURCE GRAPH OK

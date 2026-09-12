@@ -100,6 +100,8 @@ def _host(tmp_path: pathlib.Path) -> dict:
 def _public_iio() -> dict:
     values = {
         "abi_version": 1,
+        "counter_metadata_topology_supported": 0,
+        "counter_metadata_version": 1,
         "fault_flags": 0,
         "features": 7,
         "fifo_depth": 256,

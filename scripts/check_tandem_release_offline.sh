@@ -37,6 +37,7 @@ run_oracles() {
         scripts/verify_release.sh
 
     "$PYTHON" -m pytest \
+        tests/test_counter_rx_release_route.py \
         tests/test_release_oracles.py \
         tests/test_firmware_release_tooling.py \
         tests/test_tandem_rc5_release_route.py \
@@ -127,7 +128,8 @@ run_source_graph() {
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/iq-direct-async-ring-v1-rc1-source.yaml
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/iq-direct-async-v2-source.yaml
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/iq-direct-async-v3-source.yaml
-    ./scripts/check_source_graph.sh manifests/iq-direct-async-v4-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/iq-direct-async-v4-source.yaml
+    ./scripts/check_source_graph.sh manifests/counter-rx-v1-source.yaml
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/iio-throughput-coverage-window-v6-rc1-source.yaml
     ./buildroot/board/pluto/test_iiod_supervisor.sh
     ./scripts/test_legal_info_network.sh

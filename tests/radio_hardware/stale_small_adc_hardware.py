@@ -44,8 +44,12 @@ RELEASE_CLAIM = (
 PHASE_STATUS = "blocked-missing-release-interface"
 MAXIMUM_SOURCE_BYTES = 2 * 1024 * 1024
 
+# Counter v1 adds two read-only discovery attributes. They expose neither
+# detector snapshots nor same-epoch tandem control, so this audit remains blocked.
 EXPECTED_IIO_ATTRIBUTES = (
     "abi_version",
+    "counter_metadata_topology_supported",
+    "counter_metadata_version",
     "fault_flags",
     "features",
     "fifo_depth",

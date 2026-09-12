@@ -1,0 +1,11 @@
+{
+  "killed_client_releases_and_recaptures": true,
+  "forced_timeout": {
+    "type": "BrokenPipeError",
+    "errno": 32,
+    "owned_timestamp_control": 1000000
+  },
+  "timeout_releases_and_recaptures": true,
+  "settings_restored": true,
+  "timestamp_restored": true
+}

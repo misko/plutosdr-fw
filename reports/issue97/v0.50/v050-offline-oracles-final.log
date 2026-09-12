@@ -1,0 +1,457 @@
+============================= test session starts ==============================
+platform linux -- Python 3.13.15, pytest-9.1.1, pluggy-1.6.0
+rootdir: /home/mouse9911/gits/plutosdr-fw-issue-97
+configfile: pytest.ini
+plugins: anyio-4.14.2, cov-7.1.0
+collected 1521 items / 5 deselected / 1516 selected
+
+tests/test_counter_rx_release_route.py .                                 [  0%]
+tests/test_release_oracles.py ..........................                 [  1%]
+tests/test_firmware_release_tooling.py ........................          [  3%]
+tests/test_tandem_rc5_release_route.py ...                               [  3%]
+tests/test_tandem_rc6_release_route.py ....                              [  3%]
+tests/test_tandem_rc7_release_route.py .......                           [  4%]
+tests/test_tandem_rc8_release_route.py ....                              [  4%]
+tests/test_tandem_rc9_release_route.py .......                           [  5%]
+tests/test_tandem_rc10_release_route.py .......                          [  5%]
+tests/test_tandem_rc11_release_route.py ........                         [  6%]
+tests/test_tandem_rc12_release_route.py ........                         [  6%]
+tests/test_tandem_rc13_release_route.py .......                          [  6%]
+tests/test_tandem_rc14_release_route.py .......                          [  7%]
+tests/test_tandem_rc15_release_route.py ......                           [  7%]
+tests/test_tandem_rc16_release_route.py ......                           [  8%]
+tests/test_tandem_rc17_release_route.py ......                           [  8%]
+tests/test_tandem_rc18_release_route.py ......                           [  9%]
+tests/test_tandem_rc19_release_route.py ......                           [  9%]
+tests/test_tandem_rc20_release_route.py ......                           [  9%]
+tests/test_tandem_rc21_release_route.py ......                           [ 10%]
+tests/test_tandem_rc22_release_route.py .......                          [ 10%]
+tests/test_tandem_rc23_release_route.py .......                          [ 11%]
+tests/test_tandem_rc24_release_route.py .......                          [ 11%]
+tests/test_tandem_rc25_release_route.py .......                          [ 12%]
+tests/test_tandem_rc26_release_route.py .......                          [ 12%]
+tests/test_tandem_rc27_release_route.py .......                          [ 12%]
+tests/test_tandem_rc28_release_route.py ......                           [ 13%]
+tests/test_tandem_rc29_release_route.py ......                           [ 13%]
+tests/test_tandem_rc30_release_route.py ......                           [ 14%]
+tests/test_tandem_rc31_release_route.py ......                           [ 14%]
+tests/test_tandem_rc32_release_route.py ......                           [ 14%]
+tests/test_tandem_release_device_plan.py .....                           [ 15%]
+tests/test_tandem_release_evidence.py .................................. [ 17%]
+.......................................................................  [ 22%]
+tests/test_tandem_agc_ooc_validator.py ................................. [ 24%]
+........................................................................ [ 29%]
+...............                                                          [ 30%]
+tests/test_validate_integrated_release.py .............................. [ 32%]
+                                                                         [ 32%]
+tests/radio_hardware/test_candidate_binding_oracles.py ................. [ 33%]
+............................................                             [ 36%]
+tests/radio_hardware/test_modulated_hardware_oracles.py ................ [ 37%]
+...........................                                              [ 38%]
+tests/radio_hardware/test_modulated_quality_oracles.py ................. [ 40%]
+.........                                                                [ 40%]
+tests/radio_hardware/test_muted_metadata_batch_lifecycle_oracles.py .... [ 40%]
+........................................................................ [ 45%]
+........................................................................ [ 50%]
+........................................................................ [ 55%]
+.................................                                        [ 57%]
+tests/radio_hardware/test_oracles.py ..........................          [ 59%]
+tests/radio_hardware/test_pluto_plus_candidate_oracles.py .............. [ 60%]
+....                                                                     [ 60%]
+tests/radio_hardware/test_release_campaign_oracles.py .................. [ 61%]
+......                                                                   [ 61%]
+tests/radio_hardware/test_release_cli_oracles.py ....................... [ 63%]
+..................................................                       [ 66%]
+tests/radio_hardware/test_stale_small_adc_hardware_oracles.py .......... [ 67%]
+....................................................                     [ 70%]
+tests/radio_hardware/test_tandem_followup_oracles.py ................... [ 72%]
+.......................................                                  [ 74%]
+tests/radio_hardware/test_tandem_hardening_oracles.py ............       [ 75%]
+tests/radio_hardware/test_tandem_matrix_oracles.py ..................... [ 76%]
+.....                                                                    [ 77%]
+tests/radio_hardware/test_tandem_measurement_boundary_oracles.py ....... [ 77%]
+....                                                                     [ 77%]
+tests/radio_hardware/test_tandem_metadata_oracles.py ................... [ 79%]
+.....                                                                    [ 79%]
+tests/radio_hardware/test_tandem_priming_oracles.py ...                  [ 79%]
+tests/radio_hardware/test_tandem_quality_oracles.py ...........          [ 80%]
+tests/radio_hardware/test_tandem_ram_deploy_oracles.py ................. [ 81%]
+................................................................         [ 85%]
+tests/radio_hardware/test_transient_hardware_oracles.py ................ [ 86%]
+...........................................................              [ 90%]
+tests/radio_hardware/test_transient_quality_oracles.py ................. [ 91%]
+......                                                                   [ 92%]
+tests/radio_hardware/test_transient_transport_dual_target_validator_oracles.py . [ 92%]
+........                                                                 [ 92%]
+tests/radio_hardware/test_transient_transport_probe_oracles.py ......... [ 93%]
+........................................................................ [ 98%]
+.............................                                            [100%]
+
+================ 1516 passed, 5 deselected in 207.77s (0:03:27) ================
+--- tb_tandem_cdc  ---
+== tb_tandem_cdc ==
+  ok  reset asserts with the destination clock STOPPED
+  ok  reset stays asserted until the destination clock actually runs
+  ok  still asserted one edge after a late clock start
+  ok  deasserts synchronously after two edges
+  ok  re-asserts asynchronously with the clock stopped
+MARK reset-bridge done @252000
+  ok  every multi-bit payload crossed exactly once
+  ok  no payload was torn or reordered crossing domains
+MARK bus done @9829000
+  ok  every FIFO entry crossed exactly once, none lost
+  ok  FIFO preserved exact order across the domains
+  ok  no spurious overflow while the reader kept up
+MARK fifo-rw done @35321000
+  ok  the FIFO reports full when the reader stops
+  ok  overflow is counted, never silent
+---- scenario failures : 0 ----
+PASS: tb_tandem_cdc
+/home/mouse9911/gits/plutosdr-fw-issue-97/hdl-tandem/tb_tandem_cdc.v:195: $finish called at 43515000 (1ps)
+--- tb_ad9361_model  ---
+== tb_ad9361_model ==
+  ok  unarmed pulse does not move the index
+  ok  armed legal pulse moves RX1 by inc_step=1
+  ok  RX1 pulse leaves RX2 alone
+  ok  inc_step=2 moves two indices
+  ok  1-ClkRF pulse is REJECTED (UG-570 2-cycle rule)
+  ok  short pulse is counted as rejected
+  ok  2-ClkRF pulse is accepted (boundary)
+  ok  pulse after a <2-cycle low is rejected
+  ok  edges IGNORED when ENSM is not RX-active
+  ok  ignored edges are counted
+  ok  edges honoured again once RX-active
+  ok  CTRL_IN2 raises RX2
+  ok  CTRL_IN2 leaves RX1 alone
+  ok  CTRL_IN3 lowers RX2
+  ok  RX1 clamps at 0 and does not wrap
+  ok  RX1 clamps at idx_max
+  ok  drop_next_pulse swallows exactly one command
+  ok  the following pulse is honoured
+  ok  large LMT asserts on overload
+  ok  large LMT LATCHES high after the cause is gone
+  ok  a gain change clears the latched overload
+  ok  overload re-asserts with signal present
+  ok  detectors are blanked immediately after a step
+  ok  low power asserts when the signal is weak
+  ok  low power asserts on CH2 too
+  ok  low power does NOT update faster than a period
+  ok  low power clears after a full period
+== tb_ad9361_model: 0 error(s) ==
+PASS: ad9361_gain_model self-test
+/home/mouse9911/gits/plutosdr-fw-issue-97/hdl-tandem/tb_ad9361_model.v:217: $finish called at 8875000 (1ps)
+--- tb_tandem_agc  ---
+== tb_tandem_agc (CLKRF_DIV=1) ==
+  ok  reset state is LEGACY
+  ok  PS owns the pins at reset
+  ok  pins are tri-stated at reset
+  ok  legacy value passes through
+  ok  legacy tri-state passes through
+  ok  mode 1 reaches OWNED_IDLE (tandem-hold)
+  ok  FPGA owns the pins
+  ok  FPGA drives the pins
+  ok  outputs held low in tandem-hold
+  ok  requested epoch accepted on arming
+  ok  no transitions occur in tandem-hold
+  ok  mode 2 reaches ACTIVE (tandem-auto)
+  ok  one-channel overload forces a tandem decrease
+  ok  BOTH channels moved together (tandem invariant)
+  ok  the common index went down
+  ok  one low-power channel does NOT raise gain
+  ok  the starvation case is counted, not silent
+  ok  both channels low-power raises gain after dwell
+  ok  channels still equal after increases
+  ok  one-low-power plus peer-small detector state is explicit
+  ok  one-low-power plus peer-small remains HOLD
+  ok  one-channel evidence cannot accumulate clear dwell
+  ok  one receiver can hold the small-ADC latch without a gain edge
+  ok  first two conflict ticks cannot act before dwell three
+  ok  third conflict tick matures but does not skip handoff
+  ok  stale small-ADC recovery event carries SMALL_ADC_INHIBIT reason
+  ok  stale small-ADC recovery first moves gain in the safe direction
+  ok  stale small-ADC event records one paired index down
+  ok  stale small-ADC gets one conservative clear edge
+  ok  reason-2 request becomes one physical paired decrement
+  ok  all dwell evidence stays zero through clear pulse and guard
+  ok  first post-clear transition is an ordinary low-power increase
+  ok  post-clear event records the paired pre-clear endpoint
+  ok  clean both-low dwell recovers after the clear edge
+  ok  physical gain pair returns to its pre-clear endpoint
+  ok  stale-latch recovery preserves paired receiver gain
+  ok  low-power deassertion alone cannot re-arm a consumed clear
+  ok  ordinary large decrease starts re-arm proof
+  ok  strong re-arm proof cannot accrue through pulse and guard
+  ok  eligible neither-low evidence begins the re-arm dwell
+  ok  HOLD resets partial re-arm dwell without restoring availability
+  ok  one low-power bit resets re-arm proof
+  ok  later large decrease restarts re-arm proof at zero
+  ok  re-arm dwell stays zero while the second edge is guarded
+  ok  first two strong ticks cannot re-arm before dwell three
+  ok  third strong tick matures re-arm without skipping handoff
+  ok  fresh neither-low dwell re-arms after the ordinary decrease
+  ok  re-armed episode produces a bounded clear request
+  ok  a new contradiction episode gets exactly one clear edge
+  ok  HOLD waits for a queued small-latch clear pulse
+  ok  small-latch clear pulse finishes within the bounded handoff
+  ok  HOLD follows only after the small-latch clear pulse completes
+  ok  new ownership resets clear token and proof counters
+  ok  RX1 == RX2 across six independent gain cycles
+  ok  clamped-at-limit is reported while overload persists
+  ok  the index never goes below the clamp
+  ok  events were captured
+  ok  every drained event carries paired post-change indices
+  ok  the FIFO drained
+  ok  disable returns to LEGACY
+  ok  ownership returned to the PS
+  ok  pins tri-stated again
+  ok  the retired epoch is tombstoned
+  ok  re-arming takes the requested new epoch
+  ok  arming without a ready consumer raises a fault
+  ok  the part ignores edges while the ENSM is not RX-active
+  ok  reset from ACTIVE lands in LEGACY
+  ok  reset restores tri-state to the legacy path
+  ok  reset returns ownership to the PS
+  ok  configured width below 4 is clamped to 4
+  ok  no pulse is rejected as too short at any supported ratio
+  ok  transitions still occur with the clamped width
+  ok  high-PAPR conflict first emits the conservative clear edge
+  ok  zero configured dwell still requires one fresh conflict tick
+  ok  pulse, blanking, and cooldown cannot pre-credit either dwell
+  ok  LP dropout leaves only the debounced small-ADC latches
+  ok  low-power dropout without a large decrease cannot re-arm clear
+  ok  persistent conflict raises sticky illegal fault
+  ok  persistent conflict cannot ratchet below one clear step
+  ok  persistent conflict accepts exactly one physical paired pulse
+  ok  non-minimum persistent conflict does not claim a clamp
+  ok  persistent fault reaches pulse-quiet owned FAULTED state
+  ok  persistent-conflict fault remains sticky after evidence clears
+  ok  minimum-index conflict raises only sticky illegal fault
+  ok  minimum-index conflict emits no pulse and cannot underflow
+  ok  minimum-index conflict leaves the physical gain pair unchanged
+  ok  minimum-index conflict increments the clamp diagnostic once
+  ok  minimum conflict reaches pulse-quiet owned FAULTED state
+  ok  large overload outranks contradictory low-power evidence
+  ok  large-overload priority still produces a decrease
+  ok  normal-to-conflict starts a fresh tagged dwell at one
+  ok  normal credit cannot satisfy the second conflict tick
+  ok  normal credit cannot satisfy the full conflict dwell
+  ok  fresh conflict dwell alone authorizes the conservative edge
+  ok  conflict-to-normal between ticks seeds no increase credit
+  ok  first fresh normal tick cannot reuse conflict credit
+  ok  second fresh normal tick cannot reuse conflict credit
+  ok  third fresh normal tick matures without an early increase
+  ok  only a full fresh normal dwell authorizes the increase
+  ok  conflict-to-rearm starts a fresh tagged dwell at one
+  ok  conflict credit cannot satisfy the second re-arm tick
+  ok  conflict credit cannot mature re-arm early
+  ok  re-arm completes only after its own full fresh dwell
+  ok  rearm-to-conflict starts a fresh tagged dwell at one
+  ok  re-arm credit cannot satisfy the second conflict tick
+  ok  re-arm credit cannot mature the conflict early
+  ok  consumed conflict faults only after its own full fresh dwell
+---- assertion failures: 0 ----
+---- scenario failures : 0 ----
+PASS: tb_tandem_agc CLKRF_DIV=1
+/home/mouse9911/gits/plutosdr-fw-issue-97/hdl-tandem/tb_tandem_agc.v:958: $finish called at 56865000 (1ps)
+--- tb_tandem_agc -Ptb_tandem_agc.CLKRF_DIV=2 ---
+== tb_tandem_agc (CLKRF_DIV=2) ==
+  ok  reset state is LEGACY
+  ok  PS owns the pins at reset
+  ok  pins are tri-stated at reset
+  ok  legacy value passes through
+  ok  legacy tri-state passes through
+  ok  mode 1 reaches OWNED_IDLE (tandem-hold)
+  ok  FPGA owns the pins
+  ok  FPGA drives the pins
+  ok  outputs held low in tandem-hold
+  ok  requested epoch accepted on arming
+  ok  no transitions occur in tandem-hold
+  ok  mode 2 reaches ACTIVE (tandem-auto)
+  ok  one-channel overload forces a tandem decrease
+  ok  BOTH channels moved together (tandem invariant)
+  ok  the common index went down
+  ok  one low-power channel does NOT raise gain
+  ok  the starvation case is counted, not silent
+  ok  both channels low-power raises gain after dwell
+  ok  channels still equal after increases
+  ok  one-low-power plus peer-small detector state is explicit
+  ok  one-low-power plus peer-small remains HOLD
+  ok  one-channel evidence cannot accumulate clear dwell
+  ok  one receiver can hold the small-ADC latch without a gain edge
+  ok  first two conflict ticks cannot act before dwell three
+  ok  third conflict tick matures but does not skip handoff
+  ok  stale small-ADC recovery event carries SMALL_ADC_INHIBIT reason
+  ok  stale small-ADC recovery first moves gain in the safe direction
+  ok  stale small-ADC event records one paired index down
+  ok  stale small-ADC gets one conservative clear edge
+  ok  reason-2 request becomes one physical paired decrement
+  ok  all dwell evidence stays zero through clear pulse and guard
+  ok  first post-clear transition is an ordinary low-power increase
+  ok  post-clear event records the paired pre-clear endpoint
+  ok  clean both-low dwell recovers after the clear edge
+  ok  physical gain pair returns to its pre-clear endpoint
+  ok  stale-latch recovery preserves paired receiver gain
+  ok  low-power deassertion alone cannot re-arm a consumed clear
+  ok  ordinary large decrease starts re-arm proof
+  ok  strong re-arm proof cannot accrue through pulse and guard
+  ok  eligible neither-low evidence begins the re-arm dwell
+  ok  HOLD resets partial re-arm dwell without restoring availability
+  ok  one low-power bit resets re-arm proof
+  ok  later large decrease restarts re-arm proof at zero
+  ok  re-arm dwell stays zero while the second edge is guarded
+  ok  first two strong ticks cannot re-arm before dwell three
+  ok  third strong tick matures re-arm without skipping handoff
+  ok  fresh neither-low dwell re-arms after the ordinary decrease
+  ok  re-armed episode produces a bounded clear request
+  ok  a new contradiction episode gets exactly one clear edge
+  ok  HOLD waits for a queued small-latch clear pulse
+  ok  small-latch clear pulse finishes within the bounded handoff
+  ok  HOLD follows only after the small-latch clear pulse completes
+  ok  new ownership resets clear token and proof counters
+  ok  RX1 == RX2 across six independent gain cycles
+  ok  clamped-at-limit is reported while overload persists
+  ok  the index never goes below the clamp
+  ok  events were captured
+  ok  every drained event carries paired post-change indices
+  ok  the FIFO drained
+  ok  disable returns to LEGACY
+  ok  ownership returned to the PS
+  ok  pins tri-stated again
+  ok  the retired epoch is tombstoned
+  ok  re-arming takes the requested new epoch
+  ok  arming without a ready consumer raises a fault
+  ok  the part ignores edges while the ENSM is not RX-active
+  ok  reset from ACTIVE lands in LEGACY
+  ok  reset restores tri-state to the legacy path
+  ok  reset returns ownership to the PS
+  ok  configured width below 4 is clamped to 4
+  ok  no pulse is rejected as too short at any supported ratio
+  ok  transitions still occur with the clamped width
+  ok  high-PAPR conflict first emits the conservative clear edge
+  ok  zero configured dwell still requires one fresh conflict tick
+  ok  pulse, blanking, and cooldown cannot pre-credit either dwell
+  ok  LP dropout leaves only the debounced small-ADC latches
+  ok  low-power dropout without a large decrease cannot re-arm clear
+  ok  persistent conflict raises sticky illegal fault
+  ok  persistent conflict cannot ratchet below one clear step
+  ok  persistent conflict accepts exactly one physical paired pulse
+  ok  non-minimum persistent conflict does not claim a clamp
+  ok  persistent fault reaches pulse-quiet owned FAULTED state
+  ok  persistent-conflict fault remains sticky after evidence clears
+  ok  minimum-index conflict raises only sticky illegal fault
+  ok  minimum-index conflict emits no pulse and cannot underflow
+  ok  minimum-index conflict leaves the physical gain pair unchanged
+  ok  minimum-index conflict increments the clamp diagnostic once
+  ok  minimum conflict reaches pulse-quiet owned FAULTED state
+  ok  large overload outranks contradictory low-power evidence
+  ok  large-overload priority still produces a decrease
+  ok  normal-to-conflict starts a fresh tagged dwell at one
+  ok  normal credit cannot satisfy the second conflict tick
+  ok  normal credit cannot satisfy the full conflict dwell
+  ok  fresh conflict dwell alone authorizes the conservative edge
+  ok  conflict-to-normal between ticks seeds no increase credit
+  ok  first fresh normal tick cannot reuse conflict credit
+  ok  second fresh normal tick cannot reuse conflict credit
+  ok  third fresh normal tick matures without an early increase
+  ok  only a full fresh normal dwell authorizes the increase
+  ok  conflict-to-rearm starts a fresh tagged dwell at one
+  ok  conflict credit cannot satisfy the second re-arm tick
+  ok  conflict credit cannot mature re-arm early
+  ok  re-arm completes only after its own full fresh dwell
+  ok  rearm-to-conflict starts a fresh tagged dwell at one
+  ok  re-arm credit cannot satisfy the second conflict tick
+  ok  re-arm credit cannot mature the conflict early
+  ok  consumed conflict faults only after its own full fresh dwell
+---- assertion failures: 0 ----
+---- scenario failures : 0 ----
+PASS: tb_tandem_agc CLKRF_DIV=2
+/home/mouse9911/gits/plutosdr-fw-issue-97/hdl-tandem/tb_tandem_agc.v:958: $finish called at 57265000 (1ps)
+--- tb_tandem_agc_stress  ---
+== tb_tandem_agc_stress ==
+  ok  400 randomised detector rounds raise no assertion
+  ok  channels remain equal after randomised traffic
+  ok  chattering inputs raise no assertion
+  ok  dwell and cooldown bound the transition rate under chatter
+  ok  a long idle interval produces no transitions
+  ok  reset from every lifecycle state lands in safe LEGACY/high-Z
+  ok  disable at ten different pulse phases always lands clean
+  ok  no assertion fires across the disable sweep
+  ok  FIFO overflow is counted
+  ok  FIFO overflow sets a sticky fault
+  ok  the FIFO is full at its configured depth
+  ok  fault_clear clears the sticky fault
+  ok  the event sequence wraps rather than sticking
+  ok  sequence rollover raises no assertion
+  ok  64-bit counter rollover raises no assertion
+  ok  power-measurement tick period equals cfg_pwr_period exactly
+  ok  cooldown decisions obey exact (cooldown+1)*power-period spacing
+  ok  zero cooldown keeps the expected and physical indices equal
+  ok  zero cooldown accepts exactly one transition per physical pulse
+  ok  HOLD remains ACTIVE while a queued pulse starts
+  ok  HOLD becomes visible only after the queued pulse completes
+  ok  withdrawing AUTO cannot accept a final unrequested pulse
+  ok  withdrawn AUTO reaches quiescent HOLD
+  ok  an agreeing quiescent readback does not fault
+  ok  two disagreeing quiescent readbacks raise the sync fault
+  ok  the sync fault takes the controller out of ACTIVE
+---- assertion failures: 0 ----
+---- scenario failures : 0 ----
+PASS: tb_tandem_agc_stress
+/home/mouse9911/gits/plutosdr-fw-issue-97/hdl-tandem/tb_tandem_agc_stress.v:407: $finish called at 138895000 (1ps)
+--- tb_tandem_agc_axi  ---
+== tb_tandem_agc_axi (dual clock, 100 MHz / 61.44 MHz) ==
+  ok  TAG2 identity matches the kernel ABI
+  ok  FPGA ABI version is one
+  ok  capabilities report FIFO depth
+  ok  public state is IDLE after reset
+  ok  index window default is the full range (D-7 optional)
+  ok  AW-before-W write completes
+  ok  AW-before-W data and address remain paired
+  ok  W-before-AW write completes
+  ok  W-before-AW data and address remain paired
+  ok  back-to-back configuration writes survive CDC busy
+  ok  power-measurement time stops without a valid output sample
+  ok  pulse configuration reads back
+  ok  threshold provenance reads back
+  ok  HOLD reaches public ARMED_HOLD state
+  ok  kernel epoch reads back exactly
+  ok  AUTO reaches public ARMED_AUTO state
+  ok  transition count crossed back non-zero
+  ok  event level shows captured records
+  ok  reading event word three pops exactly one entry
+  ok  event carries paired gain indices
+  ok  event sequence and flags are populated
+  ok  the 64-bit sample counter crossed intact
+  ok  RX1 == RX2 with processor and receive clocks async
+  ok  teardown first reaches ARMED_HOLD
+  ok  HOLD retains ownership and actively drives every CTRL_IN low
+  ok  every quiescent release pop converges by exactly one entry
+  ok  bounded release retirement proves FIFO empty
+  ok  normal release retires queued AUTO events
+  ok  release retirement preserves transition diagnostics
+  ok  release retirement preserves overflow diagnostics
+  ok  release retirement preserves fault diagnostics
+  ok  release retirement preserves the final tandem gain endpoint
+  ok  release returns to public IDLE
+  ok  pins tri-stated back to the legacy path
+  ok  normal release leaves no inaccessible FIFO records
+  ok  undrained event FIFO raises the sticky overflow fault
+  ok  FIFO overflow enters public FAULTED state
+  ok  public FAULTED is reached only after the active pulse completes
+  ok  AUTO suppression retains pulse-quiescent FAULTED diagnostics
+  ok  every quiescent release pop converges by exactly one entry
+  ok  bounded release retirement proves FIFO empty
+  ok  faulted release retires a full asynchronous FIFO within depth
+  ok  full-depth retirement preserves transition diagnostics
+  ok  full-depth retirement preserves nonzero overflow diagnostics
+  ok  full-depth retirement preserves the sticky FIFO fault
+  ok  faulted release preserves the final tandem gain endpoint
+  ok  level-held AXI clear reaches the receive-domain fault
+  ok  level-held AXI clear resets the event FIFO
+  ok  fault recovery returns to public IDLE
+---- scenario failures : 0 ----
+PASS: tb_tandem_agc_axi
+/home/mouse9911/gits/plutosdr-fw-issue-97/hdl-tandem/tb_tandem_agc_axi.v:359: $finish called at 598625000 (1ps)
+
+ALL TANDEM AGC TESTS PASSED
+PASS: tandem release offline checks (oracles)

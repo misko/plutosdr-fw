@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "receipt_id": "d68aad555bdc449ca10658a16ace0324",
+  "outcome": "success",
+  "phases": [
+    "preflight_revalidated",
+    "dfu_util_ready",
+    "ram_transition_dispatch_attempted",
+    "ram_transition_dispatched",
+    "exact_path_entered_dfu",
+    "volatile_dfu_downloaded",
+    "dfu_detach_dispatched",
+    "exact_path_returned_runtime",
+    "return_attested",
+    "tx_safe_attested"
+  ],
+  "receipt_path": "/home/mouse9911/gits/plutosdr-fw-issue-97/evidence/v050-harness/evidence/ram-receipts/d68aad555bdc449ca10658a16ace0324.json",
+  "returned_serial": "1040007c4a94000211000b009186843ef2",
+  "returned_firmware": "v0.50-plutoplus-spf-counter-rx-v1",
+  "returned_phy": "ad9361",
+  "error": null,
+  "retryable": false,
+  "remediation": "RAM-only image is active. Power cycle to return to the unchanged QSPI image; persistent promotion requires a separate qualified flash plan.",
+  "source_receipt_id": null
+}

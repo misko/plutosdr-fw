@@ -1,0 +1,362 @@
+{
+  "serial": "1040007c4a94000211000b009186843ef2",
+  "identity": {
+    "radio_id": "1040007c4a94000211000b009186843ef2",
+    "serial": "1040007c4a94000211000b009186843ef2",
+    "uri": "ip:192.168.1.18",
+    "transport": "iio_ip",
+    "model": "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)",
+    "firmware_version": "v0.50-plutoplus-spf-counter-rx-v1",
+    "usb_path": "/sys/bus/usb/devices/3-11"
+  },
+  "original": {
+    "center_frequency_hz": 2400000000.0,
+    "sample_rate_hz": 30720000.0,
+    "bandwidth_hz": 18000000.0,
+    "gain_mode": "slow_attack",
+    "gain_db": null,
+    "channels": [
+      0
+    ]
+  },
+  "cells": [
+    {
+      "rate": 5000000,
+      "source": {
+        "requested_rate_hz": 5000000,
+        "phy_rate_hz": 5000000,
+        "capture_rate_hz": 5000000,
+        "capture_rates_available_hz": [
+          5000000,
+          625000
+        ],
+        "fpga_decimation_factor": 1,
+        "fpga_decimation_bypass": true,
+        "adc_gp_control": 0
+      },
+      "frames": [
+        {
+          "first": 8586126484,
+          "end": 8587126484,
+          "missing": 0
+        },
+        {
+          "first": 8587126484,
+          "end": 8588126484,
+          "missing": 0
+        },
+        {
+          "first": 8588126484,
+          "end": 8589126484,
+          "missing": 0
+        },
+        {
+          "first": 8589126484,
+          "end": 8590126484,
+          "missing": 0
+        },
+        {
+          "first": 8590126484,
+          "end": 8591126484,
+          "missing": 0
+        },
+        {
+          "first": 8591126484,
+          "end": 8592126484,
+          "missing": 0
+        },
+        {
+          "first": 8592126484,
+          "end": 8593126484,
+          "missing": 0
+        },
+        {
+          "first": 8593126484,
+          "end": 8594126484,
+          "missing": 0
+        },
+        {
+          "first": 8594126484,
+          "end": 8595126484,
+          "missing": 0
+        },
+        {
+          "first": 8595126484,
+          "end": 8596126484,
+          "missing": 0
+        },
+        {
+          "first": 8596126484,
+          "end": 8597126484,
+          "missing": 0
+        },
+        {
+          "first": 8597126484,
+          "end": 8598126484,
+          "missing": 0
+        },
+        {
+          "first": 8598126484,
+          "end": 8599126484,
+          "missing": 0
+        },
+        {
+          "first": 8599126484,
+          "end": 8600126484,
+          "missing": 0
+        },
+        {
+          "first": 8600126484,
+          "end": 8601126484,
+          "missing": 0
+        },
+        {
+          "first": 8601126484,
+          "end": 8602126484,
+          "missing": 0
+        },
+        {
+          "first": 8602126484,
+          "end": 8603126484,
+          "missing": 0
+        },
+        {
+          "first": 8603126484,
+          "end": 8604126484,
+          "missing": 0
+        },
+        {
+          "first": 8604126484,
+          "end": 8605126484,
+          "missing": 0
+        },
+        {
+          "first": 8605126484,
+          "end": 8606126484,
+          "missing": 0
+        },
+        {
+          "first": 8606126484,
+          "end": 8607126484,
+          "missing": 0
+        },
+        {
+          "first": 8607126484,
+          "end": 8608126484,
+          "missing": 0
+        },
+        {
+          "first": 8608126484,
+          "end": 8609126484,
+          "missing": 0
+        },
+        {
+          "first": 8609126484,
+          "end": 8610126484,
+          "missing": 0
+        },
+        {
+          "first": 8610126484,
+          "end": 8611126484,
+          "missing": 0
+        },
+        {
+          "first": 8611126484,
+          "end": 8612126484,
+          "missing": 0
+        },
+        {
+          "first": 8612126484,
+          "end": 8613126484,
+          "missing": 0
+        },
+        {
+          "first": 8613126484,
+          "end": 8614126484,
+          "missing": 0
+        },
+        {
+          "first": 8614126484,
+          "end": 8615126484,
+          "missing": 0
+        },
+        {
+          "first": 8615126484,
+          "end": 8616126484,
+          "missing": 0
+        }
+      ],
+      "allocated_kernel_buffers": 50
+    },
+    {
+      "rate": 60000000,
+      "source": {
+        "requested_rate_hz": 60000000,
+        "phy_rate_hz": 60000000,
+        "capture_rate_hz": 60000000,
+        "capture_rates_available_hz": [
+          60000000,
+          7500000
+        ],
+        "fpga_decimation_factor": 1,
+        "fpga_decimation_bypass": true,
+        "adc_gp_control": 0
+      },
+      "frames": [
+        {
+          "first": 8674714886,
+          "end": 8675714886,
+          "missing": 0
+        },
+        {
+          "first": 8675714886,
+          "end": 8676714886,
+          "missing": 0
+        },
+        {
+          "first": 8676714886,
+          "end": 8677714886,
+          "missing": 0
+        },
+        {
+          "first": 8677714886,
+          "end": 8678714886,
+          "missing": 0
+        },
+        {
+          "first": 8678714886,
+          "end": 8679714886,
+          "missing": 0
+        },
+        {
+          "first": 8679714886,
+          "end": 8680714886,
+          "missing": 0
+        },
+        {
+          "first": 8680714886,
+          "end": 8681714886,
+          "missing": 0
+        },
+        {
+          "first": 8681714886,
+          "end": 8682714886,
+          "missing": 0
+        },
+        {
+          "first": 8682714886,
+          "end": 8683714886,
+          "missing": 0
+        },
+        {
+          "first": 8683714886,
+          "end": 8684714886,
+          "missing": 0
+        },
+        {
+          "first": 8684714886,
+          "end": 8685714886,
+          "missing": 0
+        },
+        {
+          "first": 8685714886,
+          "end": 8686714886,
+          "missing": 0
+        },
+        {
+          "first": 8686714886,
+          "end": 8687714886,
+          "missing": 0
+        },
+        {
+          "first": 8687714886,
+          "end": 8688714886,
+          "missing": 0
+        },
+        {
+          "first": 8688714886,
+          "end": 8689714886,
+          "missing": 0
+        },
+        {
+          "first": 8689714886,
+          "end": 8690714886,
+          "missing": 0
+        },
+        {
+          "first": 8690714886,
+          "end": 8691714886,
+          "missing": 0
+        },
+        {
+          "first": 8691714886,
+          "end": 8692714886,
+          "missing": 0
+        },
+        {
+          "first": 8692714886,
+          "end": 8693714886,
+          "missing": 0
+        },
+        {
+          "first": 8693714886,
+          "end": 8694714886,
+          "missing": 0
+        },
+        {
+          "first": 8694714886,
+          "end": 8695714886,
+          "missing": 0
+        },
+        {
+          "first": 8695714886,
+          "end": 8696714886,
+          "missing": 0
+        },
+        {
+          "first": 8696714886,
+          "end": 8697714886,
+          "missing": 0
+        },
+        {
+          "first": 8697714886,
+          "end": 8698714886,
+          "missing": 0
+        },
+        {
+          "first": 8698714886,
+          "end": 8699714886,
+          "missing": 0
+        },
+        {
+          "first": 8699714886,
+          "end": 8700714886,
+          "missing": 0
+        },
+        {
+          "first": 8700714886,
+          "end": 8701714886,
+          "missing": 0
+        },
+        {
+          "first": 8701714886,
+          "end": 8702714886,
+          "missing": 0
+        },
+        {
+          "first": 8702714886,
+          "end": 8703714886,
+          "missing": 0
+        },
+        {
+          "first": 8703714886,
+          "end": 8704714886,
+          "missing": 0
+        }
+      ],
+      "allocated_kernel_buffers": 50
+    }
+  ],
+  "restored": true,
+  "queue_restored": true
+}

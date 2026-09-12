@@ -1,0 +1,452 @@
+From 4683cd2e3556448295e03a216a3a7fc6e8bbc474 Mon Sep 17 00:00:00 2001
+From: misko <misko@cs.toronto.edu>
+Date: Sat, 12 Sep 2026 21:18:08 +0000
+Subject: [PATCH] Add descriptor-owned single-RX counter capture lease
+
+---
+ arch/arm/configs/zynq_pluto_defconfig |  2 +
+ drivers/iio/adc/ad9361.c              | 87 +++++++++++++++++++++++++++
+ drivers/iio/adc/ad9361.h              |  8 ++-
+ drivers/iio/adc/adi_tandem_agc.c      | 81 ++++++++++++++++++++-----
+ drivers/iio/adc/cf_axi_adc.h          |  2 +
+ drivers/iio/adc/cf_axi_adc_core.c     | 38 ++++++++++--
+ include/uapi/linux/adi_rx_counter.h   | 21 +++++++
+ 7 files changed, 216 insertions(+), 23 deletions(-)
+ create mode 100644 include/uapi/linux/adi_rx_counter.h
+
+diff --git a/arch/arm/configs/zynq_pluto_defconfig b/arch/arm/configs/zynq_pluto_defconfig
+index 83f892006400..8b74045830b4 100644
+--- a/arch/arm/configs/zynq_pluto_defconfig
++++ b/arch/arm/configs/zynq_pluto_defconfig
+@@ -293,3 +293,5 @@ CONFIG_MMC=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_PLTFM=y
+ CONFIG_MMC_SDHCI_OF_ARASAN=y
++CONFIG_LOCALVERSION="-counter-rx-v1"
++# CONFIG_LOCALVERSION_AUTO is not set
+diff --git a/drivers/iio/adc/ad9361.c b/drivers/iio/adc/ad9361.c
+index 30b5c65ec350..deb5445d35e0 100644
+--- a/drivers/iio/adc/ad9361.c
++++ b/drivers/iio/adc/ad9361.c
+@@ -37,6 +37,7 @@
+ 
+ #include "ad9361.h"
+ #include "ad9361_private.h"
++#include "cf_axi_adc.h"
+ 
+ static const struct SynthLUT SynthLUT_FDD[LUT_FTDD_ENT][SYNTH_LUT_SIZE] = {
+ {
+@@ -2235,6 +2236,92 @@ static int ad9361_tandem_restore_locked(struct ad9361_rf_phy *phy)
+ 	return ret;
+ }
+ 
++/* Counter capture shares configuration exclusion, never paired preparation.
++ * Lock order matches debug register access: ADC mlock, converter, PHY.
++ * The descriptor owns timestamp restoration even if iiOD is killed.
++ */
++bool ad9361_counter_topology_supported(struct ad9361_rf_phy *phy)
++{
++	return spi_get_device_id(phy->spi)->driver_data == ID_AD9361 && !phy->pdata->rx2tx2 &&
++	       phy->pdata->rx1tx1_mode_use_rx_num == 1;
++}
++EXPORT_SYMBOL_GPL(ad9361_counter_topology_supported);
++
++int ad9361_counter_acquire(struct ad9361_rf_phy *phy, void *owner, u32 sample_rate_hz,
++			   u32 samples_per_channel)
++{
++	struct axiadc_converter *conv = spi_get_drvdata(phy->spi);
++	struct axiadc_state *adc;
++	int ret = 0;
++	u32 control;
++	if (!conv || !conv->indio_dev || !owner || !samples_per_channel ||
++	    (samples_per_channel & 1) || samples_per_channel > 0x7ffffffeU)
++		return -EINVAL;
++	adc = iio_priv(conv->indio_dev);
++	mutex_lock(&conv->indio_dev->mlock);
++	mutex_lock(&conv->lock);
++	mutex_lock(&phy->lock);
++	if (phy->tandem_owner || iio_buffer_enabled(conv->indio_dev)) {
++		ret = -EBUSY;
++		goto out;
++	}
++	if (!ad9361_counter_topology_supported(phy) || phy->state->agc_mode[0] != RF_GAIN_MGC ||
++	    clk_get_rate(phy->clks[RX_SAMPL_CLK]) != sample_rate_hz) {
++		ret = -EOPNOTSUPP;
++		goto out;
++	}
++	control = axiadc_read(adc, ADI_REG_GP_CONTROL);
++	if (control & 1) {
++		ret = -EOPNOTSUPP;
++		goto out;
++	}
++	phy->counter_previous_control = control;
++	phy->tandem_owner = owner;
++	phy->counter_owned = true;
++	conv->counter_capture_owned = true;
++	/* Four bytes per complex sample, one timestamp per packed IQ frame. */
++	axiadc_write(adc, ADI_REG_GP_CONTROL, samples_per_channel);
++	if (axiadc_read(adc, ADI_REG_GP_CONTROL) != samples_per_channel) {
++		axiadc_write(adc, ADI_REG_GP_CONTROL, control);
++		phy->tandem_owner = NULL;
++		phy->counter_owned = false;
++		conv->counter_capture_owned = false;
++		ret = -EIO;
++	}
++out:
++	mutex_unlock(&phy->lock);
++	mutex_unlock(&conv->lock);
++	mutex_unlock(&conv->indio_dev->mlock);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(ad9361_counter_acquire);
++
++int ad9361_counter_release(struct ad9361_rf_phy *phy, void *owner)
++{
++	struct axiadc_converter *conv = spi_get_drvdata(phy->spi);
++	struct axiadc_state *adc = iio_priv(conv->indio_dev);
++	int ret = 0;
++	mutex_lock(&conv->lock);
++	mutex_lock(&phy->lock);
++	if (!phy->counter_owned || phy->tandem_owner != owner) {
++		ret = -EPERM;
++		goto out;
++	}
++	axiadc_write(adc, ADI_REG_GP_CONTROL, phy->counter_previous_control);
++	if (axiadc_read(adc, ADI_REG_GP_CONTROL) != phy->counter_previous_control) {
++		ret = -EIO;
++		goto out;
++	}
++	conv->counter_capture_owned = false;
++	phy->counter_owned = false;
++	phy->tandem_owner = NULL;
++out:
++	mutex_unlock(&phy->lock);
++	mutex_unlock(&conv->lock);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(ad9361_counter_release);
++
+ int ad9361_tandem_prepare(struct ad9361_rf_phy *phy, void *owner,
+ 			  const struct ad9361_tandem_config *config,
+ 			  struct ad9361_tandem_result *result)
+diff --git a/drivers/iio/adc/ad9361.h b/drivers/iio/adc/ad9361.h
+index c271ab9b5298..4649527201e3 100644
+--- a/drivers/iio/adc/ad9361.h
++++ b/drivers/iio/adc/ad9361.h
+@@ -172,8 +172,10 @@ struct ad9361_rf_phy {
+ 	struct mutex		lock;
+ 	char			*bin_attr_buf;
+ 	u32 			ad9361_debugfs_entry_index;
+-	/* Protected by lock. Only the tandem session API may set this owner. */
++	/* Protected by lock. Shared exclusion for paired or counter capture leases. */
+ 	void			*tandem_owner;
++	bool counter_owned;
++	u32 counter_previous_control;
+ 	u8			tandem_snapshot[16];
+ 
+ 	struct ad9361_ext_band_ctl	*ext_band_ctl;
+@@ -214,6 +216,10 @@ int ad9361_set_rx_port(struct ad9361_rf_phy *phy, enum rx_port_sel sel);
+ int ad9361_tandem_prepare(struct ad9361_rf_phy *phy, void *owner,
+ 			  const struct ad9361_tandem_config *config,
+ 			  struct ad9361_tandem_result *result);
++bool ad9361_counter_topology_supported(struct ad9361_rf_phy *phy);
++int ad9361_counter_acquire(struct ad9361_rf_phy *phy, void *owner, u32 sample_rate_hz,
++			   u32 samples_per_channel);
++int ad9361_counter_release(struct ad9361_rf_phy *phy, void *owner);
+ int ad9361_tandem_arm(struct ad9361_rf_phy *phy, void *owner);
+ int ad9361_tandem_verify(struct ad9361_rf_phy *phy, void *owner,
+ 			 u8 expected_rx1, u8 expected_rx2);
+diff --git a/drivers/iio/adc/adi_tandem_agc.c b/drivers/iio/adc/adi_tandem_agc.c
+index 90659b277b79..117391039269 100644
+--- a/drivers/iio/adc/adi_tandem_agc.c
++++ b/drivers/iio/adc/adi_tandem_agc.c
+@@ -24,6 +24,7 @@
+ #include <linux/workqueue.h>
+ 
+ #include <linux/adi_tandem_agc.h>
++#include <uapi/linux/adi_rx_counter.h>
+ 
+ #include "ad9361.h"
+ 
+@@ -70,6 +71,8 @@
+ 
+ enum tandem_attr {
+ 	TANDEM_ATTR_ABI_VERSION,
++	COUNTER_ATTR_VERSION,
++	COUNTER_ATTR_TOPOLOGY,
+ 	TANDEM_ATTR_FPGA_IDENTITY,
+ 	TANDEM_ATTR_FPGA_ABI,
+ 	TANDEM_ATTR_FEATURES,
+@@ -94,6 +97,7 @@ struct adi_tandem_agc {
+ 	struct mutex lock;
+ 	bool session_open;
+ 	bool acquired;
++	bool counter_acquired;
+ 	bool permanent_fault;
+ 	u32 software_fault;
+ 	u32 epoch;
+@@ -312,8 +316,16 @@ static int tandem_release_locked(struct adi_tandem_agc *st)
+ {
+ 	int quiesce_ret, retire_ret = 0, restore_ret;
+ 
+-	if (!st->acquired && !st->permanent_fault)
++	if (!st->acquired && !st->counter_acquired && !st->permanent_fault)
+ 		return 0;
++	if (st->counter_acquired) {
++		int counter_ret = ad9361_counter_release(st->phy, st);
++		if (!counter_ret)
++			st->counter_acquired = false;
++		else
++			st->permanent_fault = true;
++		return counter_ret;
++	}
+ 	cancel_delayed_work(&st->watchdog_work);
+ 
+ 	/* Stop decisions but retain actively-low FPGA pin ownership. */
+@@ -375,7 +387,7 @@ static int tandem_acquire_locked(struct adi_tandem_agc *st,
+ 	u32 control;
+ 	int cleanup_ret = 0, release_ret, ret;
+ 
+-	if (st->acquired)
++	if (st->acquired || st->counter_acquired)
+ 		return -EBUSY;
+ 	if (st->permanent_fault)
+ 		return -EIO;
+@@ -520,10 +532,36 @@ static long tandem_ioctl(struct file *file, unsigned int cmd,
+ 	struct adi_tandem_agc_acquire acquire;
+ 	struct adi_tandem_agc_status status;
+ 	struct adi_tandem_agc_caps caps;
++	struct adi_rx_counter_request counter;
+ 	int ret = 0;
+ 
+ 	mutex_lock(&st->lock);
++	if (st->counter_acquired && cmd != ADI_TANDEM_AGC_IOC_RELEASE) {
++		ret = -EBUSY;
++		goto out_ioctl;
++	}
+ 	switch (cmd) {
++	case ADI_RX_COUNTER_IOC_ACQUIRE:
++		if (copy_from_user(&counter, argp, sizeof(counter))) {
++			ret = -EFAULT;
++			break;
++		}
++		if (counter.magic != ADI_RX_COUNTER_MAGIC ||
++		    counter.version != ADI_RX_COUNTER_VERSION || counter.size != sizeof(counter) ||
++		    counter.required_features != ADI_RX_COUNTER_FEATURES ||
++		    counter.scan_mask != 3 || counter.reserved[0] || counter.reserved[1]) {
++			ret = -EINVAL;
++			break;
++		}
++		if (st->acquired || st->permanent_fault) {
++			ret = -EBUSY;
++			break;
++		}
++		ret = ad9361_counter_acquire(st->phy, st, counter.sample_rate_hz,
++					     counter.samples_per_channel);
++		if (!ret)
++			st->counter_acquired = true;
++		break;
+ 	case ADI_TANDEM_AGC_IOC_GET_CAPS:
+ 		memset(&caps, 0, sizeof(caps));
+ 		caps.version = ADI_TANDEM_AGC_ABI_VERSION;
+@@ -560,6 +598,7 @@ static long tandem_ioctl(struct file *file, unsigned int cmd,
+ 	default:
+ 		ret = -ENOTTY;
+ 	}
++out_ioctl:
+ 	mutex_unlock(&st->lock);
+ 
+ 	return ret;
+@@ -637,6 +676,12 @@ static ssize_t tandem_attr_show(struct device *dev,
+ 
+ 	mutex_lock(&st->lock);
+ 	switch (this_attr->address) {
++	case COUNTER_ATTR_VERSION:
++		value = 1;
++		break;
++	case COUNTER_ATTR_TOPOLOGY:
++		value = ad9361_counter_topology_supported(st->phy);
++		break;
+ 	case TANDEM_ATTR_ABI_VERSION:
+ 		value = ADI_TANDEM_AGC_ABI_VERSION;
+ 		break;
+@@ -694,6 +739,8 @@ static ssize_t tandem_attr_show(struct device *dev,
+ #define TANDEM_ATTR_RO(_name, _address) \
+ 	IIO_DEVICE_ATTR(_name, 0444, tandem_attr_show, NULL, _address)
+ 
++static TANDEM_ATTR_RO(counter_metadata_version, COUNTER_ATTR_VERSION);
++static TANDEM_ATTR_RO(counter_metadata_topology_supported, COUNTER_ATTR_TOPOLOGY);
+ static TANDEM_ATTR_RO(abi_version, TANDEM_ATTR_ABI_VERSION);
+ static TANDEM_ATTR_RO(fpga_identity, TANDEM_ATTR_FPGA_IDENTITY);
+ static TANDEM_ATTR_RO(fpga_abi, TANDEM_ATTR_FPGA_ABI);
+@@ -709,20 +756,22 @@ static TANDEM_ATTR_RO(transition_count, TANDEM_ATTR_TRANSITIONS);
+ static TANDEM_ATTR_RO(overflow_count, TANDEM_ATTR_OVERFLOWS);
+ 
+ static struct attribute *tandem_attrs[] = {
+-	&iio_dev_attr_abi_version.dev_attr.attr,
+-	&iio_dev_attr_fpga_identity.dev_attr.attr,
+-	&iio_dev_attr_fpga_abi.dev_attr.attr,
+-	&iio_dev_attr_features.dev_attr.attr,
+-	&iio_dev_attr_state.dev_attr.attr,
+-	&iio_dev_attr_ownership_epoch.dev_attr.attr,
+-	&iio_dev_attr_fault_flags.dev_attr.attr,
+-	&iio_dev_attr_fifo_depth.dev_attr.attr,
+-	&iio_dev_attr_fifo_level.dev_attr.attr,
+-	&iio_dev_attr_rx1_gain_index.dev_attr.attr,
+-	&iio_dev_attr_rx2_gain_index.dev_attr.attr,
+-	&iio_dev_attr_transition_count.dev_attr.attr,
+-	&iio_dev_attr_overflow_count.dev_attr.attr,
+-	NULL,
++    &iio_dev_attr_counter_metadata_version.dev_attr.attr,
++    &iio_dev_attr_counter_metadata_topology_supported.dev_attr.attr,
++    &iio_dev_attr_abi_version.dev_attr.attr,
++    &iio_dev_attr_fpga_identity.dev_attr.attr,
++    &iio_dev_attr_fpga_abi.dev_attr.attr,
++    &iio_dev_attr_features.dev_attr.attr,
++    &iio_dev_attr_state.dev_attr.attr,
++    &iio_dev_attr_ownership_epoch.dev_attr.attr,
++    &iio_dev_attr_fault_flags.dev_attr.attr,
++    &iio_dev_attr_fifo_depth.dev_attr.attr,
++    &iio_dev_attr_fifo_level.dev_attr.attr,
++    &iio_dev_attr_rx1_gain_index.dev_attr.attr,
++    &iio_dev_attr_rx2_gain_index.dev_attr.attr,
++    &iio_dev_attr_transition_count.dev_attr.attr,
++    &iio_dev_attr_overflow_count.dev_attr.attr,
++    NULL,
+ };
+ 
+ static const struct attribute_group tandem_attr_group = {
+diff --git a/drivers/iio/adc/cf_axi_adc.h b/drivers/iio/adc/cf_axi_adc.h
+index 75d5ce28f818..5d62b2058c8c 100644
+--- a/drivers/iio/adc/cf_axi_adc.h
++++ b/drivers/iio/adc/cf_axi_adc.h
+@@ -226,6 +226,8 @@ struct axiadc_converter {
+ 
+ 	struct delayed_work	watchdog_work;
+ 	bool			sample_rate_read_only;
++	/* Protected by lock. Counter lease freezes ADC configuration. */
++	bool counter_capture_owned;
+ 	bool			running;
+ 
+ 	int (*reg_access)(struct iio_dev *indio_dev, unsigned int reg,
+diff --git a/drivers/iio/adc/cf_axi_adc_core.c b/drivers/iio/adc/cf_axi_adc_core.c
+index cbb116cccb6f..ae12917da658 100644
+--- a/drivers/iio/adc/cf_axi_adc_core.c
++++ b/drivers/iio/adc/cf_axi_adc_core.c
+@@ -241,6 +241,10 @@ static ssize_t axiadc_debugfs_pncheck_write(struct file *file,
+ 		mode = ADC_PN_OFF;
+ 
+ 	mutex_lock(&conv->lock);
++	if (conv->counter_capture_owned) {
++		mutex_unlock(&conv->lock);
++		return -EBUSY;
++	}
+ 
+ 	for (i = 0; i < axiadc_num_phys_channels(st); i++) {
+ 		if (conv->set_pnsel)
+@@ -280,6 +284,10 @@ static int axiadc_reg_access(struct iio_dev *indio_dev,
+ 		return -EINVAL;
+ 
+ 	mutex_lock(&conv->lock);
++	if (!readval && conv->counter_capture_owned) {
++		mutex_unlock(&conv->lock);
++		return -EBUSY;
++	}
+ 
+ 	if (!(reg & DEBUGFS_DRA_PCORE_REG_MAGIC)) {
+ 		struct axiadc_converter *conv = to_converter(st->dev_spi);
+@@ -298,7 +306,7 @@ static int axiadc_reg_access(struct iio_dev *indio_dev,
+ 	}
+ 	mutex_unlock(&conv->lock);
+ 
+-	return 0;
++	return ret;
+ }
+ 
+ static int axiadc_decimation_set(struct axiadc_state *st,
+@@ -416,6 +424,10 @@ static ssize_t axiadc_sync_start_store(struct device *dev,
+ 		return ret;
+ 
+ 	mutex_lock(&conv->lock);
++	if (conv->counter_capture_owned) {
++		mutex_unlock(&conv->lock);
++		return -EBUSY;
++	}
+ 	if (st->ext_sync_avail) {
+ 		switch (ret) {
+ 		case 0:
+@@ -598,11 +610,8 @@ static int axiadc_read_raw(struct iio_dev *indio_dev,
+ 	return -EINVAL;
+ }
+ 
+-static int axiadc_write_raw(struct iio_dev *indio_dev,
+-			       struct iio_chan_spec const *chan,
+-			       int val,
+-			       int val2,
+-			       long mask)
++static int axiadc_write_raw_unlocked(struct iio_dev *indio_dev, struct iio_chan_spec const *chan,
++				     int val, int val2, long mask)
+ {
+ 	struct axiadc_state *st = iio_priv(indio_dev);
+ 	struct axiadc_converter *conv = to_converter(st->dev_spi);
+@@ -696,6 +705,20 @@ static int axiadc_write_raw(struct iio_dev *indio_dev,
+ 	}
+ }
+ 
++static int axiadc_write_raw(struct iio_dev *indio_dev, const struct iio_chan_spec *chan, int val,
++			    int val2, long mask)
++{
++	struct axiadc_state *st = iio_priv(indio_dev);
++	struct axiadc_converter *conv = to_converter(st->dev_spi);
++	int ret;
++	mutex_lock(&conv->lock);
++	ret = conv->counter_capture_owned
++		  ? -EBUSY
++		  : axiadc_write_raw_unlocked(indio_dev, chan, val, val2, mask);
++	mutex_unlock(&conv->lock);
++	return ret;
++}
++
+ static int axiadc_read_label(struct iio_dev *indio_dev,
+ 			     const struct iio_chan_spec *chan, char *label)
+ {
+@@ -775,6 +798,9 @@ static int axiadc_update_scan_mode(struct iio_dev *indio_dev,
+ {
+ 	struct axiadc_state *st = iio_priv(indio_dev);
+ 	unsigned i, ctrl;
++	struct axiadc_converter *conv = to_converter(st->dev_spi);
++	if (conv->counter_capture_owned && (indio_dev->masklength != 2 || scan_mask[0] != 3))
++		return -EBUSY;
+ 
+ 	for (i = 0; i < indio_dev->masklength; i++) {
+ 		if (i > (st->have_slave_channels - 1))
+diff --git a/include/uapi/linux/adi_rx_counter.h b/include/uapi/linux/adi_rx_counter.h
+new file mode 100644
+index 000000000000..813c194e3b67
+--- /dev/null
++++ b/include/uapi/linux/adi_rx_counter.h
+@@ -0,0 +1,21 @@
++/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
++#ifndef _UAPI_ADI_RX_COUNTER_H
++#define _UAPI_ADI_RX_COUNTER_H
++#include <linux/types.h>
++#include <linux/ioctl.h>
++/* A separate request namespace; never a tandem HOLD/AUTO request. */
++#define ADI_RX_COUNTER_MAGIC 0x43465053U /* SPFC */
++#define ADI_RX_COUNTER_VERSION 1U
++#define ADI_RX_COUNTER_FEATURES 7U /* counter, canonical CI16, exact gaps */
++struct adi_rx_counter_request {
++	__u32 magic;
++	__u16 version;
++	__u16 size;
++	__u32 required_features;
++	__u32 scan_mask;
++	__u32 sample_rate_hz;
++	__u32 samples_per_channel;
++	__u32 reserved[2];
++};
++#define ADI_RX_COUNTER_IOC_ACQUIRE _IOW('T', 0x20, struct adi_rx_counter_request)
++#endif
+-- 
+2.53.0
+
