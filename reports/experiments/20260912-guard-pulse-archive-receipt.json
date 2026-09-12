@@ -1,0 +1,12 @@
+{
+  "path": "/srv/bulk/leo/starlink-pss-preflight.RVtFMZII/guard-pulse-artifacts.EqZnBaxQ/20260912-guard-pulse-evidence.tgz",
+  "bytes": 10165616,
+  "sha256": "edeb1f02b37606f5e56ea4bc08d6907ee9e136abc94eeb2ce5e163522517972b",
+  "members": 873,
+  "all_members_verified": true,
+  "full_receiver_or_deployment_claim": false,
+  "verification": "sequential payload SHA256, inventory, regular files, gzip CRC, stable archive SHA256",
+  "verifier_sha256": "c03e82ec7454df7fccba72a20fc958dc839d566094aaa6dfd6233e19b9456b88",
+  "writer_sha256": "a4b8b9394b622322ab9da8e39dd914b7d0ed36621e2a05df5265dde2e97eaca7",
+  "sources_unchanged": true
+}

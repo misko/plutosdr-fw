@@ -2,6 +2,24 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-12, checked-completion-pulse retiming: **2,390 scoped tests and
+all 92 actual FFT fault/reset/stall cases pass**. Both original guards match
+all outputs/effective state across 1,851,082 checks each. Visible timing and
+64,512 numerical words remain exact; 4,178-clock service is unchanged.
+Active/ACK/commit register slack improves about 0.3 ns, failing endpoints fall
+811 to 764, but complete timing is still FAIL: **WNS -1.236 ns / TNS -299.750 ns**,
+same-175 MHz -0.998 ns. Admission/publication endpoints still need work.
+The new worst same-domain path is preflight header equality into output
+publication. A 262,144-vector four-state proof shows that only the preflight
+term is redundant under the existing !preparing publication context. Next
+implement that phase-specific publication view, preserving acquisition-time
+checks, all other current faults, original predicate comparison and nonquiet
+behavior; then rerun actual FFT/fault tests and route. No timing waiver.
+No PRIMARY HDL, radios, PPU or main changes; native 60 MS/s fine search and
+independent 2.5 MS/s inspection remain mandatory. Branch:
+`codex/starlink-rx-only-do-not-merge-guard-pulse`.
+See [guard retiming and next measured publication path](reports/experiments/20260912-guard-pulse-actual-route.md).
+
 Update 2026-09-12, local fault views without duplicate global-abort echoes:
 **2,360 scoped tests and all 92 actual FFT fault/reset/stall cases pass**.
 Original mailbox outputs and internal state match over 1,841,886 checks,
