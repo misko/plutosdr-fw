@@ -3,7 +3,7 @@
 # This script never opens, configures or deploys to a radio.
 set -euo pipefail
 if [[ $# -lt 2 || $# -gt 4 ]]; then
-  echo 'usage: build_glrt_board.sh RATE_HZ NEW_OUTPUT_DIRECTORY [--native-refinement|--native-lean|--native-scheduled|--local-search NETLIST_DIRECTORY]' >&2
+  echo 'usage: build_glrt_board.sh RATE_HZ NEW_OUTPUT_DIRECTORY [--native-refinement|--native-lean|--native-scheduled|--local-search NETLIST_DIRECTORY|--tracking NETLIST_DIRECTORY]' >&2
   exit 2
 fi
 case "$1" in 2500000|5000000|10000000|25000000|60000000) ;; *) exit 2 ;; esac
@@ -11,18 +11,29 @@ native_refinement=0
 legacy_scorer=1
 native_schedule=0
 local_search=0
+tracking=0
 local_netlist=''
 if [[ $# -eq 4 ]]; then
-  if [[ "$3" != --local-search || "$1" != 2500000 ]]; then
+  if [[ ( "$3" != --local-search && "$3" != --tracking ) || "$1" != 2500000 ]]; then
     echo 'local search requires 2500000 Hz and its netlist directory' >&2
     exit 2
   fi
   local_search=1
   legacy_scorer=0
+  if [[ "$3" == --tracking ]]; then tracking=1; fi
   local_netlist=$(realpath "$4")
   test -s "$local_netlist/starlink_glrt_local_control.dcp"
   (cd "$local_netlist" && sha256sum --status -c outputs.sha256)
   sha256sum --status -c "$local_netlist/source-hashes.txt"
+  shared_window=0
+  if [[ -f "$local_netlist/shared_window.txt" ]]; then
+    grep -Eq '^[0-9a-f]{64}  shared_window.txt$' "$local_netlist/outputs.sha256"
+    shared_window=$(cat "$local_netlist/shared_window.txt")
+  fi
+  if [[ "$shared_window" != "$tracking" ]]; then
+    echo 'local netlist storage mode must match the selected receiver profile' >&2
+    exit 2
+  fi
 elif [[ $# -eq 3 ]]; then
   if [[ ( "$3" != --native-refinement && "$3" != --native-lean && "$3" != --native-scheduled ) || "$1" != 60000000 ]]; then
     echo 'native profiles require 60000000 Hz and an explicit native build selection' >&2
@@ -50,11 +61,13 @@ printf '%s\n' "$native_refinement" >"$output/native_refinement.txt"
 printf '%s\n' "$legacy_scorer" >"$output/legacy_scorer.txt"
 printf '%s\n' "$native_schedule" >"$output/native_schedule.txt"
 printf '%s\n' "$local_search" >"$output/local_search.txt"
+printf '%s\n' "$tracking" >"$output/tracking.txt"
 if [[ "$local_search" == 1 ]]; then
   mkdir "$output/local-netlist"
   cp "$local_netlist/starlink_glrt_local_control.edf" "$local_netlist/starlink_glrt_local_control_stub.v" \
     "$local_netlist/starlink_glrt_local_control.dcp" "$local_netlist/source-hashes.txt" \
     "$local_netlist/outputs.sha256" "$output/local-netlist/"
+  if [[ -f "$local_netlist/shared_window.txt" ]]; then cp "$local_netlist/shared_window.txt" "$output/local-netlist/"; fi
   local_netlist="$output/local-netlist"
   (cd "$local_netlist" && sha256sum --status -c outputs.sha256)
 fi
@@ -65,6 +78,7 @@ export STARLINK_GLRT_NATIVE_REFINEMENT="$native_refinement"
 export STARLINK_GLRT_LEGACY_SCORER="$legacy_scorer"
 export STARLINK_GLRT_NATIVE_SCHEDULE="$native_schedule"
 export STARLINK_GLRT_LOCAL_SEARCH="$local_search"
+export STARLINK_GLRT_TRACKING="$tracking"
 export STARLINK_GLRT_LOCAL_NETLIST="$local_netlist"
 export ADI_HDL_DIR="$output/hdl"
 export ADI_USE_OOC_SYNTHESIS=n

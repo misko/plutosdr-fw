@@ -1,4 +1,5 @@
 """Invalid native board selections fail before creating a build or using tools."""
+import hashlib
 import subprocess
 from pathlib import Path
 
@@ -16,6 +17,43 @@ def test_invalid_native_build_selection_creates_no_evidence_directory(tmp_path, 
         capture_output=True, text=True, timeout=10, check=False)
     assert result.returncode == 2
     assert not output.exists()
+
+
+def test_tracking_build_refuses_a_duplicate_window_netlist_before_checkout(tmp_path):
+    repo = Path(__file__).resolve().parents[2]
+    netlist = tmp_path/"local"; netlist.mkdir()
+    names = ("starlink_glrt_local_control.dcp", "shared_window.txt")
+    for name in names: (netlist/name).write_text("0\n")
+    (netlist/"outputs.sha256").write_text("".join(
+        f"{hashlib.sha256((netlist/name).read_bytes()).hexdigest()}  {name}\n" for name in names))
+    (netlist/"source-hashes.txt").write_text(
+        f"{hashlib.sha256((netlist/names[0]).read_bytes()).hexdigest()}  {netlist/names[0]}\n")
+    output = tmp_path/"board"
+    result = subprocess.run(["bash", str(repo/"scripts/build_glrt_board.sh"), "2500000", str(output),
+        "--tracking", str(netlist)], capture_output=True, text=True, timeout=10, check=False)
+    assert result.returncode == 2 and "storage mode" in result.stderr and not output.exists()
+
+
+@pytest.mark.parametrize("tracking,shared,local,accepted", [
+    ("1", "1", "1", True), ("1", "0", "1", False), ("1", None, "1", False),
+    ("1", "1", "0", False), ("2", "1", "1", False)])
+def test_tracking_board_requires_shared_local_component(tmp_path, tracking, shared, local, accepted):
+    repo = Path(__file__).resolve().parents[2]
+    if shared is not None: (tmp_path/"shared_window.txt").write_text(shared+"\n")
+    values = {"RATE_HZ": "2500000", "NATIVE_REFINEMENT": "0", "LEGACY_SCORER": "0",
+        "NATIVE_SCHEDULE": "0", "LOCAL_SEARCH": local, "LOCAL_NETLIST": str(tmp_path), "TRACKING": tracking}
+    bench = tmp_path/"tracking-selection.tcl"
+    bench.write_text("\n".join([
+        *(f"set ::env(STARLINK_GLRT_{key}) {{{value}}}" for key, value in values.items()),
+        "proc unknown {args} { return {} }",
+        'proc ad_ip_parameter {cell key value} { puts "$key=$value" }',
+        f"source {{{repo/'hdl/projects/pluto/system_glrt_bd.tcl'}}}",
+    ])+"\n")
+    result = subprocess.run(["tclsh", str(bench)], capture_output=True, text=True, timeout=10, check=False)
+    assert (result.returncode == 0) == accepted, result.stdout+result.stderr
+    if accepted:
+        assert "CONFIG.ENABLE_TRACKING=1" in result.stdout
+        assert "native_direct_2500000_phase4_upper_interleaved.mem" in result.stdout
 
 
 @pytest.mark.parametrize("rate,native,legacy,schedule,local,netlist,accepted", [

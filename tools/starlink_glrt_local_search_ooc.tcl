@@ -1,10 +1,14 @@
 # Complete local acquisition component, with duplicated or shared IQ storage.
-if {$argc ni {2 3} || [version -short] ne "2022.2"} {
-  error "requires Vivado 2022.2, fresh output, ROM directory, optional --control-netlist or --shared-window"
+if {$argc ni {2 3 4} || [version -short] ne "2022.2"} {
+  error "requires Vivado 2022.2, fresh output, ROM directory, optional --control-netlist and --shared-window"
 }
-set control_netlist [expr {$argc==3 && [lindex $argv 2] eq "--control-netlist"}]
-set shared_window [expr {$argc==3 && [lindex $argv 2] eq "--shared-window"}]
-if {$argc==3 && !$control_netlist && !$shared_window} { error "unknown output mode" }
+set control_netlist 0
+set shared_window 0
+foreach option [lrange $argv 2 end] {
+  if {$option eq "--control-netlist" && !$control_netlist} { set control_netlist 1
+  } elseif {$option eq "--shared-window" && !$shared_window} { set shared_window 1
+  } else { error "unknown or repeated output mode" }
+}
 set output [file normalize [lindex $argv 0]]
 set roms [file normalize [lindex $argv 1]]
 if {[file exists $output]} { error "output exists" }
@@ -121,7 +125,12 @@ if {$control_netlist} {
   set finish [string first "\n);" $content $start]
   if {$start<0 || $finish<0} { error "cannot extract local control interface" }
   set fd [open $output/starlink_glrt_local_control_stub.v {WRONLY CREAT EXCL}]
-  puts $fd "(* black_box=\"yes\" *) [string range $content $start [expr {$finish+2}]]\nendmodule"
+  set header [string range $content $start [expr {$finish+2}]]
+  set header [string map [list SHARED_WINDOW=0 SHARED_WINDOW=$shared_window] $header]
+  puts $fd "(* black_box=\"yes\" *) $header\nendmodule"
+  close $fd
+  set fd [open $output/shared_window.txt {WRONLY CREAT EXCL}]
+  puts $fd $shared_window
   close $fd
   set fd [open $output/source-hashes.txt {WRONLY CREAT EXCL}]
   foreach path $tracked {
@@ -130,7 +139,7 @@ if {$control_netlist} {
   }
   close $fd
   set fd [open $output/outputs.sha256 {WRONLY CREAT EXCL}]
-  foreach name {starlink_glrt_local_control.edf starlink_glrt_local_control_stub.v source-hashes.txt} {
+  foreach name {starlink_glrt_local_control.edf starlink_glrt_local_control_stub.v source-hashes.txt shared_window.txt} {
     puts $fd "[lindex [exec sha256sum $output/$name] 0]  $name"
   }
   close $fd

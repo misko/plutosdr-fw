@@ -15,6 +15,7 @@ write_checkpoint $output/starlink_glrt_local_control.dcp
 foreach name {starlink_glrt_local_control.edf starlink_glrt_local_control_stub.v source-hashes.txt} {
   file copy $input/$name $output/$name
 }
+if {[file isfile $input/shared_window.txt]} { file copy $input/shared_window.txt $output/shared_window.txt }
 set fd [open $output/source-hashes.txt a]
 set script [file normalize [info script]]
 puts $fd "[lindex [exec sha256sum $script] 0]  $script"
@@ -22,6 +23,9 @@ close $fd
 set fd [open $output/outputs.sha256 {WRONLY CREAT EXCL}]
 foreach name {starlink_glrt_local_control.edf starlink_glrt_local_control_stub.v starlink_glrt_local_control.dcp source-hashes.txt} {
   puts $fd "[lindex [exec sha256sum $output/$name] 0]  $name"
+}
+if {[file isfile $output/shared_window.txt]} {
+  puts $fd "[lindex [exec sha256sum $output/shared_window.txt] 0]  shared_window.txt"
 }
 close $fd
 puts "LOCAL_CONTROL_CHECKPOINT_READY_NOT_BOARD_TIMING_VERIFIED"
