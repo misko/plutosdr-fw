@@ -36,6 +36,7 @@ def controller(tmp_path_factory):
                     "-I", str(ROOT/"tools"), str(out/"wrapper.c"),
                     *(str(ROOT/"tools"/f"glrt_native_{name}.c") for name in
                       ("controller", "trend", "schedule", "solver")),
+                    str(ROOT/"tools/glrt_tracking_schedule.c"),
                     "-lm", "-o", str(out/"controller.so")], check=True)
     lib = c.CDLL(str(out/"controller.so"))
     lib.controller_size.restype = c.c_size_t

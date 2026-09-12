@@ -20,6 +20,7 @@ reg [47:0] config_period_q16=0,config_step_q16=0,config_step_delta_q16=0;
 reg [7:0] config_repeats=0;
 wire config_ready,config_rejected,reserved,job_valid,decision_valid,counter_exhausted;
 wire [63:0] job_start,decision_start;
+wire job_reference_phase,decision_reference_phase;
 wire [31:0] job_phase_seed,job_phase_step,job_tag,decision_tag;
 wire [7:0] job_repeat,decision_repeat;
 wire [2:0] decision_reason;
@@ -78,8 +79,8 @@ WAIT = (0,)*9
 CANCEL = (3,)+(0,)*8
 
 
-def simulate(tmp_path, rows):
-    (tmp_path/"tb.sv").write_text(BENCH)
+def simulate(tmp_path, rows, *, bench=BENCH):
+    (tmp_path/"tb.sv").write_text(bench)
     (tmp_path/"input.txt").write_text("".join(
         f"{row[0]} "+" ".join(f"{value:x}" for value in row[1:])+"\n" for row in rows))
     built = subprocess.run(["iverilog", "-g2012", "-s", "tb", "-o", "sim", "tb.sv",

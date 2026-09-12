@@ -15,7 +15,9 @@ the operator receipt; it is not an acquired pilot.
 
 Build `glrt_native_radio.c`, `glrt_native_posix.c`,
 `glrt_native_controller.c`, `glrt_native_trend.c`,
-`glrt_native_schedule.c` and `glrt_native_solver.c` together with C99 and `-lm`.
+`glrt_native_schedule.c`, `glrt_tracking_schedule.c` and `glrt_native_solver.c`
+together with C99 and `-lm`. The shared trend implementation now also exposes
+internal multirate entry points; this executable still speaks fixed-60-MS/s GLS1.
 The Cortex-A9 hard-float static build uses the existing firmware toolchain.
 The executable takes five positional arguments:
 

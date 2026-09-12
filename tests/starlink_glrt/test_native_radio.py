@@ -23,6 +23,7 @@ def runner(tmp_path_factory):
     common = ["cc", "-std=c99", "-O2", "-Wall", "-Wextra", "-Werror", "-I", str(ROOT/"tools")]
     sources = [str(ROOT/"tools"/f"glrt_native_{name}.c") for name in
                ("posix", "controller", "trend", "schedule", "solver")]
+    sources.append(str(ROOT/"tools/glrt_tracking_schedule.c"))
     subprocess.run([*common, "-shared", "-fPIC", str(wrapper), *sources, "-lm", "-o", str(out/"runner.so")], check=True)
     subprocess.run([*common, str(ROOT/"tools/glrt_native_radio.c"), *sources, "-lm", "-o", str(out/"runner")], check=True)
     lib = c.CDLL(str(out/"runner.so"))

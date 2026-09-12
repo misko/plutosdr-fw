@@ -143,3 +143,45 @@ deadlines checked against the live native index, durable head retention before
 POP, finite active/pending schedule ownership, and measured I/O/jitter. The
 existing native-IQ and real 25 MS/s qualification gates remain required; these
 unit tests do not replace them.
+
+## Internal multirate solver and prediction ports
+
+`glrt_tracking_solve` in `glrt_native_solver.h` consumes a rate/phase-bound
+16-word moment payload. Four direct reference phases at 2.5 MS/s and single
+references at 15/30/60 MS/s bind the exact bank hashes and generated Gram
+matrices in `glrt_tracking_gram.inc`. Generate that include with
+`generate_glrt_tracking_gram.py`; its decoder rejects unpinned banks. A fit
+returns a local delay correction about the selected reference. To locate the
+pilot, retain the integer native start and add both the selected reference
+delay and the correction. Never add the reference delay to CFO observation
+time: the IQ window's center remains its physical observation coordinate.
+
+`glrt_tracking_schedule.h` and `glrt_tracking_trend.h` provide internal causal
+prediction at these rates. The shared trend keeps rational nominal periods,
+integer anchors, one explicit fractional-reference correction, the same
+96-position fit window and finite prediction horizon. The fit is ordinary
+least squares over supported local estimates; robust innovation gating remains
+an integration task. This is not a new wire ABI or a multirate radio executable.
+Compile the shared trend with `glrt_tracking_schedule.c` as well as the native
+schedule and solver. Existing native entry points preserve 60-MS/s semantics.
+
+At 2.5 MS/s, prediction rounds to the nearest quarter-sample reference, including
+ties to even and carry into the integer IQ start. Other rates round to samples.
+The Q16 period retains the fractional part of the 3,333.333... sample repeat;
+it is never truncated to a repeated 3,333-sample interval. Rate-specific engine
+preparation/admission leads are:
+
+| Rate, MS/s | Pilot samples | Minimum lead | Issue lead | Maximum period, samples |
+| --- | ---: | ---: | ---: | ---: |
+| 2.5 | 3300 | 3 | 22 | 3375 |
+| 15 | 19800 | 16 | 128 | 20250 |
+| 30 | 39600 | 32 | 256 | 40500 |
+| 60 | 79200 | 64 | 512 | 81000 |
+
+These are native-sample counts for the tested 100-MHz processor. The minimum
+period is pilot samples plus twice the minimum lead. The FPGA scheduler takes
+these as compile-time parameters and exposes the selected phase on both admitted
+jobs and decisions. Default parameters remain the original single-phase 60-MS/s
+scheduler. The old GLS1 transport is unchanged and does not carry these phases.
+A future tracking transport must bind rate, reference profile/phase, source
+epoch and admitted descriptor before the new solver/trend may consume it.

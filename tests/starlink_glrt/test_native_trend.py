@@ -36,7 +36,8 @@ def core(tmp_path_factory):
     root = Path(__file__).resolve().parents[2]
     out = tmp_path_factory.mktemp("native-trend")/"trend.so"
     subprocess.run(["cc","-std=c99","-O2","-Wall","-Wextra","-Werror","-shared","-fPIC",
-        *(str(root/"tools"/name) for name in ("glrt_native_trend.c","glrt_native_schedule.c","glrt_native_solver.c")),
+        *(str(root/"tools"/name) for name in ("glrt_native_trend.c","glrt_native_schedule.c",
+                                           "glrt_tracking_schedule.c","glrt_native_solver.c")),
         "-lm","-o",str(out)],check=True)
     lib = c.CDLL(str(out))
     lib.glrt_native_trend_reset.argtypes = [c.POINTER(Trend),c.c_uint32]
