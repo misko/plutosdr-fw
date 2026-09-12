@@ -71,12 +71,15 @@ def integer_grid(iq, coefficients):
     return (totals//support).astype(np.uint32)
 
 
-@pytest.mark.parametrize("signal", ["random","rails","zero"])
+@pytest.mark.parametrize("signal", ["random","rails","zero","full_scale_coefficients"])
 def test_every_grid_value_and_selected_peak_matches_independent_math(api, signal):
     iq = np.random.default_rng(700600).integers(-32768,32768,(14000,2),dtype=np.int16)
     coefficients = bank()
     if signal == "rails": iq[:] = -32768
     elif signal == "zero": iq[:] = 0
+    elif signal == "full_scale_coefficients":
+        iq[:]=[-32768,32767]
+        coefficients[:]=[-2048,2047]
     w = Workspace()
     assert api.glrt_cpu_coarse_search(C.byref(w),iq.ctypes.data,coefficients.ctypes.data,POLL(lambda _:0),None) == 0
     expected = integer_grid(iq,coefficients)

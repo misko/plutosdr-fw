@@ -34,7 +34,7 @@ def review(root):
         'probe did not complete')
     require((root/'iq.ci16').stat().st_size==4*16384*160, 'IQ payload size')
     lines=(root/'journal.txt').read_text().splitlines()
-    blocks=[];heads=[];tracking=[];batch=None;final=None;clear=None
+    blocks=[];heads=[];tracking=[];batch=None;final=None;clear=None;pre_epoch_drops=[]
     pair=lambda w,k:w[k]+(w[k+1]<<32)
     for line in lines:
         if not line: continue
@@ -72,7 +72,14 @@ def review(root):
             head.require_complete();heads.append(head)
         elif key=='tracking_snapshot':
             state=TrackingSnapshot.from_sysfs(wire)
-            require(state.rate==rate and state.cdc_drops==state.pacer_drops==0,'native source drops')
+            require(state.rate==rate,'native source rate')
+            if not blocks and batch is None and not state.status&16 and state.configured==0:
+                # Before REBASE these are boot/calibration counters, not visit
+                # losses. REBASE establishes the new rate-correct source epoch.
+                state.require_drained()
+                pre_epoch_drops.append([state.cdc_drops,state.pacer_drops])
+            else:
+                require(state.cdc_drops==state.pacer_drops==0,'native source drops')
             require(state.faults in (0,8), 'unexpected tracking fault')
             if state.faults==8:
                 require(blocks and not blocks[-1][1][19]&3 and
@@ -95,6 +102,7 @@ def review(root):
     return {'status':'pass','rate':rate,'iq_samples':16384*160,'native_results':16,
             'native_samples_per_result':rate*33//25000,'cdc_drops':0,'pacer_drops':0,
             'finite_stop_invalidated_epoch':True,'tracking_lock_qualified':False,
+            'pre_epoch_cdc_pacer_counters':pre_epoch_drops,
             'sha256':{name:hashlib.sha256((root/name).read_bytes()).hexdigest()
                       for name in ('stdout.json','journal.txt','iq.ci16')}}
 

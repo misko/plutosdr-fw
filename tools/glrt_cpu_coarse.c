@@ -5,12 +5,30 @@
 
 static uint32_t root(uint64_t n)
 {
-    uint64_t r=(uint64_t)sqrt((double)n);
+    /* The square root fits u32. Avoid ARM's software double-to-u64 helper. */
+    double value=(double)(uint32_t)(n>>32)*4294967296.0+(double)(uint32_t)n;
+    uint32_t r=(uint32_t)sqrt(value);
     /* Correct floating conversion at perfect-square boundaries. Supported
      * CI16/CI12 powers are below 2^63, so these products cannot wrap u64. */
-    while(r*r>n) r--;
-    while((r+1)*(r+1)<=n) r++;
-    return (uint32_t)r;
+    while((uint64_t)r*r>n) r--;
+    while((uint64_t)(r+1)*(r+1)<=n) r++;
+    return r;
+}
+
+static uint32_t ratio_q16(uint32_t numerator, uint32_t denominator)
+{
+    uint64_t scaled;
+    uint32_t q;
+    if(!denominator) return 0;
+    if(numerator>=denominator) return 65536;
+    scaled=(uint64_t)numerator<<16;
+    /* Both operands are exactly representable in double. Correct the VFP
+     * quotient with integer products, preserving the exact saturated floor
+     * while avoiding the Cortex-A9 software u64 division routine. */
+    q=(uint32_t)(((double)numerator*65536.0)/(double)denominator);
+    while((uint64_t)q*denominator>scaled) q--;
+    while((uint64_t)(q+1)*denominator<=scaled) q++;
+    return q;
 }
 
 static unsigned distance(unsigned a, unsigned b)
@@ -59,18 +77,18 @@ int glrt_cpu_coarse_search(struct glrt_cpu_coarse_workspace *w, const int16_t *i
                 observed+=(uint64_t)(i*i+q*q);
             }
             for(f=0;f<11;f++) {
-                int64_t re=0,im=0;
+                /* 11 * 2 * 32768 * 2048 = 1,476,395,008, below INT32_MAX.
+                 * Keep the dot products in bounded i32, widen before squaring. */
+                int32_t re=0,im=0;
                 uint32_t numerator,denominator;
-                uint64_t score;
                 for(t=0;t<11;t++) {
-                    int64_t i=iq[2*(start+t)],q=iq[2*(start+t)+1];
-                    int64_t a=c[s][f][t][0],b=c[s][f][t][1];
+                    int32_t i=iq[2*(start+t)],q=iq[2*(start+t)+1];
+                    int32_t a=c[s][f][t][0],b=c[s][f][t][1];
                     re+=i*a+q*b;im+=q*a-i*b;
                 }
-                numerator=root((uint64_t)(re*re)+(uint64_t)(im*im));
+                numerator=root((uint64_t)((int64_t)re*re)+(uint64_t)((int64_t)im*im));
                 denominator=root(observed*energy[s][f]);
-                score=denominator ? ((uint64_t)numerator<<16)/denominator : 0;
-                totals[f]+=(uint32_t)(score>65536 ? 65536 : score);
+                totals[f]+=ratio_q16(numerator,denominator);
             }
         }
         for(f=0;f<11;f++) w->grid[f][e]=support ? totals[f]/support : 0;

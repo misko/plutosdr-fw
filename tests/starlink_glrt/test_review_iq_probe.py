@@ -46,6 +46,21 @@ def test_full_finite_capture_and_native_retirement(evidence):
     assert result['status']=='pass' and not result['tracking_lock_qualified']
 
 
+@pytest.mark.parametrize('during_visit',[False,True])
+def test_boot_counters_cannot_be_mistaken_for_current_epoch_losses(evidence,during_visit):
+    path=evidence/'journal.txt';lines=path.read_text().splitlines()
+    w=[0]*24;w[:3]=[0x474c5431,1,0];w[5]=2;w[19]=5413836
+    rate=json.loads((evidence/'stdout.json').read_text())['rate']
+    w[20:]=[rate,rate*33//25000,0xb04a2fab,1]
+    wire='tracking_snapshot GLT1SNAP 00010000 '+' '.join(f'{v:08x}' for v in w)
+    lines.insert(2 if during_visit else 0,wire)
+    path.write_text('\n'.join(lines)+'\n')
+    if during_visit:
+        with pytest.raises(ValueError,match='source drops'): review(evidence)
+    else:
+        assert review(evidence)['pre_epoch_cdc_pacer_counters']==[[0,5413836]]
+
+
 @pytest.mark.parametrize('fault',['missing_head','repeated_head','early_stop','unclosed','short_iq','failed_probe'])
 def test_incomplete_or_wrong_evidence_cannot_pass(evidence,fault):
     path=evidence/'journal.txt';lines=path.read_text().splitlines()
