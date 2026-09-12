@@ -16,7 +16,12 @@ def fixture(auxiliary):
 @pytest.mark.parametrize('auxiliary',[False,True])
 def test_all_functional_gates_required(auxiliary):
     result=experiment.qualification(fixture(auxiliary),auxiliary)
-    assert len(result)==(13 if auxiliary else 11)
+    expected={'product_capacity','output_identity','balanced_forward_identity',
+        'registered_abort','product_current_fence','forward_private_status',
+        'product_retirement_receipt','private_forward_descriptor',
+        'output_retirement_receipt','private_replay_sequence'}
+    if auxiliary:expected|={'auxiliary','output_boundaries'}
+    assert set(result)==expected
     assert result['product_capacity']['first_refills']==0
 
 @pytest.mark.parametrize('marker',[
