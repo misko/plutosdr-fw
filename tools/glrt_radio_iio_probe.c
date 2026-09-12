@@ -285,7 +285,8 @@ int main(int argc, char **argv)
     if(bootstrap) {
         CHECK((references=malloc(105600))!=NULL && read_references(argv[8],references)==0,"bootstrap_references");
         CHECK((fft_storage=fftw_malloc(GLRT_RESOLVER_FFT*sizeof(*fft_storage)))!=NULL,"bootstrap_fft_storage");
-        fft_plan=fftw_plan_dft_1d(GLRT_RESOLVER_FFT,fft_storage,fft_storage,FFTW_FORWARD,FFTW_ESTIMATE|FFTW_UNALIGNED);
+        /* Plan before RX starts; worker FFT arrays use ordinary heap alignment. */
+        fft_plan=fftw_plan_dft_1d(GLRT_RESOLVER_FFT,fft_storage,fft_storage,FFTW_FORWARD,FFTW_MEASURE|FFTW_UNALIGNED);
         CHECK(fft_plan!=NULL,"bootstrap_fft_plan");
         memset(&action,0,sizeof(action));action.sa_handler=interrupt_run;sigemptyset(&action.sa_mask);
         CHECK(!sigaction(SIGINT,&action,NULL) && !sigaction(SIGTERM,&action,NULL),"bootstrap_signal_handlers");
