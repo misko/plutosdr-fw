@@ -86,32 +86,38 @@ def test_port_names_cannot_escape_to_other_device_attributes(adapter, tmp_path, 
         lib.glrt_native_posix_close(c.byref(io))
 
 
-def test_exact_attribute_bytes_without_implicit_nul_or_newline(adapter, tmp_path):
+@pytest.mark.parametrize("prefix", ["native_schedule_", "tracking_"])
+@pytest.mark.parametrize("read_name", ["result", "snapshot"])
+@pytest.mark.parametrize("write_name", ["submit", "pop", "command"])
+def test_exact_attribute_bytes_without_implicit_nul_or_newline(adapter, tmp_path,prefix,read_name,write_name):
     lib, _ = adapter
     data = b"GLS1 sample\n"
-    (tmp_path/"native_schedule_result").write_bytes(data)
-    (tmp_path/"native_schedule_pop").touch()
+    read_name,write_name = prefix+read_name,prefix+write_name
+    (tmp_path/read_name).write_bytes(data)
+    (tmp_path/write_name).touch()
     rc, io, p = open_ports(lib, tmp_path, tmp_path/"journal")
     assert rc == 0
     try:
         raw = c.create_string_buffer(512)
-        assert p.read(p.context, b"native_schedule_result", raw, len(raw)) == len(data)
+        assert p.read(p.context, read_name.encode(), raw, len(raw)) == len(data)
         assert raw.raw[:len(data)] == data
-        assert p.write(p.context, b"native_schedule_pop", b"3 7\n", 4) == 4
-        assert (tmp_path/"native_schedule_pop").read_bytes() == b"3 7\n"
+        assert p.write(p.context, write_name.encode(), b"3 7\n", 4) == 4
+        assert (tmp_path/write_name).read_bytes() == b"3 7\n"
     finally:
         lib.glrt_native_posix_close(c.byref(io))
 
 
-def test_symlink_attributes_are_not_followed(adapter, tmp_path):
+@pytest.mark.parametrize("prefix", ["native_schedule_", "tracking_"])
+def test_symlink_attributes_are_not_followed(adapter, tmp_path,prefix):
     lib, _ = adapter
     target = tmp_path/"outside"
     target.write_bytes(b"untouched")
-    (tmp_path/"native_schedule_command").symlink_to(target)
+    name = prefix+"command"
+    (tmp_path/name).symlink_to(target)
     rc, io, p = open_ports(lib, tmp_path, tmp_path/"journal")
     assert rc == 0
     try:
-        assert p.write(p.context, b"native_schedule_command", b"2\n", 2) == -1
+        assert p.write(p.context, name.encode(), b"2\n", 2) == -1
         assert target.read_bytes() == b"untouched"
     finally:
         lib.glrt_native_posix_close(c.byref(io))

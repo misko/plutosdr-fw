@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 #ifndef GLRT_NATIVE_CONTROLLER_H
 #define GLRT_NATIVE_CONTROLLER_H
-#include "glrt_native_trend.h"
+#include "glrt_tracking_trend.h"
 
 /* Narrow synchronous ports. read/write return byte counts or negative errors.
  * retain returns zero only once the exact bytes are retained. It must finish
@@ -30,7 +30,7 @@ struct glrt_native_owned_batch {
     int occupied;
 };
 struct glrt_native_controller {
-    struct glrt_native_trend trend;
+    struct glrt_tracking_trend trend;
     struct glrt_native_owned_batch slots[2];
     struct glrt_native_ports ports;
     struct glrt_native_batch bootstrap;
@@ -39,6 +39,7 @@ struct glrt_native_controller {
     double deadline, cleanup_deadline;
     int started, stopping, cancelled, clearing, done, failure, bootstrap_active, bootstrap_offset_valid;
     int acquisition_horizon_exhausted;
+    int tracking;
 };
 /* Bootstrap is a retained acquisition prediction in a freshly rebased source
  * epoch, with zero scheduled counters. It begins at global frame zero. The
@@ -47,6 +48,13 @@ struct glrt_native_controller {
  * Returns zero after local validation; does not perform I/O. */
 int glrt_native_controller_init(struct glrt_native_controller *,
     const struct glrt_native_ports *, const struct glrt_native_batch *bootstrap,
+    uint32_t frames, double seconds);
+/* GLT1 uses explicitly rate-bound descriptors, snapshots, heads and ports.
+ * The caller must attest the profile's full ROM hash and receiver rate before
+ * init. This initializer performs local validation only. Tick/request_stop
+ * and retention/ownership semantics are shared with the legacy controller. */
+int glrt_tracking_controller_init(struct glrt_native_controller *,
+    const struct glrt_native_ports *, const struct glrt_tracking_batch *bootstrap,
     uint32_t frames, double seconds);
 /* Explicit startup mode: a 17..64-repeat externally validated prediction is
  * an authorization horizon. Submit 12 first, then at most four at a time

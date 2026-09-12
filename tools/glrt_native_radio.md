@@ -15,9 +15,20 @@ the operator receipt; it is not an acquired pilot.
 
 Build `glrt_native_radio.c`, `glrt_native_posix.c`,
 `glrt_native_controller.c`, `glrt_native_trend.c`,
-`glrt_native_schedule.c`, `glrt_tracking_schedule.c` and `glrt_native_solver.c`
+`glrt_native_schedule.c`, `glrt_tracking_schedule.c`, `glrt_tracking_transport.c`
+and `glrt_native_solver.c`
 together with C99 and `-lm`. The shared trend implementation now also exposes
 internal multirate entry points; this executable still speaks fixed-60-MS/s GLS1.
+The controller's `glrt_tracking_controller_init` entry point accepts explicit
+2.5/15/30/60-MS/s GLT1 batches and uses `tracking_*` attributes. It checks the
+entire bootstrap horizon before I/O, binds snapshots to that rate, associates
+heads with the exact prediction/reference phase, and preserves a 100-microsecond
+submission lead before and after descriptor retention. Trend observations add
+the selected reference-phase delay once. The same finite tick/stop APIs retain
+evidence before acknowledgement and cancel uncertain submissions without retry.
+The POSIX adapter accepts these additional narrow attributes. A GLT1 executable
+entry point, acquisition handoff and GLT1 journal review/recovery remain to be
+integrated; the existing CLI and GLS1 journal reviewer do not select this mode.
 The Cortex-A9 hard-float static build uses the existing firmware toolchain.
 The executable takes five positional arguments:
 

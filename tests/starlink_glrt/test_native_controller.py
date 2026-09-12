@@ -5,6 +5,7 @@ It is an I/O/ownership test, not RTL or physical-signal precision evidence.
 """
 import ctypes as c
 import subprocess
+from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
@@ -14,6 +15,10 @@ from tests.starlink_glrt.test_native_solver import packet
 from tests.starlink_glrt.test_native_trend import Batch
 from tools.starlink_glrt_native_replay import coefficients
 from tools.starlink_glrt_schedule_abi import ScheduleBatch
+from tools.starlink_glrt_tracking_abi import TrackingBatch, bank_id
+
+from .test_native_schedule_port import Batch as PortBatch
+from .test_tracking_schedule import TrackingBatch as CTrackingBatch
 
 ROOT = Path(__file__).resolve().parents[2]
 Read = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_char_p, c.c_void_p, c.c_size_t)
@@ -37,12 +42,15 @@ def controller(tmp_path_factory):
                     *(str(ROOT/"tools"/f"glrt_native_{name}.c") for name in
                       ("controller", "trend", "schedule", "solver")),
                     str(ROOT/"tools/glrt_tracking_schedule.c"),
+                    str(ROOT/"tools/glrt_tracking_transport.c"),
                     "-lm", "-o", str(out/"controller.so")], check=True)
     lib = c.CDLL(str(out/"controller.so"))
     lib.controller_size.restype = c.c_size_t
     lib.glrt_native_controller_init.argtypes = [c.c_void_p, c.POINTER(Ports), c.POINTER(Batch),
                                               c.c_uint32, c.c_double]
     lib.glrt_native_controller_init_sliced.argtypes = lib.glrt_native_controller_init.argtypes
+    lib.glrt_tracking_controller_init.argtypes = [c.c_void_p, c.POINTER(Ports),
+        c.POINTER(CTrackingBatch), c.c_uint32, c.c_double]
     lib.glrt_native_controller_tick.argtypes = [c.c_void_p]
     lib.glrt_native_controller_request_stop.argtypes = [c.c_void_p]
     return lib
@@ -58,8 +66,13 @@ def pilot_words():
 
 
 class Radio:
-    def __init__(self, controller, pilot_words, frames=128):
+    def __init__(self, controller, pilot_words, frames=128, *, tracking_rate=None):
         self.lib = controller
+        self.rate = tracking_rate or 60000000
+        self.tracking = tracking_rate is not None
+        self.prefix = "tracking_" if self.tracking else "native_schedule_"
+        self.protocol = "GLT1" if self.tracking else "GLS1"
+        self.samples = self.rate*33//25000
         self.template = pilot_words
         self.state = c.create_string_buffer(controller.controller_size())
         self.time = 0.0
@@ -85,20 +98,36 @@ class Radio:
         self.retention_delay = 0
         self.gap_on_descriptor = False
         self.ports = Ports(None, Read(self.read), Write(self.write), Retain(self.retain), Clock(lambda _: self.time))
-        self.seed = Batch(epoch=3, tag=7, start=self.origin+300000, fraction=0,
-                          period=80000*65536, step=7310173*65536, delta=0, seed=17,
-                          repeats=16, expires=self.origin+300000+16*80000)
-        assert controller.glrt_native_controller_init(self.state, c.byref(self.ports),
-                                                      c.byref(self.seed), frames, 2) == 0
+        self.seed = Batch(epoch=3, tag=7, start=self.origin+self.rate//200,
+                          fraction=24576 if self.tracking else 0,
+                          period=round(Fraction(self.rate*65536,750)),
+                          step=7310173*65536, delta=0, seed=17,
+                          repeats=16, expires=self.origin+self.rate//200+round(Fraction(16*self.rate,750)))
+        if self.tracking:
+            batch = CTrackingBatch(PortBatch(**{name: getattr(self.seed,name)
+                                               for name,_ in PortBatch._fields_}), self.rate)
+            rc = controller.glrt_tracking_controller_init(self.state, c.byref(self.ports),
+                                                          c.byref(batch), frames, 2)
+        else:
+            rc = controller.glrt_native_controller_init(self.state, c.byref(self.ports),
+                                                        c.byref(self.seed), frames, 2)
+        assert rc == 0
 
-    def advance(self, samples=3000):
+    def advance(self, samples=None):
+        if samples is None:
+            samples = self.rate//20000
         self.latest += samples
-        self.time = (self.latest-self.origin)/60000000
-        while self.pending and self.pending[0][0]+79199 <= self.latest:
+        self.time = (self.latest-self.origin)/self.rate
+        while self.pending and self.pending[0][0]+self.samples-1 <= self.latest:
             start, b, repeat = self.pending.pop(0)
-            w = list(self.template)
+            if self.tracking:
+                phase = b.prediction(repeat)[2]
+                w = [0x474c5431]+[0]*8+list(self.template[self.rate,phase])+[
+                    self.rate, self.samples, repeat, phase, bank_id(self.rate), 0x10000, 0]
+            else:
+                w = list(self.template)
             w[1:9] = [self.admitted, b.tag, start % 2**32, start >> 32,
-                       b.seed, b.prediction(repeat)[1], 79200, 0]
+                       b.seed, b.prediction(repeat)[1], self.samples, 0]
             w[27] = repeat
             if self.reject:
                 w[9:25] = [0]*16
@@ -113,19 +142,22 @@ class Radio:
         w = [0x474c5331, 1, self.epoch, self.latest % 2**32, self.latest >> 32,
              status, self.fault, self.configured, self.admitted, 0, 0, 0, 0,
              self.cancelled, self.admitted, self.popped, len(self.queue), self.highwater, 0, 0]
-        return ("GLS1SNAP 00010000 " + " ".join(f"{x:08x}" for x in w)+"\n").encode()
+        if self.tracking:
+            w[0] = 0x474c5431
+            w += [self.rate,self.samples,bank_id(self.rate),4 if self.rate == 2500000 else 1]
+        return (self.protocol+"SNAP 00010000 " + " ".join(f"{x:08x}" for x in w)+"\n").encode()
 
     def read(self, _, name, output, size):
         try:
             name = name.decode()
-            if name == "native_schedule_snapshot":
+            if name == self.prefix+"snapshot":
                 data = self.snapshot()
             else:
-                assert name == "native_schedule_result" and self.queue
+                assert name == self.prefix+"result" and self.queue
                 w = list(self.queue[0])
                 if self.bad_head:
                     w[2] += 1000
-                data = ("GLS1 00010000 " + " ".join(f"{x:08x}" for x in (self.epoch, *w))+"\n").encode()
+                data = (self.protocol+" 00010000 " + " ".join(f"{x:08x}" for x in (self.epoch, *w))+"\n").encode()
             assert len(data) <= size
             c.memmove(output, data, len(data))
             self.events.append(("read", name, data))
@@ -151,8 +183,14 @@ class Radio:
             self.events.append(("write", name, data))
             if name == self.fail_write:
                 return -1
-            if name == "native_schedule_submit":
-                b = ScheduleBatch(*[int(v, 16) for v in data.split()])
+            if name == self.prefix+"submit":
+                if self.tracking:
+                    fields = data.split()
+                    assert fields[:4] == [b"GLT1",b"00010000",f"{self.rate:08x}".encode(),
+                                           f"{bank_id(self.rate):08x}".encode()]
+                    b = TrackingBatch(self.rate,*[int(v,16) for v in fields[4:]])
+                else:
+                    b = ScheduleBatch(*[int(v, 16) for v in data.split()])
                 assert any(kind == "retain" and key == "descriptor" and body.endswith(data)
                            for kind, key, body in self.events)
                 assert b.prediction(0)[0] > self.latest, "submitted an already late descriptor"
@@ -162,7 +200,7 @@ class Radio:
                 self.pending.extend((b.prediction(r)[0], b, r) for r in range(b.repeats))
                 if self.submit_return_error:
                     return -1
-            elif name == "native_schedule_pop":
+            elif name == self.prefix+"pop":
                 epoch, seq = (int(x, 16) for x in data.split())
                 assert self.queue and epoch == self.epoch and seq == self.queue[0][1]
                 assert self.events[-2][:2] == ("retain", "estimate")
@@ -172,7 +210,7 @@ class Radio:
                 if self.pop_return_error:
                     return -1
             else:
-                assert name == "native_schedule_command"
+                assert name == self.prefix+"command"
                 if data.strip() == b"2":
                     self.cancelled += len(self.pending)
                     self.pending.clear()
@@ -202,7 +240,7 @@ class Radio:
 
     def writes(self, suffix):
         return [body for kind, name, body in self.events
-                if kind == "write" and name == "native_schedule_"+suffix]
+                if kind == "write" and name == self.prefix+suffix]
 
 
 def test_every_repeat_feedback_retains_before_submit_and_pop(controller, pilot_words):

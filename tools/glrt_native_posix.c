@@ -15,7 +15,8 @@ static int read_attribute(void *context, const char *name, char *out, size_t siz
     struct glrt_native_posix *p = context;
     ssize_t n;
     int fd, rc;
-    if (strcmp(name,"native_schedule_snapshot") && strcmp(name,"native_schedule_result")) return -1;
+    if (strcmp(name,"native_schedule_snapshot") && strcmp(name,"native_schedule_result") &&
+        strcmp(name,"tracking_snapshot") && strcmp(name,"tracking_result")) return -1;
     if (!size || size > INT_MAX) return -1;
     fd = openat(p->device,name,O_RDONLY|O_CLOEXEC|O_NOFOLLOW);
     if (fd < 0) return -1;
@@ -30,7 +31,8 @@ static int write_attribute(void *context, const char *name, const char *data, si
     ssize_t n;
     int fd, rc;
     if (strcmp(name,"native_schedule_submit") && strcmp(name,"native_schedule_pop") &&
-        strcmp(name,"native_schedule_command")) return -1;
+        strcmp(name,"native_schedule_command") && strcmp(name,"tracking_submit") &&
+        strcmp(name,"tracking_pop") && strcmp(name,"tracking_command")) return -1;
     if (!size || size > INT_MAX) return -1;
     fd = openat(p->device,name,O_WRONLY|O_CLOEXEC|O_NOFOLLOW);
     if (fd < 0) return -1;
