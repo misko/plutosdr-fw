@@ -2,6 +2,24 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-12, shared preflight diagnostic history: **2,266 scoped tests
+and all 92 actual FFT fault/reset/stall cases pass**, including X/Z metadata
+and both one-sided raw resets. Each original guard is compared exactly for
+1,850,180 checks. Numerical words and 4,178-clock service remain unchanged.
+Routing still fails and regresses overall: **WNS -1.318 ns / TNS -453.574 ns /
+1,049 endpoints**. The diagnostic path is shorter, but reset/fault handling
+through guard capacity and job admission is now the worst path. Not promoted.
+Next evaluate an explicit held-bank admission grant that does not reintroduce
+current cross-block readiness into its request, retaining current publication
+vetoes, candidate expiry, exact numerical results and throughput limits.
+Native 60 MS/s fine search and independent 2.5 MS/s inspection remain required.
+FW/HDL source `1d50e40dc` / `3da1ba936`, branch
+`codex/starlink-rx-only-do-not-merge-shared-preflight-evidence`, pushed.
+Verified evidence is stored on the bulk-volume branch to avoid duplicating a
+26 MB archive into the nearly-full root filesystem. PRIMARY HDL remains
+`0b4bf2f0fd8c58c79852266b07f9e95770f75f36`; no radio, PPU or main changes.
+See [shared diagnostic proof and next architecture test](reports/experiments/20260912-shared-preflight-actual-route.md).
+
 Update 2026-09-12, registered product output capacity: **2,229 scoped tests
 and all 82 actual FFT fault/reset/stall cases pass**. With no added replay
 queue, exact numerical results take 4,689 clocks, within the unchanged
