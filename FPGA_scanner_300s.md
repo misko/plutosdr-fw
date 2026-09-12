@@ -2,6 +2,20 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-12, current publication factoring: **1,977 regression tests and
+all 79 actual FFT fault/reset/delay cases pass**; arithmetic and 4,178-clock
+service unchanged. Seven archive-writer and two recorder tests also pass.
+The original handoff path improves -1.095 to -0.659 ns, but aggregate timing
+regresses: **WNS -1.218 ns / TNS -364.715 ns / 862 failing endpoints**.
+Same-domain worst -1.022 ns now traverses forward-buffer capture validation
+into kernel control. This candidate is a retained experiment, **not promoted**.
+Next separate capture validation/private replay/final publication under explicit
+registered ownership, preserving current vetoes and comparing against the
+output-retirement parent. Branch
+`codex/starlink-rx-only-do-not-merge-product-publication-cone`, source FW
+`d27f92ce0`, HDL `c6bcdd7b1`. No primary HDL, radio or PPU/main changes.
+See [publication experiment and route](reports/experiments/20260912-product-publication-cone-actual-route.md).
+
 Update 2026-09-11, private output retirement from real bank ownership:
 output occupancy now passes at **+1.432 ns**. **1,869 tests and all 71 actual FFT
 fault/reset/delay cases pass**, with unchanged arithmetic and 4,178-clock service.
