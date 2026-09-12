@@ -70,6 +70,7 @@ def seed(tmp_path_factory):
                     "-fPIC", "-I", str(root/"tools"), str(out/"wrapper.c"),
                     *(str(root/"tools"/name) for name in SOURCES), "-lm", "-o", str(out/"seed.so")], check=True)
     lib = c.CDLL(str(out/"seed.so"))
+    lib.glrt_tracking_seed_event.argtypes = [c.c_void_p]
     lib.glrt_tracking_seed_plan.argtypes = [c.c_void_p, c.c_void_p, c.c_uint32, c.POINTER(Window)]
     lib.glrt_tracking_seed_copy.argtypes = [c.c_void_p, c.c_void_p, c.c_uint32, c.c_void_p,
                                           c.c_size_t, c.POINTER(Window)]
@@ -196,6 +197,7 @@ def test_c_gate_preserves_existing_python_event_contract(seed):
             expected = -1
         out = Window(); c.memset(c.byref(out), 0x55, c.sizeof(out))
         source = view(words)
+        assert seed.glrt_tracking_seed_event(words) == expected
         assert seed.glrt_tracking_seed_plan(words, c.byref(source), RATE, c.byref(out)) == expected
         if expected != 1: assert bytes(out) == bytes(Window())
     assert seed.glrt_tracking_seed_plan(None, None, RATE, c.byref(Window())) == -1

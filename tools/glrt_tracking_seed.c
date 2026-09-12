@@ -8,7 +8,7 @@
 #define PILOT_OFFSET 22U
 
 static uint64_t pair(const uint32_t *w) { return w[0]|((uint64_t)w[1]<<32); }
-static int accepted(const uint32_t *w)
+int glrt_tracking_seed_event(const uint32_t w[16])
 {
     uint32_t flags,reasons;
     int64_t units;
@@ -37,7 +37,7 @@ int glrt_tracking_seed_plan(const uint32_t event[16], const struct glrt_tracking
     int rc;
     if(!out) return GLRT_SEED_INVALID;
     memset(out,0,sizeof(*out));
-    rc=accepted(event);
+    rc=glrt_tracking_seed_event(event);
     if(rc!=GLRT_SEED_READY) return rc;
     if(!v || !maximum_age || maximum_age>RATE || !v->valid || v->closed ||
         v->epoch!=event[1] || !v->observed_ns || !v->generation ||
@@ -75,7 +75,7 @@ int glrt_tracking_seed_copy(struct glrt_tracking_iq_owner *o, const uint32_t eve
     int rc;
     if(!out) return GLRT_SEED_INVALID;
     memset(out,0,sizeof(*out));
-    rc=accepted(event);
+    rc=glrt_tracking_seed_event(event);
     if(rc!=GLRT_SEED_READY) return rc;
     if(!iq || capacity<GLRT_SEED_WINDOW_SAMPLES) return GLRT_SEED_INVALID;
     if(glrt_tracking_iq_owner_copy(o,event[1],0,NULL,0,&v)) return GLRT_SEED_UNAVAILABLE;

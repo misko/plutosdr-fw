@@ -1,11 +1,13 @@
 /* Finite conserved IQ and one empty coarse decision. Faults exercise the
  * owner's lifecycle; numerical/source attestation uses independent Python. */
+#define _POSIX_C_SOURCE 200809L
 #include "iio.h"
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 struct iio_context { int unused; };
 struct iio_device { int kind; };
 struct iio_channel { int kind,index; };
@@ -15,8 +17,20 @@ static struct iio_device devices[3]={{0},{1},{2}};
 static struct iio_channel channels[3][16];
 static uint32_t visit,limit,received,generation=1;
 static int armed,closed,event_closed,event_sent;
+static int bootstrap_signal;
+static int16_t references[52800];
 static int fault(const char *name) { const char *s=getenv("PROBE_FAULT");return s && !strcmp(s,name); }
-struct iio_context *iio_create_local_context(void) { return &context; }
+struct iio_context *iio_create_local_context(void)
+{
+    bootstrap_signal=getenv("PROBE_SIGNAL")!=NULL;
+    if(bootstrap_signal) {
+        const char *name=getenv("PROBE_REFERENCE");FILE *f=name ? fopen(name,"rb") : NULL;
+        if(!f) return NULL;
+        int valid=fread(references,sizeof(references),1,f)==1 && fgetc(f)==EOF;
+        if(fclose(f) || !valid) return NULL;
+    }
+    return &context;
+}
 void iio_context_destroy(struct iio_context *c)
 {
     FILE *f=fopen(getenv("PROBE_TRACE"),"w");(void)c;
@@ -84,7 +98,15 @@ ssize_t iio_device_attr_read(const struct iio_device *d,const char *name,char *o
         n=snprintf(out,size,"GLA1 00010000 %u %u 2500000",g,visit);
     } else if (search) {
         count=16;w[13]=visit;
-        if (!base) { w[0]=0x113;w[3]=1;w[4]=w[5]=1;w[6]=w[7]=w[9]=1;w[14]=100; }
+        if (!base) {
+            w[0]=0x113;w[3]=1;w[4]=w[5]=1;w[6]=w[7]=w[9]=1;w[14]=100;
+            if(bootstrap_signal) {
+                unsigned complete=amount>=458752;
+                w[0]|=complete ? 0 : 128;w[3]=2;w[4]=2*complete;w[5]=(unsigned)event_sent;
+                w[6]=(amount+249999)/250000;w[7]=amount ? 1 : 0;w[8]=w[6]-w[7];
+                w[9]=w[10]=complete;w[11]=w[7]-complete;
+            }
+        }
         n=snprintf(out,size,"GLA1 00010000 %u 2500000 250000 14000",g);
     } else {
         if (amount) {
@@ -95,7 +117,8 @@ ssize_t iio_device_attr_read(const struct iio_device *d,const char *name,char *o
         if (!base && !final && amount && fault("source_gap")) w[44]=1;
         if (!base && !final && amount && fault("stale_snapshot")) g=2;
         n=snprintf(out,size,"GLA1 00010000 2500000 2500000 %u 0 2500000 0 %u %u 0 0 0 0",g,
-            amount==limit && armed,amount==limit && armed);
+            bootstrap_signal ? 2*(amount>=458752) : amount==limit && armed,
+            bootstrap_signal ? 2*(amount>=458752) : amount==limit && armed);
     }
     for (i=0;i<count;i++) n+=snprintf(out+n,size-(size_t)n," %08x",w[i]);
     n+=snprintf(out+n,size-(size_t)n,"\n");
@@ -119,13 +142,33 @@ ssize_t iio_buffer_refill(struct iio_buffer *b)
 {
     if (b->kind) {
         uint32_t *w=b->data;
+        if(bootstrap_signal) {
+            if(received<458752 || event_sent>=2) return -EAGAIN;
+            memset(w,0,64);w[0]=0x474c4131;w[1]=visit;w[2]=(unsigned)event_sent;w[3]=100;
+            w[5]=(4U<<6)|(event_sent==1);w[7]=23000;w[8]=w[9]=w[10]=w[11]=65536;w[12]=14000;
+            event_sent++;return 64;
+        }
         if (received!=limit || event_sent) return -EAGAIN;
         w[0]=0x474c4131;w[1]=visit;w[2]=fault("event_sequence") ? 1 : 0;w[3]=100;w[5]=3;w[12]=14000;
         event_sent=1;return 64;
     } else {
         size_t i;int16_t *w=b->data;
         if (fault("refill")) return -EIO;
-        for (i=0;i<2*b->samples;i++) w[i]=(int16_t)((2*received+i)%65536-32768);
+        for (i=0;i<2*b->samples;i++) {
+            if(bootstrap_signal) {
+                uint64_t offset=received+i/2;unsigned phase=0,position=3300;
+                if(offset>=22) {
+                    uint64_t frame=(3*(offset-22)+2)/10000;
+                    position=(unsigned)(offset-22-frame*10000/3);
+                    phase=frame%3==0 ? 0 : frame%3==1 ? 1 : 3;
+                }
+                w[i]=position<3300 ? references[(phase*3300+position)*4+i%2] : 0;
+            } else w[i]=(int16_t)((2*received+i)%65536-32768);
+        }
+        if(bootstrap_signal) {
+            struct timespec pause={0,(long)(b->samples*400)};
+            while(nanosleep(&pause,&pause) && errno==EINTR) {}
+        }
         received+=(uint32_t)b->samples;
         return fault("partial") ? (ssize_t)b->bytes-4 : (ssize_t)b->bytes;
     }

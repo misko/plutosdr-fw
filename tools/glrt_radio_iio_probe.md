@@ -49,6 +49,62 @@ closure keeps past evidence readable but forbids publication. This prepares
 concurrent bootstrap access; the ingestion probe still does not resolve live
 candidates or submit tracking jobs.
 
+An optional `GLRT_PROBE_BOOTSTRAP` build now connects a real background session
+to this owner. The default invocation above retains its ingestion-only behavior.
+The additional invocation is:
+
+```text
+probe SERIAL FIRMWARE VISIT EVEN_CHUNK BLOCKS /NEW_OUTPUT_DIR --bootstrap /ATTESTED_REFERENCES.bin
+```
+
+The reference file is exactly 105,600 bytes: four phase banks, each with 3,300
+rows of four little-endian signed 16-bit reference/derivative coefficients.
+The operator pins its full hash and the executable/library identities before
+execution. The executable rejects missing, nonregular, symlinked or incorrectly
+sized reference files before opening a radio context. This profile remains
+direct 2.5 MS/s, upper edge only; it does not generalize the seed convention to
+a decimated higher-rate source.
+
+One waiting pthread accepts at most one pending event while idle. Every event
+gets a retained disposition: ignored, queued, busy or stopped. The original
+raw stream is retained before dispatch. FFT and bootstrap computation use the
+protected IQ copy outside the capture thread. The session uses the existing
+one-second seed-age limit, a two-second source deadline from event origin and
+a three-second wall budget. These are explicit rejection bounds, not measured
+latency promises. New publication wakes the worker; bounded timed waits also
+permit cancellation if publication stops.
+
+Three extra files retain the diagnostic:
+
+- `bootstrap_events.csv`: original event sequence, dispatch time and disposition.
+- `bootstrap.jsonl`: explicit versioned fields for seed selection, all resolver
+  hypotheses, past-pilot moments/estimates, history/proposals and terminal status.
+- `bootstrap.iq.ci16`: the exact seed and past-pilot copies, indexed by each
+  JSON record's complex-sample offset/count.
+
+Worker evidence is limited to 8 MiB including the event-disposition log. A
+failed write, invalid event or worker-port error fails the probe. Unsupported
+history, expired work or normal stop cancellation are retained diagnostic
+outcomes. A queued event canceled before computation gets its terminal record.
+Only the worker writes its IQ/JSON journal; only the capture thread writes
+event dispositions. The session mutex never encloses FFT or pilot arithmetic.
+
+STOP and SIGINT/SIGTERM request worker cancellation before IQ teardown. Final
+event draining records stopped dispositions, then joins the worker before
+destroying owner storage, references or the FFT plan. A HANDOFF record is a
+proposal: a later terminal failure can invalidate it. This diagnostic build
+performs **zero hardware tracking submissions**, including after READY. Actual
+controller/driver admission remains a separate integration gate.
+
+The optional build additionally links `glrt_tracking_session.c`, the seed,
+worker, bootstrap/solver/schedule dependencies, and double-precision FFTW.
+Its FFTW plan allows unaligned worker storage explicitly. The `fftw` test
+marker requires native FFTW headers/library; `GLRT_FFTW_PREFIX` may select a
+local installation. Missing dependencies fail explicitly. The declared IIO
+fixture can supply continuous synthetic pilot samples and a modeled accepted
+coarse event while the actual pthread, FFTW and bootstrap run. That test is
+not RF or FPGA detector qualification. Real-radio verification is separate.
+
 `blocks.csv` records absolute source coordinates and monotonic timestamps
 around refill, snapshot read, ring copying, evidence storage and event draining.
 `block_snapshots.txt` retains the underlying wire evidence. Receiver backlog

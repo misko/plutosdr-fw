@@ -6,6 +6,11 @@
 #define _POSIX_C_SOURCE 200809L
 #include "glrt_capture_source.h"
 #include "glrt_tracking_iq_owner.h"
+#ifdef GLRT_PROBE_BOOTSTRAP
+#include "glrt_tracking_session.h"
+#include <fftw3.h>
+#include <signal.h>
+#endif
 #include <iio.h>
 #include <ctype.h>
 #include <errno.h>
@@ -21,6 +26,39 @@
 #define RATE 2500000U
 #define MAX_SAMPLES (5U*RATE)
 #define WIRE_SIZE 4096
+
+struct event_sink {
+    void *context;
+    int (*offer)(void *,const uint32_t *);
+    int closing,failures;
+};
+
+#ifdef GLRT_PROBE_BOOTSTRAP
+static volatile sig_atomic_t interrupted;
+static void interrupt_run(int signal) { (void)signal;interrupted=1; }
+static int offer_bootstrap(void *context,const uint32_t *event)
+{ return glrt_tracking_session_offer(context,event); }
+static int transform(void *context,double (*bins)[2],size_t count)
+{
+    if(count!=GLRT_RESOLVER_FFT) return -1;
+    fftw_execute_dft((fftw_plan)context,bins,bins);return 0;
+}
+static int read_references(const char *path,int16_t *refs)
+{
+    int fd=open(path,O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK),failed=0;
+    struct stat st;size_t used=0;
+    if(fd<0) return -1;
+    if(fstat(fd,&st) || !S_ISREG(st.st_mode) || st.st_size!=105600) failed=1;
+    while(!failed && used<105600) {
+        ssize_t n=read(fd,(char *)refs+used,105600-used);
+        if(n<0 && errno==EINTR) continue;
+        if(n<=0) { failed=1;break; }
+        used+=(size_t)n;
+    }
+    if(close(fd)) failed=1;
+    return failed ? -1 : 0;
+}
+#endif
 
 static uint64_t ns(void)
 {
@@ -148,7 +186,7 @@ static int save_text(int directory, const char *name, const char *text)
 }
 
 static int drain_events(struct iio_buffer *buffer, FILE *stream, uint32_t visit,
-    uint64_t *events, uint64_t *other)
+    uint64_t *events, uint64_t *other, struct event_sink *sink)
 {
     unsigned limit=2048;
     while (limit--) {
@@ -162,6 +200,10 @@ static int drain_events(struct iio_buffer *buffer, FILE *stream, uint32_t visit,
         if (w[1]!=visit) { (*other)++;continue; }
         if (w[2]!=*events) return -1;
         (*events)++;
+        if(sink->offer && (fflush(stream) || sink->offer(sink->context,w)<0)) {
+            sink->failures++;
+            if(!sink->closing) return -1;
+        }
     }
     return -1;
 }
@@ -203,18 +245,30 @@ int main(int argc, char **argv)
     struct glrt_capture_source cursor;
     struct glrt_tracking_iq_owner owner={0};
     struct glrt_tracking_iq_view view;
+    struct event_sink sink={0};
+#ifdef GLRT_PROBE_BOOTSTRAP
+    struct glrt_tracking_session session={0};
+    struct sigaction action;
+    int16_t *references=NULL;
+    fftw_complex *fft_storage=NULL;
+    fftw_plan fft_plan=NULL;
+    int bootstrap=argc==9 && !strcmp(argv[7],"--bootstrap"),join_safe=1;
+#endif
     int16_t *storage=NULL,*copied=NULL;
     FILE *iq_file=NULL,*event_file=NULL,*blocks_file=NULL,*snapshots_file=NULL;
     char wire[WIRE_SIZE],before[WIRE_SIZE],after[WIRE_SIZE];
     const char *stage="arguments",*failure=NULL;
     uint32_t visit,chunk,blocks,n=0;
     uint64_t limit=0,first=0,source_now=0,event_count=0,other_events=0,started=0,finished=0;
-    int directory=-1,length,have_baseline=0,have_final=0,armed=0;
+    int directory=-1,length,have_baseline=0,have_final=0,armed=0,valid_arguments=argc==7;
     unsigned i;
     uint16_t endian=1;
 #define CHECK(condition, label) do { stage=label; if (!(condition)) { failure=stage; goto cleanup; } } while (0)
     if (argc==2 && !strcmp(argv[1],"--base64")) return export_base64();
-    if (argc!=7 || strlen(argv[1])<1 || strlen(argv[1])>128 || strlen(argv[2])<1 || strlen(argv[2])>80 ||
+#ifdef GLRT_PROBE_BOOTSTRAP
+    if(bootstrap && argv[8][0]=='/' && !strchr(argv[8],'\n') && !strchr(argv[8],'\r')) valid_arguments=1;
+#endif
+    if (!valid_arguments || strlen(argv[1])<1 || strlen(argv[1])>128 || strlen(argv[2])<1 || strlen(argv[2])>80 ||
         decimal(argv[3],UINT32_MAX,&visit) || decimal(argv[4],250000,&chunk) ||
         decimal(argv[5],MAX_SAMPLES,&blocks) || chunk%2 ||
         (uint64_t)chunk*blocks>MAX_SAMPLES || argv[6][0]!='/' ||
@@ -227,6 +281,16 @@ int main(int argc, char **argv)
     for (i=0;argv[2][i];i++) if (!isalnum((unsigned char)argv[2][i]) &&
         !strchr("-._",argv[2][i])) return 2;
     CHECK(*(unsigned char *)&endian==1,"little_endian_cpu");
+#ifdef GLRT_PROBE_BOOTSTRAP
+    if(bootstrap) {
+        CHECK((references=malloc(105600))!=NULL && read_references(argv[8],references)==0,"bootstrap_references");
+        CHECK((fft_storage=fftw_malloc(GLRT_RESOLVER_FFT*sizeof(*fft_storage)))!=NULL,"bootstrap_fft_storage");
+        fft_plan=fftw_plan_dft_1d(GLRT_RESOLVER_FFT,fft_storage,fft_storage,FFTW_FORWARD,FFTW_ESTIMATE|FFTW_UNALIGNED);
+        CHECK(fft_plan!=NULL,"bootstrap_fft_plan");
+        memset(&action,0,sizeof(action));action.sa_handler=interrupt_run;sigemptyset(&action.sa_mask);
+        CHECK(!sigaction(SIGINT,&action,NULL) && !sigaction(SIGTERM,&action,NULL),"bootstrap_signal_handlers");
+    }
+#endif
     limit=(uint64_t)chunk*blocks;
     CHECK(mkdir(argv[6],0700)==0,"new_output_directory");
     CHECK((directory=open(argv[6],O_RDONLY|O_DIRECTORY|O_NOFOLLOW))>=0,"output_directory");
@@ -247,6 +311,12 @@ int main(int argc, char **argv)
     iq_file=new_file(directory,"iq.ci16");event_file=new_file(directory,"events.raw");
     blocks_file=new_file(directory,"blocks.csv");snapshots_file=new_file(directory,"block_snapshots.txt");
     CHECK(iq_file && event_file && blocks_file && snapshots_file,"evidence_files");
+#ifdef GLRT_PROBE_BOOTSTRAP
+    if(bootstrap) {
+        CHECK(glrt_tracking_session_start(&session,directory,&owner,references,transform,fft_plan)==0,"bootstrap_session");
+        sink.context=&session;sink.offer=offer_bootstrap;
+    }
+#endif
     CHECK(fputs("block,first,source_now,refill_begin_ns,refill_end_ns,snapshot_begin_ns,snapshot_end_ns,ring_end_ns,store_end_ns,event_end_ns\n",blocks_file)>=0,"block_header");
     CHECK(iio_device_set_kernel_buffers_count(events,1024)==0,"event_kernel_buffers");
     CHECK((event_buffer=iio_device_create_buffer(events,1,false))!=NULL,"event_buffer");
@@ -267,6 +337,9 @@ int main(int argc, char **argv)
         uint64_t t0=ns(),t1,t2,t3,t4,t5,t6;
         ssize_t bytes;
         CHECK(t0>=started && t0-started<UINT64_C(20000000000),"capture_wall_deadline");
+#ifdef GLRT_PROBE_BOOTSTRAP
+        CHECK(!interrupted,"interrupted");
+#endif
         bytes=iio_buffer_refill(iq_buffer);t1=ns();
         CHECK(bytes==(ssize_t)chunk*4 && iio_buffer_step(iq_buffer)==4 &&
             (char *)iio_buffer_end(iq_buffer)-(char *)iio_buffer_start(iq_buffer)==bytes,"whole_iq_block");
@@ -282,12 +355,19 @@ int main(int argc, char **argv)
         t4=ns();
         CHECK(fwrite(copied,4,chunk,iq_file)==chunk && fprintf(snapshots_file,"%s\n",wire)>0,"iq_evidence");
         t5=ns();
-        CHECK(drain_events(event_buffer,event_file,visit,&event_count,&other_events)==0,"live_event_drain");
+#ifdef GLRT_PROBE_BOOTSTRAP
+        if(bootstrap) CHECK(glrt_tracking_session_wake(&session)==0,"bootstrap_worker_health");
+#endif
+        CHECK(drain_events(event_buffer,event_file,visit,&event_count,&other_events,&sink)==0,"live_event_drain");
         t6=ns();
         CHECK(fprintf(blocks_file,"%u,%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64
             ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 "\n",n,first,source_now,t0,t1,t2,t3,t4,t5,t6)>0,"block_evidence");
     }
 cleanup:
+#ifdef GLRT_PROBE_BOOTSTRAP
+    if(session.started && glrt_tracking_session_stop(&session) && !failure) failure="bootstrap_stop";
+#endif
+    sink.closing=1;
     if (iq_buffer) { iio_buffer_destroy(iq_buffer);iq_buffer=NULL; }
     if (owner.initialized && glrt_tracking_iq_owner_close(&owner,failure!=NULL) && !failure)
         failure="ring_close";
@@ -307,7 +387,7 @@ cleanup:
         else {
             uint64_t target=final.cpu[1]-baseline.cpu[1];
             while (event_count<target && ns()<deadline) {
-                if (drain_events(event_buffer,event_file,visit,&event_count,&other_events)) {
+                if (drain_events(event_buffer,event_file,visit,&event_count,&other_events,&sink)) {
                     if (!failure) failure="final_event_drain";
                     break;
                 }
@@ -316,6 +396,13 @@ cleanup:
             if (event_count!=target && !failure) failure="event_count";
         }
     }
+#ifdef GLRT_PROBE_BOOTSTRAP
+    if(session.started) {
+        if(glrt_tracking_session_join(&session) && !failure) failure="bootstrap_join";
+        join_safe=session.joined;
+    }
+#endif
+    if(sink.failures && !failure) failure="bootstrap_event_retention";
     if (event_buffer) iio_buffer_destroy(event_buffer);
     if (ctx && armed) {
         if (rf_state(ctx,after) || save_text(directory,"rf_after.txt",after) || strcmp(before,after))
@@ -326,13 +413,32 @@ cleanup:
     if (event_file && fclose(event_file) && !failure) failure="events_close";
     if (blocks_file && fclose(blocks_file) && !failure) failure="blocks_close";
     if (snapshots_file && fclose(snapshots_file) && !failure) failure="snapshots_close";
-    if (owner.initialized && glrt_tracking_iq_owner_destroy(&owner) && !failure) failure="ring_destroy";
-    free(copied);free(storage);
+#ifdef GLRT_PROBE_BOOTSTRAP
+    if(join_safe) {
+        if(fft_plan) fftw_destroy_plan(fft_plan);
+        fftw_free(fft_storage);free(references);
+#endif
+        if (owner.initialized && glrt_tracking_iq_owner_destroy(&owner) && !failure) failure="ring_destroy";
+        free(copied);free(storage);
+#ifdef GLRT_PROBE_BOOTSTRAP
+    }
+#endif
     if (directory>=0) close(directory);
+#ifdef GLRT_PROBE_BOOTSTRAP
+    if(bootstrap) printf("{\"scope\":\"live_bootstrap_diagnostic\",\"attempts\":%" PRIu64
+        ",\"completed\":%" PRIu64 ",\"ready_proposals\":%" PRIu64 ",\"ignored\":%" PRIu64
+        ",\"busy_events\":%" PRIu64 ",\"stopped_events\":%" PRIu64
+        ",\"evidence_bytes\":%" PRIu64 ",\"event_bytes\":%" PRIu64 ",\"fatal\":%d,\"joined\":%d,\"hardware_submissions\":0}\n",
+        session.attempts,session.completed,session.ready,session.ignored,session.busy_events,
+        session.stopped_events,session.bytes,session.event_bytes,session.fatal,session.joined);
+#endif
     printf("{\"status\":\"%s\",\"failed_stage\":\"%s\",\"visit\":%u,\"chunk_samples\":%u,"
         "\"requested_samples\":%" PRIu64 ",\"completed_blocks\":%u,\"events\":%" PRIu64
         ",\"other_visit_events\":%" PRIu64 ",\"capture_begin_ns\":%" PRIu64 ",\"capture_closed_ns\":%" PRIu64
         ",\"independent_attestation_required\":true,\"tracking_feedback_exercised\":false}\n",
         failure ? "failed" : "captured",failure ? failure : "",visit,chunk,limit,n,event_count,other_events,started,finished);
+#ifdef GLRT_PROBE_BOOTSTRAP
+    if(!join_safe) { fflush(stdout);_Exit(1); }
+#endif
     return failure ? 1 : 0;
 }

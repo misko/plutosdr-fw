@@ -13,6 +13,8 @@ struct glrt_tracking_seed_window {
     size_t starts[4];
     struct glrt_tracking_iq_view selected, copied;
 };
+/* Validate/classify one record without touching IQ or starting computation. */
+int glrt_tracking_seed_event(const uint32_t event[16]);
 /* Internal direct 2.5-MS/s upper-edge profile. Caller attests the GLA1 stream,
  * radio/reference identities and event sequence before offering CPU-endian
  * words. Transport-valid final accepted decisions alone may seed resolution.
