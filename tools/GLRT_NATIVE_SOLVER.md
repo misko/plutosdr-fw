@@ -187,6 +187,7 @@ The additive [GLT1 transport](GLRT_TRACKING_TRANSPORT.md) now binds rate,
 reference profile/phase, source epoch and admitted descriptor before its C
 association port invokes the solver. Compile `glrt_tracking_transport.c`,
 `glrt_tracking_schedule.c` and `glrt_native_solver.c` together. This supplies the
-FPGA result producer and C/Python offline association; Linux attributes and the
-multirate radio controller still need integration. It does not turn the existing
+FPGA result/control bank, coherent C/Python snapshots and association, and Linux
+attributes. The complete receiver and multirate radio controller still need
+integration. It does not turn the existing
 60-MS/s controller or GLS1 interface into a multirate runtime.

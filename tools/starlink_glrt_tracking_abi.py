@@ -141,3 +141,52 @@ class TrackingResult:
     def acknowledgement(self) -> str:
         """Only after raw retention and association; not proof of a supported fit."""
         return f"{self.epoch:08x} {self.sequence:08x}\n"
+
+
+@dataclass(frozen=True)
+class TrackingSnapshot:
+    generation: int
+    epoch: int
+    latest_index: int
+    status: int
+    faults: int
+    configured: int
+    admitted: int
+    late: int
+    no_space: int
+    unavailable: int
+    expired: int
+    cancelled: int
+    committed: int
+    popped: int
+    queued: int
+    high_water: int
+    cdc_drops: int
+    pacer_drops: int
+    rate: int
+    samples: int
+    reference_bank: int
+    reference_phases: int
+
+    @classmethod
+    def from_sysfs(cls, text: str) -> TrackingSnapshot:
+        fields = text.split()
+        require(len(fields) == 26 and fields[0] == "GLT1SNAP", "invalid GLT1 snapshot envelope")
+        require(all(re.fullmatch(r"[0-9a-fA-F]{8}", word) for word in fields[1:]),
+                "GLT1 snapshot requires canonical u32 hexadecimal words")
+        version, *w = (int(word, 16) for word in fields[1:])
+        require(version == VERSION and w[0] == MAGIC and w[1] > 0, "invalid tracking snapshot identity")
+        require(w[22] == bank_id(w[20]) and w[21] == w[20]*33//25000 and
+                w[23] == (4 if w[20] == 2500000 else 1), "invalid tracking snapshot geometry")
+        require(w[5] & ~0xff == 0 and w[6] & ~0xf == 0, "unknown tracking snapshot status/fault")
+        require(sum(w[8:14]) <= w[7], "tracking decisions exceed configured repeats")
+        require(w[15] <= w[14] <= w[8] and w[8]-w[14] <= 1,
+                "inconsistent tracking admission/commit/pop counters")
+        require(w[16] == w[14]-w[15] <= w[17] <= 64, "inconsistent tracking queue counters")
+        return cls(w[1], w[2], w[3] | w[4] << 32, *w[5:])
+
+    def require_drained(self) -> None:
+        require(not self.status & 4 and self.queued == 0, "tracking work or results remain reserved")
+        require(self.configured == sum((self.admitted, self.late, self.no_space,
+                                       self.unavailable, self.expired, self.cancelled)) and
+                self.admitted == self.committed == self.popped, "incomplete tracking loss accounting")

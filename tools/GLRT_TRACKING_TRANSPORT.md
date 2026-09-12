@@ -2,9 +2,9 @@
 
 GLT1 is an additive scheduled-result contract. GLS1 and GLN1 retain their
 published 60-MS/s meanings. This implementation supplies a result producer,
-offline decoder and radio C association port; Linux attributes and integrated
-receiver/controller deployment are subsequent work. The text submit format
-below is specified here but is not yet an available radio attribute.
+coherent control bank, offline decoder, radio C association port and Linux
+attributes. Complete receiver/controller integration and deployment remain
+subsequent work; these attributes are not yet available on the resident radio.
 
 Each queue record is 128 bytes, 32 little-endian unsigned 32-bit words:
 
@@ -67,3 +67,54 @@ The RTL `TRACKING=1` option selects GLT1 and scales schedule geometry for the
 fixed SOURCE_RATE. It exports the scheduler phase to the engine and serializes
 the engine's captured result phase. Default `TRACKING=0` retains GLS1 and its
 legacy field layout. The 32-word queue size and reservation rules are unchanged.
+
+## Control bank and snapshots
+
+The tracking option in `starlink_glrt_native_schedule_control` uses the existing
+scheduled register region at byte 0x800, with GLT1 magic and explicit geometry.
+Configuration, command, ownership, epoch and queue-head offsets retain their
+roles. Read-only capabilities at word offsets 32..38 are pilot samples, native
+rate, capacity (64 in the production profile), bank discriminator, capability
+bits (1: moments), reference phase count and snapshot word count (24).
+
+`GLT1SNAP 00010000` is followed by 24 eight-digit hex words:
+
+| Words | Meaning |
+|---|---|
+| 0–2 | GLT1 magic, nonzero snapshot generation, source epoch |
+| 3–4 | Latest integer native source index, low/high |
+| 5–6 | Status and sticky control faults |
+| 7–13 | Configured, admitted, late, no-space, unavailable, expired, cancelled |
+| 14–17 | Committed, popped, queued, queue high-water |
+| 18–19 | CDC and pacer drop counts |
+| 20–23 | Native rate, full pilot samples, bank discriminator, phase count |
+
+Status bits 0..7 are submit ready, manual engine idle, reserved, head readable,
+epoch valid, source good, clearing and counter exhausted. Control fault bits
+0..3 are invalid write, rejected descriptor, queue fault and source epoch fault.
+All higher bits are invalid. Snapshot words reside at byte 0x900. Source index,
+status and counters freeze together; advancing the source does not change a
+retained snapshot. Both C and Python decoders validate geometry and queue
+conservation. A drained snapshot requires every opportunity accounted for and
+all admitted results committed and popped, with no reservation or queued head.
+
+## Linux interface
+
+New attributes are `tracking_abi`, `tracking_snapshot`, `tracking_result`,
+`tracking_submit`, `tracking_pop` and `tracking_command`. Only the matching
+interface advertises its ABI; GLT1 is never emitted under native_schedule_*.
+The driver verifies all fixed hardware capabilities before binding. The first
+accepted board combination is GLA1 direct 2.5 MS/s plus tracking, capabilities
+25; the higher-rate transaction helpers are tested but full higher-rate board
+profiles still require integration and qualification. Existing GLA1 capabilities
+9 and legacy GLS1 remain supported.
+
+The submit parser validates the version/rate/bank before register writes and
+requires a profile identical to the probed one. Common queue transactions
+preserve retained-head caching, readback checks, epoch fencing and uncertain
+POP reconciliation. Starting a conflicting capture/configuration or clearing
+reserved evidence is refused. Clock changes prevent new REBASE/SUBMIT; source
+loss still permits draining saved results. Unbind cancels without popping.
+The kernel does not perform scientific association or estimation: the radio
+controller must retain each raw head and use the C association port before
+acknowledging it.

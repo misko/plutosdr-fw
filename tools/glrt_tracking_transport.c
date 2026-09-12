@@ -25,14 +25,14 @@ int glrt_tracking_batch_encode(const struct glrt_tracking_batch *t, char *text, 
     return n;
 }
 
-int glrt_tracking_head_parse(const char *text, size_t size, uint32_t *epoch, uint32_t w[32])
+static int parse_words(const char *text, size_t size, const char *prefix,
+                       unsigned count, uint32_t *parsed)
 {
-    uint32_t parsed[34];
-    size_t pos=4;
+    size_t pos=strlen(prefix);
     unsigned i,j;
-    if (!text || !epoch || !w || size<=pos || memcmp(text,"GLT1",4) ||
+    if (!text || size<=pos || memcmp(text,prefix,pos) ||
         !isspace((unsigned char)text[pos])) return -1;
-    for (i=0;i<34;i++) {
+    for (i=0;i<count;i++) {
         uint32_t value=0;
         while (pos<size && isspace((unsigned char)text[pos])) pos++;
         if (size-pos<8) return -1;
@@ -49,10 +49,48 @@ int glrt_tracking_head_parse(const char *text, size_t size, uint32_t *epoch, uin
         if (pos<size && !isspace((unsigned char)text[pos])) return -1;
     }
     while (pos<size && isspace((unsigned char)text[pos])) pos++;
-    if (pos!=size || parsed[0]!=GLRT_TRACKING_VERSION || !parsed[1]) return -1;
+    return pos==size ? 0 : -1;
+}
+
+int glrt_tracking_head_parse(const char *text, size_t size, uint32_t *epoch, uint32_t w[32])
+{
+    uint32_t parsed[34];
+    if (!epoch || !w || parse_words(text,size,"GLT1",34,parsed) ||
+        parsed[0]!=GLRT_TRACKING_VERSION || !parsed[1]) return -1;
     *epoch=parsed[1];
     memcpy(w,parsed+2,32*sizeof(*w));
     return 0;
+}
+
+static int snapshot_valid(const uint32_t *w)
+{
+    const struct glrt_tracking_profile *p;
+    uint64_t terminal=0;
+    unsigned n;
+    if (!w || w[0]!=GLRT_TRACKING_MAGIC || !w[1] || (w[5]&~0xffU) || (w[6]&~0xfU) ||
+        !(p=glrt_tracking_profile_get(w[20],0)) || w[21]!=p->samples ||
+        w[22]!=bank_id(w[20]) || w[23]!=p->reference_phases) return 0;
+    for (n=8;n<14;n++) terminal+=w[n];
+    return terminal<=w[7] && w[15]<=w[14] && w[14]<=w[8] && w[8]-w[14]<=1 &&
+        w[16]==w[14]-w[15] && w[16]<=w[17] && w[17]<=64;
+}
+
+int glrt_tracking_snapshot_parse(const char *text, size_t size, uint32_t w[24])
+{
+    uint32_t parsed[25];
+    if (!w || parse_words(text,size,"GLT1SNAP",25,parsed) ||
+        parsed[0]!=GLRT_TRACKING_VERSION || !snapshot_valid(parsed+1)) return -1;
+    memcpy(w,parsed+1,24*sizeof(*w));
+    return 0;
+}
+
+int glrt_tracking_snapshot_drained(const uint32_t w[24])
+{
+    uint64_t terminal=0;
+    unsigned n;
+    if (!snapshot_valid(w) || (w[5]&4) || w[16]) return 0;
+    for (n=8;n<14;n++) terminal+=w[n];
+    return terminal==w[7] && w[8]==w[14] && w[14]==w[15];
 }
 
 int glrt_tracking_associated_solve(const struct glrt_tracking_batch *t,

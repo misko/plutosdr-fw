@@ -12,6 +12,8 @@
 int glrt_tracking_batch_encode(const struct glrt_tracking_batch *, char *, size_t);
 /* Explicit size excludes any C terminator. Parse failure publishes nothing. */
 int glrt_tracking_head_parse(const char *, size_t, uint32_t *epoch, uint32_t words[32]);
+int glrt_tracking_snapshot_parse(const char *, size_t, uint32_t words[24]);
+int glrt_tracking_snapshot_drained(const uint32_t words[24]);
 /* Retain the original head before association/acknowledgement. Associated
  * partial/faulted heads return 0 with rejection bits for explicit draining.
  * Invalid association/encoding returns -1 and invalidates any stale estimate. */
