@@ -98,7 +98,8 @@ def test_cadence_and_exact_window_staging(tmp_path, period, window, partial):
     "dut.admitted=32'hffffffff;dut.remaining=0;",
     "dut.skipped=32'hffffffff;dut.remaining=0;engine_arm_ready=0;",
     "dut.expected_index=0;input_index=0;"])
-def test_faults_fence_admission_and_forwarding(tmp_path, damage):
+@pytest.mark.parametrize("recovery", ["flush", "reset"])
+def test_faults_fence_admission_and_forwarding(tmp_path, damage, recovery):
     bench = r'''
 module tb;
 reg clk=0;always #5 clk=~clk;
@@ -110,6 +111,8 @@ wire signed [15:0] engine_input_i,engine_input_q;
 wire [63:0] engine_input_index;
 wire [31:0] opportunities,admitted,skipped;
 starlink_glrt_local_cadence dut(.*);
+integer n;
+reg [95:0] stopped_counts;
 initial begin
  repeat(3) @(negedge clk);resetn=1;input_valid=1;
  @(negedge clk);input_index=1;
@@ -117,14 +120,38 @@ initial begin
  #1;if(engine_arm) $fatal(1,"bad source admitted");
  @(negedge clk);input_valid=0;
  if(!fault || engine_input_valid || engine_arm) $fatal(1,"fault not fenced");
- flush=1;@(negedge clk);flush=0;source_closed=0;input_gap=0;input_index=123;
+ stopped_counts={opportunities,admitted,skipped};
+ // Once fenced, arbitrary payload and readiness changes cannot create valid
+ // samples or admission. The original error may disappear before source stop.
+ source_closed=0;input_gap=0;
+ for(n=0;n<9;n=n+1) begin
+  input_valid=n%3!=0;input_index=~input_index;input_i=16'h8000+n;input_q=16'h7fff-n;
+  engine_arm_ready=n%2;
+  #1;if(engine_arm) $fatal(1,"fenced payload admitted");
+  @(negedge clk);
+  if(!fault || engine_input_valid || {opportunities,admitted,skipped}!==stopped_counts)
+   $fatal(1,"fenced visit changed");
+ end
+ source_closed=1;input_valid=1;engine_arm_ready=1;
+ @(negedge clk);
+ if(!closed || !fault || engine_input_valid || engine_arm) $fatal(1,"fault closure lost");
+ RECOVER_ON
+ @(negedge clk);
+ if(fault || closed || engine_input_valid || engine_arm || opportunities || admitted || skipped)
+  $fatal(1,"recovery accepted old payload");
+ RECOVER_OFF
+ source_closed=0;input_gap=0;input_index=123;input_i=-32768;input_q=32767;
  engine_arm_ready=1;input_valid=1;
  #1;if(!engine_arm) $fatal(1,"restart not admitted");
  @(negedge clk);input_valid=0;
- if(fault || !engine_input_valid || engine_input_index!=123 || admitted!=1 || opportunities!=1)
+ if(fault || !engine_input_valid || engine_input_index!=123 ||
+    engine_input_i!==16'h8000 || engine_input_q!==16'h7fff || admitted!=1 || opportunities!=1)
   $fatal(1,"restart wrong");
  $display("PASS");$finish;
 end
 endmodule
 '''
-    simulate(tmp_path, bench.replace("DAMAGE", damage))
+    bench = bench.replace("DAMAGE", damage)
+    bench = bench.replace("RECOVER_ON", "flush=1;" if recovery == "flush" else "resetn=0;")
+    bench = bench.replace("RECOVER_OFF", "flush=0;" if recovery == "flush" else "resetn=1;")
+    simulate(tmp_path, bench)
