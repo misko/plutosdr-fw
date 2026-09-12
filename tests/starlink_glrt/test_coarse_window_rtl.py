@@ -8,7 +8,6 @@ import pytest
 
 from .test_coarse_peaks_rtl import reference as retained_reference
 
-
 BENCH=r'''
 `timescale 1ns/1ps
 module tb;
@@ -86,9 +85,15 @@ endmodule
 
 @pytest.mark.parametrize("with_peaks", [False, True])
 @pytest.mark.parametrize("stride", [1,24])
-def test_complete_coarse_grid_prefix_reuse_backpressure_and_source_gap(tmp_path, with_peaks, stride):
+@pytest.mark.parametrize("full_scale", [False, True])
+def test_complete_coarse_grid_prefix_reuse_backpressure_and_source_gap(tmp_path, with_peaks, stride, full_scale):
     rng=np.random.default_rng(6014250)
     values=rng.integers(-128,129,(14000,2),dtype=np.int16)
+    if full_scale:
+        # Exercise signed square operands at both CI16 limits as well as zero;
+        # asymmetric I/Q catches cross-lane or cross-group pipeline pairing.
+        values=rng.choice(np.array([-32768,-32767,-1,0,1,32766,32767],dtype=np.int16),
+                          size=(14000,2))
     coefficients=rng.integers(-512,513,(12,12,11,2),dtype=np.int64)
     coefficients[:,11]=0
     coeff_path=tmp_path/'coeff.mem';energy_path=tmp_path/'energy.mem'
@@ -152,6 +157,7 @@ def test_complete_coarse_grid_prefix_reuse_backpressure_and_source_gap(tmp_path,
         check=True,capture_output=True,text=True)
     result=subprocess.run(['vvp',str(executable),f'+INPUT={stimulus}'],check=True,
         capture_output=True,text=True,timeout=60)
+    (tmp_path/'simulation.log').write_text(result.stdout+result.stderr)
     actual=[tuple(map(int,line.split()[1:])) for line in result.stdout.splitlines() if line.startswith('R ')]
     assert actual==expected
     assert 'DONE' in result.stdout
