@@ -196,6 +196,24 @@ def test_job_without_reference_lead_time_is_explicitly_rejected(tmp_path):
         expected(job,[],[],0x12)]
 
 
+@pytest.mark.parametrize("distance", [-2**40, -1, 1, 2**40])
+def test_before_start_ordering_never_admits_wrong_absolute_sample(tmp_path, distance):
+    count=96
+    bank=bank_for(count)
+    coefficients=coefficient_oracle(bank,24,count)
+    job=(2**60+1000,7,919)
+    rows=[row(job=job)]+[row()]*59
+    # A clipped observation before the requested origin is irrelevant. A late
+    # first observation is a source discontinuity even across large high bits.
+    rows += [row(value=sample(job[0]+distance),clipped=int(distance<0))]
+    if distance<0:
+        rows += [row(value=sample(job[0]+n),closed=int(n==count-1)) for n in range(count)]
+        truth=expected(job,[sample(job[0]+n) for n in range(count)],coefficients)
+    else:
+        truth=expected(job,[],[],1)
+    assert simulate(tmp_path,count,bank,rows)==[truth]
+
+
 def test_reference_clipping_is_rejected_before_any_product_is_admitted(tmp_path):
     count = 96
     bank = bank_for(count)

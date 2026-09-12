@@ -157,6 +157,25 @@ def test_complete_coarse_grid_prefix_reuse_backpressure_and_source_gap(tmp_path,
         names.extend(['peaks', 'search'])
         rows = [[item[2] for item in expected[e*11:e*11+11]] for e in range(12)]
         expected = [(epoch, frequency, score, rank) for rank, epoch, frequency, score in retained_reference(rows)]
+    # A completed score bank, copy fault and source fault must not contaminate
+    # a fresh window. Recompute all scalar-oracle scores after the final fault.
+    source=source.replace('$finish;',r'''
+ flush=1;@(negedge clk);flush=0;@(negedge clk);
+ $fclose(fd);fd=$fopen(path,"r");
+ arm=1;@(negedge clk);arm=0;
+ for(cycles=0;cycles<14000;cycles=cycles+1) begin
+  rc=$fscanf(fd,"%d %d\n",si,sq);if(rc!=2) $fatal;
+  input_valid=1;input_i=si;input_q=sq;input_index=cycles*24;
+  @(negedge clk);
+ end
+ input_valid=0;waits=0;
+ while(!done && !fault && waits<100000) begin
+  output_ready=waits%7!=0;@(negedge clk);waits=waits+1;
+ end
+ if(fault || !done || rejected_arms!=0) $fatal(1,"fresh score bank did not recover");
+ $finish;
+''')
+    expected=expected+expected
     source=source.replace('(STRIDE)',f'({stride})').replace('cycles*24',f'cycles*{stride}').replace('14001*24',f'14001*{stride}')
     source=source.replace('.EPOCH_COUNT(12)',f'.EPOCH_COUNT(12),.FOLDED_NORM({int(folded)})')
     bench=tmp_path/'tb.sv';bench.write_text(source.replace('"COEFF"',f'"{coeff_path}"').replace('"ENERGY"',f'"{energy_path}"'))

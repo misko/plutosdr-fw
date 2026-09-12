@@ -217,6 +217,20 @@ def test_true_source_rate_continuous_iq_and_snapshot(rate, captures, tmp_path):
     assert decoded.source_center(0) == int(oracle.indexes[oracle.supported][0])-regs[0x17c]
 
 
+@pytest.mark.parametrize("native", [False, True])
+def test_empty_prefix_snapshot_stays_zero_during_filter_warmup(native,captures,tmp_path):
+    raw=np.random.default_rng(33165536).integers(-10000,10001,(500,2),dtype=np.int16)
+    oracle=Ddc(60000000).process(raw,16)
+    assert len(oracle.iq)>0 and not any(oracle.supported)
+    rows=[*arm(),*samples(raw),wait(5000),*snapshot(),write(8,2),*snapshot()]
+    output,reads,_=run(captures(60000000,native=native),rows,tmp_path)
+    assert not output
+    for capture in (reads[:65],reads[65:]):
+        regs=dict(capture)
+        assert u64(regs,0x80)==u64(regs,0x88)==u64(regs,0x90)==0
+        assert u64(regs,0xa0)==len(oracle.iq) and regs[0xc8]==0
+
+
 def test_full_width_write_decode_boundaries_and_partial_strobes(captures,tmp_path):
     rows=[]
     expected=[]
