@@ -1,6 +1,11 @@
 # Paired FPGA PSS / host GLRT scanner — DO NOT MERGE firmware into main
 
-Status: implementation started; hardware qualification is NOT complete.
+Status: **NO-GO — incremental timing-closure work aborted on 2026-09-12.**
+Hardware qualification is NOT complete. See [hard gates and stop decision](PSS_DEPLOYMENT_GO_NO_GO.md).
+The final in-flight product-publication route regressed to -1.067 ns same-clock
+slack and 880 failing endpoints. No further variants or deployment are permitted
+without an explicit user-approved restart. Previously listed next steps below
+are historical, not authorization to continue this approach.
 
 Update 2026-09-12, phase-specific quiet publication: **2,411 scoped tests and
 all 92 actual FFT fault/reset/stall cases pass**. Full and reduced publication
