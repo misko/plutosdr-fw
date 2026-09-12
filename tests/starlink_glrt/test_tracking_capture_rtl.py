@@ -66,12 +66,19 @@ def test_first_tracking_image_has_one_native_engine_and_shared_acquisition(captu
     assert re.search(r'\.scope generate, "g_serial"', source)
 
 
-@pytest.mark.parametrize("termination", ["complete", "mid-pilot", "gap", "cancel"])
-def test_exact_native_results_coexist_with_iq_and_stop_keeps_queued_evidence(captures, tmp_path, termination):
+@pytest.mark.parametrize(("termination", "stop_phase"), [
+    ("complete", 0), ("gap", 0), ("cancel", 0),
+    # Sweep one complete 2.5-MS/s sample interval at the 100-MHz core clock.
+    # Every partial result must remain independently covered by exported IQ.
+    *(("mid-pilot", phase) for phase in range(40)),
+])
+def test_exact_native_results_coexist_with_iq_and_stop_keeps_queued_evidence(
+    captures, tmp_path, termination, stop_phase
+):
     completed = termination == "complete"
     count = 3 if completed else 2
     rows = [(0, 11, 0, 3, 1), write(8, 4), wait(2000), write(0x20, 517), write(8, 1),
-        write(0x808, 16), *configuration(), wait(450000 if completed else 200000)]
+        write(0x808, 16), *configuration(), wait(450000 if completed else 200000+stop_phase)]
     if termination == "gap": rows += [(0, 5, 0, 0x12345678, 0), wait(100)]
     if termination == "cancel": rows += [write(0x808, 2), wait(500)]
     rows += [write(8, 2), wait(500), *snapshot(), *tracking_snapshot()]
