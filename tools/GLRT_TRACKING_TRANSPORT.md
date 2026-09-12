@@ -1,5 +1,12 @@
 # GLT1 v1.0 multirate tracking transport
 
+The user-space `glrt_tracking_batch_parse` port accepts the versioned submit
+text as a retained seed, validates its complete finite horizon and publishes
+the output only on success. Its size excludes a C terminator; embedded/trailing
+NULs, oversized fields and unknown rate/bank combinations are rejected. Parsing
+does not attest the live firmware: the controller additionally matches source
+snapshots to the chosen rate, and deployment attests the full reference hash.
+
 GLT1 is an additive scheduled-result contract. GLS1 and GLN1 retain their
 published 60-MS/s meanings. This implementation supplies a result producer,
 coherent control bank, offline decoder, radio C association port and Linux

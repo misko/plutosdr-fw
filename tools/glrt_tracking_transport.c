@@ -25,6 +25,45 @@ int glrt_tracking_batch_encode(const struct glrt_tracking_batch *t, char *text, 
     return n;
 }
 
+int glrt_tracking_batch_parse(const char *text, size_t size, struct glrt_tracking_batch *out)
+{
+    struct glrt_tracking_batch candidate;
+    struct glrt_tracking_job last;
+    uint64_t v[13];
+    size_t at=5;
+    unsigned i;
+    if (!out || !text || size<=5 || memcmp(text,"GLT1 ",5)) return -1;
+    for (i=0;i<13;i++) {
+        unsigned digits=0;
+        uint64_t value=0;
+        while (at<size && isspace((unsigned char)text[at])) at++;
+        while (at<size && !isspace((unsigned char)text[at])) {
+            unsigned char ch=(unsigned char)text[at++];
+            unsigned digit;
+            if (digits==16) return -1;
+            if (ch>='0' && ch<='9') digit=ch-'0';
+            else if (ch>='a' && ch<='f') digit=ch-'a'+10;
+            else if (ch>='A' && ch<='F') digit=ch-'A'+10;
+            else return -1;
+            value=(value<<4)|digit;
+            digits++;
+        }
+        if (!digits || (i<3 && digits!=8)) return -1;
+        v[i]=value;
+    }
+    while (at<size && isspace((unsigned char)text[at])) at++;
+    if (at!=size || v[0]!=GLRT_TRACKING_VERSION || v[1]>UINT32_MAX ||
+        v[2]!=bank_id((uint32_t)v[1]) || v[3]>UINT32_MAX || v[4]>UINT32_MAX ||
+        v[6]>65535 || v[10]>UINT32_MAX || v[11]>64) return -1;
+    candidate.prediction=(struct glrt_native_batch){(uint32_t)v[3],(uint32_t)v[4],v[5],v[7],v[8],v[9],v[12],
+        (uint32_t)v[6],(uint32_t)v[10],(uint32_t)v[11]};
+    candidate.rate=(uint32_t)v[1];
+    if (!glrt_tracking_batch_valid(&candidate) ||
+        glrt_tracking_prediction(&candidate,candidate.prediction.repeats-1,&last)) return -1;
+    *out=candidate;
+    return 0;
+}
+
 static int parse_words(const char *text, size_t size, const char *prefix,
                        unsigned count, uint32_t *parsed)
 {

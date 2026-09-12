@@ -10,6 +10,9 @@
  * Deployment must attest the full reference SHA256 before accepting a source
  * epoch. The on-wire 32-bit bank discriminator is not a hash attestation. */
 int glrt_tracking_batch_encode(const struct glrt_tracking_batch *, char *, size_t);
+/* Parse a retained seed without a C terminator; validate the complete horizon.
+ * Failure leaves the output untouched. The live receiver must match its rate. */
+int glrt_tracking_batch_parse(const char *, size_t, struct glrt_tracking_batch *);
 /* Explicit size excludes any C terminator. Parse failure publishes nothing. */
 int glrt_tracking_head_parse(const char *, size_t, uint32_t *epoch, uint32_t words[32]);
 int glrt_tracking_snapshot_parse(const char *, size_t, uint32_t words[24]);

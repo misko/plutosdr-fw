@@ -8,9 +8,15 @@ from __future__ import annotations
 import math
 import re
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 
-from .starlink_glrt_schedule_abi import SAMPLES, ScheduleBatch, ScheduleSnapshot, ScheduledResult
+from .starlink_glrt_schedule_abi import (
+    SAMPLES,
+    ScheduleBatch,
+    ScheduledResult,
+    ScheduleSnapshot,
+)
 
 KINDS = {"bootstrap_seed", "initial", "descriptor", "head", "estimate", "before_submit",
          "stopping", "drained", "final", "snapshot"}
@@ -56,8 +62,19 @@ def batch(text: str) -> ScheduleBatch:
     return b
 
 
-def descriptors(entries: list[JournalRecord], *, epoch: int) -> dict[int, tuple[int, ScheduleBatch]]:
-    owners: dict[int, tuple[int, ScheduleBatch]] = {}
+@dataclass(frozen=True)
+class JournalCodec:
+    batch: Callable
+    snapshot: Callable
+    head: Callable
+    prefix: str
+
+
+GLS1 = JournalCodec(batch, ScheduleSnapshot.from_sysfs, ScheduledResult.from_sysfs, "native_schedule_")
+
+
+def _descriptors(entries: list[JournalRecord], *, epoch: int, codec: JournalCodec) -> dict:
+    owners = {}
     next_frame = 0
     for record in entries:
         if record.kind != "descriptor":
@@ -65,7 +82,7 @@ def descriptors(entries: list[JournalRecord], *, epoch: int) -> dict[int, tuple[
         fields = record.payload.decode("ascii").split(maxsplit=2)
         if len(fields) != 3 or fields[0] != "frame" or not re.fullmatch(r"[0-9]{1,6}", fields[1]):
             raise ValueError("invalid retained global frame mapping")
-        first, b = int(fields[1]), batch(fields[2])
+        first, b = int(fields[1]), codec.batch(fields[2])
         if b.epoch != epoch or b.tag in owners or first != next_frame or first+b.repeats > 225000:
             raise ValueError("retained descriptor ownership is inconsistent")
         owners[b.tag] = first, b
@@ -73,14 +90,18 @@ def descriptors(entries: list[JournalRecord], *, epoch: int) -> dict[int, tuple[
     return owners
 
 
-def review(data: bytes, *, epoch: int) -> dict:
+def descriptors(entries: list[JournalRecord], *, epoch: int) -> dict[int, tuple[int, ScheduleBatch]]:
+    return _descriptors(entries, epoch=epoch, codec=GLS1)
+
+
+def _review(data: bytes, *, epoch: int, codec: JournalCodec) -> dict:
     """Require a complete retained drain and final clear, independent of C state.
 
     This checks transport/association and finite fit fields. It does not repeat
     the numerical solver or establish pilot detection or physical accuracy.
     """
     entries, _ = records(data)
-    owners = descriptors(entries, epoch=epoch)
+    owners = _descriptors(entries, epoch=epoch, codec=codec)
     seen: set[int] = set()
     heads = []
     estimates = []
@@ -93,11 +114,11 @@ def review(data: bytes, *, epoch: int) -> dict:
             raise ValueError("records follow final clearance")
         if record.kind == "descriptor":
             # Only descriptors already retained at this point authorize heads.
-            seen.add(batch(text.split(maxsplit=2)[2]).tag)
+            seen.add(codec.batch(text.split(maxsplit=2)[2]).tag)
         elif record.kind == "head":
             if pending is not None:
                 raise ValueError("retained head lacks associated estimate")
-            head = ScheduledResult.from_sysfs(text)
+            head = codec.head(text)
             if head.tag not in seen:
                 raise ValueError("head precedes retained ownership")
             first, b = owners[head.tag]
@@ -127,7 +148,7 @@ def review(data: bytes, *, epoch: int) -> dict:
                 linearized_coherence=values[4], rejection=int(fields[8])))
             pending = None
         elif record.kind in {"initial", "before_submit", "stopping", "drained", "final"}:
-            state = ScheduleSnapshot.from_sysfs(text)
+            state = codec.snapshot(text)
             if state.epoch != epoch:
                 raise ValueError("journal crosses source epoch")
             if record.kind == "drained":
@@ -147,8 +168,13 @@ def review(data: bytes, *, epoch: int) -> dict:
                 supported=sum(e["rejection"] == 0 for e in estimates))
 
 
-def recover(device, data: bytes, *, epoch: int, writer_stopped: bool, retain,
-            deadline: float, clock=time.monotonic, sleep=time.sleep) -> ScheduleSnapshot:
+def review(data: bytes, *, epoch: int) -> dict:
+    """Review GLS1 evidence only; transport checks do not repeat its solver."""
+    return _review(data, epoch=epoch, codec=GLS1)
+
+
+def _recover(device, data: bytes, *, epoch: int, writer_stopped: bool, retain,
+             deadline: float, codec: JournalCodec, clock, sleep):
     """Cancel, retain/associate outstanding heads, drain, then clear.
 
     The caller retains every callback payload before it returns. No uncertain
@@ -158,36 +184,36 @@ def recover(device, data: bytes, *, epoch: int, writer_stopped: bool, retain,
     if not writer_stopped:
         raise ValueError("recovery requires a confirmed stopped writer")
     entries, _ = records(data, allow_partial=True)
-    owners = descriptors(entries, epoch=epoch)
+    owners = _descriptors(entries, epoch=epoch, codec=codec)
 
     def snap():
         if clock() >= deadline:
             raise TimeoutError("retained recovery deadline")
-        raw = device.read("native_schedule_snapshot")
+        raw = device.read(codec.prefix+"snapshot")
         retain("snapshot", raw)
-        state = ScheduleSnapshot.from_sysfs(raw)
+        state = codec.snapshot(raw)
         if state.epoch != epoch:
             raise ValueError("recovery source epoch changed")
         return state
 
     state = snap()
-    device.command("native_schedule_command", 2)
+    device.command(codec.prefix+"command", 2)
     while True:
         state = snap()
         if not state.status & 4 and state.admitted == state.committed:
             break
         sleep(.002)
     while state.queued:
-        raw = device.read("native_schedule_result")
+        raw = device.read(codec.prefix+"result")
         retain("head", raw)
-        head = ScheduledResult.from_sysfs(raw)
+        head = codec.head(raw)
         if head.tag not in owners:
             raise ValueError("recovery head has no retained descriptor")
         head.require_association(owners[head.tag][1], sequence=state.popped)
-        if device.read("native_schedule_result") != raw:
+        if device.read(codec.prefix+"result") != raw:
             raise ValueError("recovery head changed before POP")
         try:
-            device.command("native_schedule_pop", head.acknowledgement().strip())
+            device.command(codec.prefix+"pop", head.acknowledgement().strip())
         except (OSError, RuntimeError):
             after = snap()
             if after.popped != state.popped+1:
@@ -196,9 +222,16 @@ def recover(device, data: bytes, *, epoch: int, writer_stopped: bool, retain,
         if state.popped != head.sequence+1:
             raise ValueError("recovery POP did not advance exactly one head")
     state.require_drained()
-    device.command("native_schedule_command", 4)
+    device.command(codec.prefix+"command", 4)
     final = snap()
     final.require_drained()
     if final.configured or final.faults or final.status & 16:
         raise ValueError("recovery failed to clear drained source")
     return final
+
+
+def recover(device, data: bytes, *, epoch: int, writer_stopped: bool, retain,
+            deadline: float, clock=time.monotonic, sleep=time.sleep) -> ScheduleSnapshot:
+    """Recover GLS1 evidence only after the owner confirms its writer stopped."""
+    return _recover(device, data, epoch=epoch, writer_stopped=writer_stopped,
+                    retain=retain, deadline=deadline, codec=GLS1, clock=clock, sleep=sleep)

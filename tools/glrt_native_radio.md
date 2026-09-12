@@ -18,7 +18,8 @@ Build `glrt_native_radio.c`, `glrt_native_posix.c`,
 `glrt_native_schedule.c`, `glrt_tracking_schedule.c`, `glrt_tracking_transport.c`
 and `glrt_native_solver.c`
 together with C99 and `-lm`. The shared trend implementation now also exposes
-internal multirate entry points; this executable still speaks fixed-60-MS/s GLS1.
+internal multirate entry points. The default executable mode speaks fixed-60-MS/s
+GLS1; `--tracking` explicitly selects GLT1.
 The controller's `glrt_tracking_controller_init` entry point accepts explicit
 2.5/15/30/60-MS/s GLT1 batches and uses `tracking_*` attributes. It checks the
 entire bootstrap horizon before I/O, binds snapshots to that rate, associates
@@ -26,9 +27,8 @@ heads with the exact prediction/reference phase, and preserves a 100-microsecond
 submission lead before and after descriptor retention. Trend observations add
 the selected reference-phase delay once. The same finite tick/stop APIs retain
 evidence before acknowledgement and cancel uncertain submissions without retry.
-The POSIX adapter accepts these additional narrow attributes. A GLT1 executable
-entry point, acquisition handoff and GLT1 journal review/recovery remain to be
-integrated; the existing CLI and GLS1 journal reviewer do not select this mode.
+The POSIX adapter accepts these additional narrow attributes. Acquisition
+handoff remains separate: the executable consumes a retained future prediction.
 The Cortex-A9 hard-float static build uses the existing firmware toolchain.
 The executable takes five positional arguments:
 
@@ -36,8 +36,26 @@ The executable takes five positional arguments:
 glrt_native_radio ATTESTED_SYSFS_DIRECTORY NEW_JOURNAL BOOTSTRAP_FILE FRAMES SECONDS
 ```
 
+Append `--tracking` for an explicitly versioned GLT1 seed file. Its content is
+the exact `GLT1 VERSION RATE BANK EPOCH TAG START FRACTION PERIOD STEP DELTA
+SEED REPEATS EXPIRES` submit text defined in `GLRT_TRACKING_TRANSPORT.md`.
+The parser rejects malformed widths, hidden NULs, unknown profiles, overflow
+and an expired final pilot before opening the journal or radio directory.
+The initial live snapshot must match the parsed rate; a descriptor never
+changes the receiver's sample clock. Do not combine `--tracking` with the
+legacy `--bootstrap-slices` option. Result summaries include protocol and rate.
+
+Use `starlink_glrt_tracking_journal.review(data, epoch=..., rate=...)` for GLT1
+journals. It checks retained ownership before each head, reference phase and
+prediction association, finite fit fields, terminal accounting and final clear.
+It does not independently recompute the numerical solver. Its `recover` port
+requires a confirmed stopped writer and the same attested rate/epoch; it retains
+and associates raw heads before acknowledgement, and reconciles an uncertain
+POP without repeating it. The GLS1 reviewer/recovery API continues to accept
+only GLS1 bodies. Both use the internal length-framed GLRJ1 journal envelope.
+
 Use the canonical `/sys/devices/...` directory supplied by the operator, not
-the `/sys/bus/iio/devices/...` symlink. The seed file contains the exact ten
+the `/sys/bus/iio/devices/...` symlink. In default GLS1 mode, the seed file contains the exact ten
 hexadecimal GLS1 SUBMIT fields (epoch, tag, start, fraction, period, step,
 delta, seed, repeats, expires), with no prefixes, signs or hidden terminators.
 Bounds are 225,000 total opportunities and 300 seconds, plus at most five

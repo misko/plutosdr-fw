@@ -34,11 +34,11 @@ class Port:
         # Fake C controller enforces a preceding estimate; recovery needs only
         # the separately retained associated raw head. Preserve its assertion
         # and additionally require the real recovery retention here.
-        if name == "native_schedule_pop":
+        if name == self.radio.prefix+"pop":
             assert self.evidence and self.evidence[-1][0] == "head"
             self.radio.events.extend([("retain", "head", self.evidence[-1][1].encode()),
                                       ("retain", "estimate", b"recovery-only")])
-        if name == "native_schedule_command" and value == 4:
+        if name == self.radio.prefix+"command" and value == 4:
             self.radio.events.append(("retain", "drained", self.evidence[-1][1].encode()))
         n = self.radio.write(None, name.encode(), text, len(text))
         assert not self.radio.errors, self.radio.errors
