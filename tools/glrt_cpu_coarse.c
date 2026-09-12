@@ -45,15 +45,16 @@ static int better(const struct glrt_cpu_coarse_peak *a, const struct glrt_cpu_co
     return a->frequency<b->frequency;
 }
 
-int glrt_cpu_coarse_search(struct glrt_cpu_coarse_workspace *w, const int16_t *iq,
-    const int16_t c[12][11][11][2], int (*poll)(void *), void *context)
+int glrt_cpu_coarse_grid(uint32_t grid[11][GLRT_CPU_COARSE_EPOCHS], const int16_t *iq,
+    const int16_t c[12][11][11][2], unsigned begin, unsigned end,
+    uint32_t *completed, int (*poll)(void *), void *context)
 {
     static const unsigned offsets[5]={0,3333,6667,10000,13333};
     uint64_t energy[12][11];
     unsigned e,s,f,r,t,k;
-    if(!w) return -1;
-    memset(w,0,sizeof(*w));
-    if(!iq || !c || !poll || poll(context)) return -1;
+    if(completed) *completed=0;
+    if(!grid || !completed || begin>=end || end>GLRT_CPU_COARSE_EPOCHS ||
+       !iq || !c || !poll || poll(context)) return -1;
     for(s=0;s<12;s++) for(f=0;f<11;f++) {
         uint64_t sum=0;
         for(t=0;t<11;t++) for(k=0;k<2;k++) {
@@ -63,7 +64,7 @@ int glrt_cpu_coarse_search(struct glrt_cpu_coarse_workspace *w, const int16_t *i
         }
         energy[s][f]=sum;
     }
-    for(e=0;e<GLRT_CPU_COARSE_EPOCHS;e++) {
+    for(e=begin;e<end;e++) {
         uint32_t totals[11]={0};
         unsigned support=0;
         if(!(e%16) && poll(context)) return -1;
@@ -91,9 +92,18 @@ int glrt_cpu_coarse_search(struct glrt_cpu_coarse_workspace *w, const int16_t *i
                 totals[f]+=ratio_q16(numerator,denominator);
             }
         }
-        for(f=0;f<11;f++) w->grid[f][e]=support ? totals[f]/support : 0;
-        w->completed_epochs=e+1;
+        for(f=0;f<11;f++) grid[f][e]=support ? totals[f]/support : 0;
+        *completed=e-begin+1;
     }
+    return 0;
+}
+
+int glrt_cpu_coarse_select(struct glrt_cpu_coarse_workspace *w, int (*poll)(void *), void *context)
+{
+    unsigned k,f,e,r;
+    if(!w) return -1;
+    w->count=0;memset(w->peaks,0,sizeof(w->peaks));
+    if(!poll || w->completed_epochs!=GLRT_CPU_COARSE_EPOCHS) return -1;
     for(k=0;k<8;k++) {
         struct glrt_cpu_coarse_peak best={0,0,0};
         for(f=0;f<11;f++) for(e=0;e<GLRT_CPU_COARSE_EPOCHS;e++) {
@@ -114,4 +124,14 @@ int glrt_cpu_coarse_search(struct glrt_cpu_coarse_workspace *w, const int16_t *i
     if(poll(context)) { memset(w->peaks,0,sizeof(w->peaks)); return -1; }
     w->count=k;
     return 0;
+}
+
+int glrt_cpu_coarse_search(struct glrt_cpu_coarse_workspace *w, const int16_t *iq,
+    const int16_t c[12][11][11][2], int (*poll)(void *), void *context)
+{
+    if(!w) return -1;
+    memset(w,0,sizeof(*w));
+    if(glrt_cpu_coarse_grid(w->grid,iq,c,0,GLRT_CPU_COARSE_EPOCHS,
+                           &w->completed_epochs,poll,context)) return -1;
+    return glrt_cpu_coarse_select(w,poll,context);
 }

@@ -22,4 +22,12 @@ struct glrt_cpu_coarse_workspace {
  */
 int glrt_cpu_coarse_search(struct glrt_cpu_coarse_workspace *, const int16_t *iq,
     const int16_t coefficients[12][11][11][2], int (*poll)(void *), void *context);
+/* Internal disjoint grid partitions. These publish no peaks. Caller owns the
+ * complete input lifetime, uses separate completion counters, and joins every
+ * writer before selecting peaks. Poll must be safe for concurrent calls.
+ * select requires all 3333 epochs computed successfully. */
+int glrt_cpu_coarse_grid(uint32_t grid[11][GLRT_CPU_COARSE_EPOCHS], const int16_t *,
+    const int16_t [12][11][11][2], unsigned begin, unsigned end,
+    uint32_t *completed, int (*poll)(void *), void *context);
+int glrt_cpu_coarse_select(struct glrt_cpu_coarse_workspace *, int (*poll)(void *), void *context);
 #endif

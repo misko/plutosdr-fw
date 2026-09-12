@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
+#ifdef GLRT_COARSE_BENCH_PARALLEL
+#include <pthread.h>
+#include <string.h>
+#endif
 static double clock_s(void)
 {
     struct timespec t;
@@ -13,6 +17,44 @@ static double clock_s(void)
     return t.tv_sec+1e-9*t.tv_nsec;
 }
 static int poll(void *deadline) { return clock_s()>=*(double *)deadline; }
+#ifdef GLRT_COARSE_BENCH_PARALLEL
+struct part {
+    struct glrt_cpu_coarse_workspace *w;
+    const int16_t *iq;
+    const int16_t (*coefficients)[11][11][2];
+    unsigned begin,end;
+    uint32_t completed;
+    int result;
+    double *deadline;
+};
+static void *partition(void *context)
+{
+    struct part *p=context;
+    p->result=glrt_cpu_coarse_grid(p->w->grid,p->iq,p->coefficients,p->begin,p->end,
+                                 &p->completed,poll,p->deadline);
+    return NULL;
+}
+static int search(struct glrt_cpu_coarse_workspace *w,const int16_t *iq,
+                  const int16_t c[12][11][11][2],double *deadline)
+{
+    pthread_t child;
+    struct part parts[2]={{w,iq,c,0,1666,0,-1,deadline},
+                          {w,iq,c,1666,3333,0,-1,deadline}};
+    memset(w,0,sizeof(*w));
+    if(pthread_create(&child,NULL,partition,&parts[0])) return -1;
+    partition(&parts[1]);
+    /* A failed join must terminate this saved-IQ-only executable; it cannot
+     * return and release stack/input storage still reachable by a writer. */
+    if(pthread_join(child,NULL)) exit(2);
+    if(parts[0].result || parts[1].result) return -1;
+    w->completed_epochs=parts[0].completed+parts[1].completed;
+    return glrt_cpu_coarse_select(w,poll,deadline);
+}
+#else
+static int search(struct glrt_cpu_coarse_workspace *w,const int16_t *iq,
+                  const int16_t c[12][11][11][2],double *deadline)
+{ return glrt_cpu_coarse_search(w,iq,c,poll,deadline); }
+#endif
 int main(int argc,char **argv)
 {
     struct glrt_cpu_coarse_workspace *w;
@@ -29,7 +71,7 @@ int main(int argc,char **argv)
         double started,elapsed;
         if(fread(iq,sizeof(iq),1,data)!=1) return 2;
         started=clock_s();
-        if(glrt_cpu_coarse_search(w,iq,c,poll,&deadline)) return 1;
+        if(search(w,iq,c,&deadline)) return 1;
         elapsed=clock_s()-started;
         if(fwrite(w->grid,sizeof(w->grid),1,grid)!=1) return 2;
         printf("%s{\"window\":%u,\"milliseconds\":%.9g,\"peaks\":[",i ? "," : "",i,elapsed*1000);

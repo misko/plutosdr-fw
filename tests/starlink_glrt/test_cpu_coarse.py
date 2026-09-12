@@ -30,6 +30,9 @@ def api(tmp_path_factory):
                    check=True,capture_output=True)
     lib = C.CDLL(str(root/"coarse.so"))
     lib.glrt_cpu_coarse_search.argtypes = [C.POINTER(Workspace),C.c_void_p,C.c_void_p,POLL,C.c_void_p]
+    lib.glrt_cpu_coarse_grid.argtypes = [C.c_void_p,C.c_void_p,C.c_void_p,C.c_uint,C.c_uint,
+                                        C.POINTER(C.c_uint32),POLL,C.c_void_p]
+    lib.glrt_cpu_coarse_select.argtypes = [C.POINTER(Workspace),POLL,C.c_void_p]
     return lib
 
 
@@ -109,3 +112,40 @@ def test_coefficient_range_is_checked_before_computation(api):
     w = Workspace()
     assert api.glrt_cpu_coarse_search(C.byref(w),iq.ctypes.data,coefficients.ctypes.data,POLL(lambda _:0),None) == -1
     assert w.count == w.completed_epochs == 0
+
+
+def test_disjoint_partitions_cannot_publish_an_incomplete_scan(api):
+    iq=np.random.default_rng(8523).integers(-32768,32768,(14000,2),dtype=np.int16)
+    c=bank();w=Workspace();done=C.c_uint32();check=POLL(lambda _:0)
+    np.ctypeslib.as_array(w.grid)[:]=0xdeadbeef
+    assert api.glrt_cpu_coarse_grid(C.byref(w),iq.ctypes.data,c.ctypes.data,1666,3333,
+                                    C.byref(done),check,None)==0
+    assert done.value==1667
+    w.completed_epochs=done.value
+    assert np.all(np.ctypeslib.as_array(w.grid)[:,:1666]==0xdeadbeef)
+    assert api.glrt_cpu_coarse_select(C.byref(w),check,None)==-1 and not w.count
+    assert api.glrt_cpu_coarse_grid(C.byref(w),iq.ctypes.data,c.ctypes.data,0,1666,
+                                    C.byref(done),check,None)==0
+    assert done.value==1666
+    w.completed_epochs+=done.value
+    assert api.glrt_cpu_coarse_select(C.byref(w),check,None)==0
+    expected=integer_grid(iq,c)
+    np.testing.assert_array_equal(np.ctypeslib.as_array(w.grid),expected)
+    assert [(p.epoch,p.frequency,p.score) for p in w.peaks[:w.count]]==[
+        p[:3] for p in expected_candidates(expected)]
+
+
+def test_actual_two_thread_benchmark_matches_complete_serial_grid(api,tmp_path):
+    binary=tmp_path/'bench'
+    subprocess.run(['cc','-O2','-std=c99','-Wall','-Wextra','-Werror',
+        '-DGLRT_COARSE_BENCH_PARALLEL',str(ROOT/'tools/glrt_cpu_coarse_bench.c'),
+        str(ROOT/'tools/glrt_cpu_coarse.c'),'-pthread','-lm','-o',str(binary)],check=True)
+    iq=np.random.default_rng(6148).integers(-32768,32768,(56000,2),dtype=np.int16)
+    c=bank();c.tofile(tmp_path/'bank');iq.tofile(tmp_path/'iq')
+    subprocess.run([str(binary),str(tmp_path/'bank'),str(tmp_path/'iq'),str(tmp_path/'grid')],
+                   check=True,capture_output=True,timeout=10)
+    grids=np.fromfile(tmp_path/'grid',dtype='<u4').reshape(4,11,3333)
+    for i in range(4):
+        w=Workspace();cut=iq[i*14000:(i+1)*14000]
+        assert api.glrt_cpu_coarse_search(C.byref(w),cut.ctypes.data,c.ctypes.data,POLL(lambda _:0),None)==0
+        np.testing.assert_array_equal(grids[i],np.ctypeslib.as_array(w.grid))
