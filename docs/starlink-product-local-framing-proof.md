@@ -52,7 +52,11 @@ ownership. This is source-derived cofactoring, not delayed fault suppression.
   Bad final position/certificate/LAST and both raw reset inputs are covered.
 - Final version-2 regression: 2,232 tests pass, including auxiliary-witness
   rejection and matched-stimulus tests.
-  Full inherited actual campaign and physical results are recorded separately.
+  The complete version-2 actual campaign also passes all 88 cases in 349.566 s:
+  906,329 original-request comparisons, 134 actual product publications and
+  seven local framing rejections (six new plus one inherited). All prior
+  arithmetic, ownership, quarantine and fresh-recovery witnesses pass.
+  Physical results are recorded separately.
 
 Initial component test construction failures remain in the evidence: overly
 broad parameter-token replacement, exact trailing-newline differences, and

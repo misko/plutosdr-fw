@@ -1,0 +1,12 @@
+{
+  "path": "/dev/shm/starlink-local-framing.8W1DqIoa/20260912-product-local-framing-evidence.tgz",
+  "bytes": 11569562,
+  "sha256": "c636012caf89b873cfa52d92f82b2a8155fb08bf7cee167d173d7f17fe821adf",
+  "members": 811,
+  "all_members_verified": true,
+  "full_receiver_or_deployment_claim": false,
+  "verification": "sequential payload SHA256, inventory, regular files, gzip CRC, stable archive SHA256",
+  "verifier_sha256": "c03e82ec7454df7fccba72a20fc958dc839d566094aaa6dfd6233e19b9456b88",
+  "writer_sha256": "a4b8b9394b622322ab9da8e39dd914b7d0ed36621e2a05df5265dde2e97eaca7",
+  "sources_unchanged": true
+}
