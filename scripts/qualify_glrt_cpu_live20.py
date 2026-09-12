@@ -6,7 +6,12 @@ import json
 from pathlib import Path
 import shlex
 import subprocess
+import sys
 import uuid
+
+# Use the component's public GLT1 decoder, including its counter invariants.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tools.starlink_glrt_tracking_abi import TrackingSnapshot
 
 from leo.acquisition.authority import LocalCaptureAuthority, RadioResource, CaptureTaskKind
 from pluto_plus import bootstrap_firmware as b
@@ -17,6 +22,21 @@ from pluto_plus.release_candidate_rx_only_linux import _close_iio_context
 from deploy_glrt_iq_tracking20 import EVIDENCE, PASSWORD
 
 ARTIFACTS = ('capture.txt', 'iq.ci16', 'worker.jsonl', 'worker.iq.ci16', 'grids.u32', 'native.journal')
+
+
+def configure_idle_rx(context, *, rate, lo_hz, evidence):
+    device = context.find_device('starlink-glrt-iq')
+    if device is None:
+        raise ValueError('missing GLI1 capture device')
+    wire = device.attrs['tracking_snapshot'].value
+    evidence['tracking_before_configuration'] = wire
+    state = TrackingSnapshot.from_sysfs(wire)
+    state.require_drained()
+    if state.rate != rate or state.status & 16 or state.faults or state.configured:
+        raise ValueError('tracking must be drained and cleared before RF configuration')
+    return g.configure_checked_rx(context, lo=lo_hz, bandwidth=2500000, gain=30,
+                                  port='A_BALANCED', source_rate=rate,
+                                  base_abi='GLI1-1.0-upper-only')
 
 
 def main():
@@ -78,9 +98,8 @@ def main():
                 context.set_timeout(5000)
                 if context.attrs['hw_serial'] != ENDPOINT[0] or context.attrs['fw_version'] != plan['expected_firmware']:
                     raise ValueError('configuration identity differs')
-                evidence['configured'] = g.configure_checked_rx(context, lo=args.lo_hz,
-                    bandwidth=2500000, gain=30, port='A_BALANCED', source_rate=args.rate,
-                    base_abi='GLI1-1.0-upper-only')
+                evidence['configured'] = configure_idle_rx(context, rate=args.rate,
+                    lo_hz=args.lo_hz, evidence=evidence)
                 evidence['calibration'] = {}
                 save()
                 g.calibrate_rx(context.find_device('ad9361-phy'), source_rate=args.rate,

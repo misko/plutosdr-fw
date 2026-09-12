@@ -69,3 +69,57 @@ def test_refusal_precedes_radio_contact_and_records_busy_receipt(tmp_path, monke
         assert receipt["live_tracking_qualified"] is False
     else:
         assert not output.exists()
+
+
+@pytest.mark.parametrize('case', [
+    'ready', 'boot_drops', 'unread', 'active', 'unaccounted', 'fault',
+    'epoch_valid', 'uncleared', 'wrong_rate', 'malformed', 'missing',
+])
+def test_native_preflight_precedes_every_rf_mutation(tmp_path, monkeypatch, case):
+    """A prior failed controller's retained results survive a later invocation."""
+    def module(name, **values):
+        result = ModuleType(name)
+        result.__dict__.update(values)
+        monkeypatch.setitem(sys.modules, name, result)
+        return result
+
+    mutations = []
+    module('leo');module('leo.acquisition')
+    module('leo.acquisition.authority', LocalCaptureAuthority=None,
+           RadioResource=None, CaptureTaskKind=None)
+    module('pluto_plus', bootstrap_firmware=None, glrt_canary=SimpleNamespace(
+        configure_checked_rx=lambda *args, **kwargs: mutations.append(kwargs)))
+    module('pluto_plus.glrt_iq_tracking_profiles', ENDPOINT=('serial20', '192.168.1.20'))
+    module('pluto_plus.radio_lock', acquire_radio_lock=None)
+    module('pluto_plus.release_candidate_rx_only_linux', _close_iio_context=None)
+    module('deploy_glrt_iq_tracking20', EVIDENCE=tmp_path, PASSWORD=tmp_path/'unused')
+    root = Path(__file__).resolve().parents[2]
+    spec = importlib.util.spec_from_file_location('live_operator_preflight', root/'scripts/qualify_glrt_cpu_live20.py')
+    operator = importlib.util.module_from_spec(spec);spec.loader.exec_module(operator)
+    # CLEAR invalidates the epoch but preserves its monotonically increasing ID.
+    words = [0x474c5431, 3, 19, 42, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+             0, 0, 0, 0, 0, 0, 30000000, 39600, 0xb04a2fab, 1]
+    if case == 'boot_drops': words[18:20] = [31, 72]
+    if case == 'unread':
+        for index in (7, 8, 14, 16, 17): words[index] = 1
+    if case == 'active': words[5] = 4
+    if case == 'unaccounted': words[7] = 1
+    if case == 'fault': words[6] = 8
+    if case == 'epoch_valid': words[5] = 16
+    if case == 'uncleared':
+        for index in (7, 8, 14, 15, 17): words[index] = 1
+    if case == 'wrong_rate': words[20:22] = [60000000, 79200]
+    wire = 'GLT1SNAP 00010000 '+' '.join(f'{word:08x}' for word in words)+'\n'
+    if case == 'malformed': wire = wire[:-10]
+    device = None if case == 'missing' else SimpleNamespace(attrs={
+        'tracking_snapshot': SimpleNamespace(value=wire)})
+    context = SimpleNamespace(find_device=lambda name: device)
+    evidence = {}
+    if case in ('ready', 'boot_drops'):
+        operator.configure_idle_rx(context, rate=30000000, lo_hz=1690312496, evidence=evidence)
+        assert len(mutations) == 1 and mutations[0]['source_rate'] == 30000000
+    else:
+        with pytest.raises(ValueError):
+            operator.configure_idle_rx(context, rate=30000000, lo_hz=1690312496, evidence=evidence)
+        assert mutations == []
+    if case != 'missing': assert evidence['tracking_before_configuration'] == wire

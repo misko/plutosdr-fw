@@ -90,3 +90,8 @@ The operator requires the existing production capture authority and PPU serial
 lock. It never removes another invocation's files or retries an uncertain
 remote execution. A timeout leaves its remote directory available for
 reconciliation. Reference payloads must match the reviewed bank hashes.
+Before changing RF settings or calibrating RX, the operator retains and decodes
+the native snapshot and requires drained counters, a cleared epoch and the
+requested native rate. A previous failed run's unread results therefore prevent
+retuning; recovery must retire them explicitly. Historical boot drop counters
+are retained and do not substitute for the fresh epoch's loss accounting.
