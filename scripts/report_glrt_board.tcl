@@ -41,6 +41,8 @@ set legacy_vector_stages {}
 set local_controls {}
 set local_engines {}
 set local_cadences {}
+set tracking_controls {}
+set acquisition_engines {}
 foreach cell [get_cells -hierarchical] {
   set name [get_property NAME $cell]
   set ref [get_property REF_NAME $cell]
@@ -62,6 +64,9 @@ foreach cell [get_cells -hierarchical] {
     }
   }
   foreach {base destination} {starlink_glrt_local_control local_controls starlink_glrt_local_search local_engines starlink_glrt_local_cadence local_cadences} {
+    if {[string match ${base}* $ref] || [string match ${base}* $orig]} { lappend $destination $name }
+  }
+  foreach {base destination} {starlink_glrt_tracking_control tracking_controls starlink_glrt_acquisition acquisition_engines} {
     if {[string match ${base}* $ref] || [string match ${base}* $orig]} { lappend $destination $name }
   }
 }
@@ -87,6 +92,8 @@ puts $f "legacy_vector_stages\t[llength $legacy_vector_stages]"
 puts $f "local_search_controls\t[llength $local_controls]"
 puts $f "local_search_engines\t[llength $local_engines]"
 puts $f "local_search_cadences\t[llength $local_cadences]"
+puts $f "tracking_controls\t[llength $tracking_controls]"
+puts $f "acquisition_engines\t[llength $acquisition_engines]"
 puts $f "hardware_eligible\t0"
 puts $f "qualification\tTiming, CDC, I/O and exception reports require review; audit alone grants no deployment."
 close $f

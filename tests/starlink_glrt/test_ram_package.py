@@ -9,6 +9,28 @@ import pytest
 from scripts.package_glrt_ram import package, read_newc, stamp_rootfs, verify_native_selection
 
 
+@pytest.mark.parametrize("rate", [30000000, 60000000])
+@pytest.mark.parametrize("damage", [None, "tracking_controls", "acquisition_engines",
+    "native_refinement_engines", "native_schedule_controls", "native_result_queues",
+    "local_search_controls", "legacy_correlators", "tracking.txt", "native_refinement.txt",
+    "native_schedule.txt", "rate"])
+def test_iq_tracking_package_requires_exact_implemented_topology(tmp_path, rate, damage):
+    selectors = {"native_refinement.txt":"0", "legacy_scorer.txt":"0",
+                 "native_schedule.txt":"0", "local_search.txt":"0", "tracking.txt":"1"}
+    audit = {"native_refinement_engines":"1", "native_schedule_controls":"1",
+             "native_result_queues":"1", "tracking_controls":"1", "acquisition_engines":"0",
+             "local_search_controls":"0", "local_search_engines":"0", "local_search_cadences":"0",
+             "legacy_correlators":"0", "legacy_scorers":"0", "legacy_vector_stages":"0"}
+    if damage in selectors: selectors[damage] = "0" if selectors[damage] == "1" else "1"
+    if damage in audit: audit[damage] = "0" if audit[damage] == "1" else "1"
+    if damage == "rate": rate = 15000000
+    for name, value in selectors.items(): (tmp_path/name).write_text(value+"\n")
+    if damage is None:
+        assert verify_native_selection(tmp_path, audit, rate) == [tmp_path/name for name in selectors]
+    else:
+        with pytest.raises(ValueError): verify_native_selection(tmp_path, audit, rate)
+
+
 @pytest.mark.parametrize("selection,controls,queues,legacy,accepted", [
     ("1", "1", "1", "0", True), ("0", "0", "0", "0", True),
     ("1", "0", "1", "0", False), ("1", "1", "0", "0", False),

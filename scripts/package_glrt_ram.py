@@ -100,6 +100,10 @@ def stamp_rootfs(compressed: bytes, versions: str, *, lean_init: bytes | None = 
 
 
 def verify_native_selection(board: Path, audit: dict, rate: int) -> list[Path]:
+    tracking_path = board / "tracking.txt"
+    tracking = tracking_path.read_text().strip() if tracking_path.exists() else "0"
+    if tracking not in ("0", "1"):
+        raise ValueError("invalid tracking build selection")
     local_path = board / "local_search.txt"
     local = local_path.read_text().strip() if local_path.exists() else "0"
     if local not in ("0", "1"):
@@ -115,7 +119,7 @@ def verify_native_selection(board: Path, audit: dict, rate: int) -> list[Path]:
     # Old reference builds predate this field. An enabled image always needs
     # explicit implemented-netlist evidence; its source setting alone is not
     # proof that the native engine survived synthesis and routing.
-    if audit.get("native_refinement_engines", "0") != enabled:
+    if audit.get("native_refinement_engines", "0") != ("1" if tracking == "1" else enabled):
         raise ValueError("implemented native engine differs from build selection")
     if enabled == "1" and rate != 60_000_000:
         raise ValueError("native refinement requires a 60 MS/s board")
@@ -125,7 +129,7 @@ def verify_native_selection(board: Path, audit: dict, rate: int) -> list[Path]:
         raise ValueError("invalid legacy scorer build selection")
     if local == "1" and (rate != 2_500_000 or enabled != "0" or legacy != "0"):
         raise ValueError("local search requires direct 2.5 MS/s without native or legacy scoring")
-    if legacy == "0" and enabled != "1" and local != "1":
+    if legacy == "0" and enabled != "1" and local != "1" and tracking != "1":
         raise ValueError("lean profile requires native refinement or local search")
     # New selections require exact topology evidence. Reference artifacts
     # predating this selector remain valid under their original gates.
@@ -137,11 +141,19 @@ def verify_native_selection(board: Path, audit: dict, rate: int) -> list[Path]:
     scheduled = schedule_path.read_text().strip() if schedule_path.exists() else "0"
     if scheduled not in ("0", "1") or (scheduled == "1" and (enabled != "1" or legacy != "0")):
         raise ValueError("native scheduling requires the lean native profile")
+    if tracking == "1":
+        if enabled != "0" or legacy != "0" or scheduled != "0" or (
+                rate != 2_500_000 if local == "1" else rate not in (30_000_000, 60_000_000)):
+            raise ValueError("invalid integrated tracking profile")
+        if audit.get("tracking_controls") != "1" or audit.get("acquisition_engines") != "0":
+            raise ValueError("implemented tracking/acquisition topology differs")
+    if rate == 30_000_000 and (tracking != "1" or local != "0"):
+        raise ValueError("30-MS/s packaging requires GLI1")
     if schedule_path.exists():
         for block in ("native_schedule_controls", "native_result_queues"):
-            if audit.get(block) != scheduled:
+            if audit.get(block) != ("1" if tracking == "1" else scheduled):
                 raise ValueError("implemented schedule/queue differs from build selection")
-    return [path for path in (selection, legacy_path, schedule_path, local_path) if path.exists()]
+    return [path for path in (selection, legacy_path, schedule_path, local_path, tracking_path) if path.exists()]
 
 
 def package(args):
@@ -167,7 +179,7 @@ def package(args):
     if "VIOLATED" in (audit_root / "bus_skew.rpt").read_text():
         raise ValueError("implemented CDC bus skew failed")
     rate = int((board / "source_rate_hz.txt").read_text())
-    if rate not in (2_500_000, 5_000_000, 10_000_000, 25_000_000, 60_000_000):
+    if rate not in (2_500_000, 5_000_000, 10_000_000, 25_000_000, 30_000_000, 60_000_000):
         raise ValueError("unsupported board source rate")
     native_inputs = verify_native_selection(board, audit, rate)
     lean_profile = (board / "legacy_scorer.txt").exists() and (board / "legacy_scorer.txt").read_text().strip() == "0"
