@@ -1,0 +1,83 @@
+/* SPDX-License-Identifier: GPL-2.0 */
+#include "glrt_tracking_transport.h"
+#include <ctype.h>
+#include <inttypes.h>
+#include <stdio.h>
+#include <string.h>
+
+static uint32_t bank_id(uint32_t rate)
+{
+    return rate == 2500000 ? UINT32_C(0xdc509401) : UINT32_C(0xb04a2fab);
+}
+
+int glrt_tracking_batch_encode(const struct glrt_tracking_batch *t, char *text, size_t size)
+{
+    const struct glrt_native_batch *b;
+    int n;
+    if (!glrt_tracking_batch_valid(t) || !text || !size) return -1;
+    b=&t->prediction;
+    n=snprintf(text,size,"GLT1 %08" PRIx32 " %08" PRIx32 " %08" PRIx32
+        " %" PRIx32 " %" PRIx32 " %" PRIx64 " %" PRIx32
+        " %" PRIx64 " %" PRIx64 " %" PRIx64 " %" PRIx32 " %" PRIx32 " %" PRIx64 "\n",
+        GLRT_TRACKING_VERSION,t->rate,bank_id(t->rate),b->epoch,b->tag,b->start,b->fraction,
+        b->period,b->step,b->delta,b->seed,b->repeats,b->expires);
+    if (n<0 || (size_t)n>=size) { text[0]=0; return -1; }
+    return n;
+}
+
+int glrt_tracking_head_parse(const char *text, size_t size, uint32_t *epoch, uint32_t w[32])
+{
+    uint32_t parsed[34];
+    size_t pos=4;
+    unsigned i,j;
+    if (!text || !epoch || !w || size<=pos || memcmp(text,"GLT1",4) ||
+        !isspace((unsigned char)text[pos])) return -1;
+    for (i=0;i<34;i++) {
+        uint32_t value=0;
+        while (pos<size && isspace((unsigned char)text[pos])) pos++;
+        if (size-pos<8) return -1;
+        for (j=0;j<8;j++) {
+            unsigned char c=(unsigned char)text[pos++];
+            unsigned digit;
+            if (c>='0' && c<='9') digit=c-'0';
+            else if (c>='a' && c<='f') digit=c-'a'+10;
+            else if (c>='A' && c<='F') digit=c-'A'+10;
+            else return -1;
+            value=(value<<4)|digit;
+        }
+        parsed[i]=value;
+        if (pos<size && !isspace((unsigned char)text[pos])) return -1;
+    }
+    while (pos<size && isspace((unsigned char)text[pos])) pos++;
+    if (pos!=size || parsed[0]!=GLRT_TRACKING_VERSION || !parsed[1]) return -1;
+    *epoch=parsed[1];
+    memcpy(w,parsed+2,32*sizeof(*w));
+    return 0;
+}
+
+int glrt_tracking_associated_solve(const struct glrt_tracking_batch *t,
+    uint32_t epoch, uint32_t sequence, const uint32_t w[32], struct glrt_native_estimate *out)
+{
+    const struct glrt_tracking_profile *p;
+    struct glrt_tracking_job job;
+    struct glrt_tracking_moments moments;
+    if (!out) return -1;
+    memset(out,0,sizeof(*out));
+    out->rejection=GLRT_NATIVE_FAULT;
+    if (!w || !t || !glrt_tracking_batch_valid(t) || w[0]!=GLRT_TRACKING_MAGIC ||
+        epoch!=t->prediction.epoch || w[1]!=sequence || w[2]!=t->prediction.tag ||
+        w[25]!=t->rate || w[29]!=bank_id(t->rate) || w[30]!=GLRT_TRACKING_VERSION || w[31] ||
+        !(p=glrt_tracking_profile_get(t->rate,w[28])) || w[26]!=p->samples || (w[8]&~0x3ffU) ||
+        glrt_tracking_prediction(t,w[27],&job) || w[28]!=job.reference_phase ||
+        w[5]!=t->prediction.seed || w[6]!=job.phase_step ||
+        (((uint64_t)w[4]<<32)|w[3])!=job.start) return -1;
+    moments.start=job.start;
+    moments.count=w[7];
+    /* Scheduled abort/source faults remain in the retained packet. The solver
+     * takes engine faults only; map either wrapper fault to generic failure,
+     * then let it validate counts and canonical moments even on failed jobs. */
+    moments.fault=(w[8]&0xffU) | ((w[8]&0x300U) ? 1U : 0U);
+    moments.phase_step=w[6];
+    memcpy(moments.words,w+9,sizeof(moments.words));
+    return glrt_tracking_solve(t->rate,w[28],&moments,out);
+}

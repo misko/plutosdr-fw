@@ -183,5 +183,10 @@ period is pilot samples plus twice the minimum lead. The FPGA scheduler takes
 these as compile-time parameters and exposes the selected phase on both admitted
 jobs and decisions. Default parameters remain the original single-phase 60-MS/s
 scheduler. The old GLS1 transport is unchanged and does not carry these phases.
-A future tracking transport must bind rate, reference profile/phase, source
-epoch and admitted descriptor before the new solver/trend may consume it.
+The additive [GLT1 transport](GLRT_TRACKING_TRANSPORT.md) now binds rate,
+reference profile/phase, source epoch and admitted descriptor before its C
+association port invokes the solver. Compile `glrt_tracking_transport.c`,
+`glrt_tracking_schedule.c` and `glrt_native_solver.c` together. This supplies the
+FPGA result producer and C/Python offline association; Linux attributes and the
+multirate radio controller still need integration. It does not turn the existing
+60-MS/s controller or GLS1 interface into a multirate runtime.

@@ -2,8 +2,12 @@
 from __future__ import annotations
 
 import subprocess
+from fractions import Fraction
 
 import pytest
+
+from tools.generate_glrt_direct_phase_rom import pack_phase_rom
+from tools.starlink_glrt_tracking_abi import TrackingBatch, TrackingResult
 
 from .ddc import BANK_ROOT
 from .test_cubic_coefficients_rtl import expected as coefficient_oracle
@@ -18,17 +22,34 @@ def signed(words):
 
 
 @pytest.mark.parametrize("fault_mode", [0, 1, 2], ids=["full-750hz", "cancel", "source-loss"])
-def test_scheduled_engine_queue_preserves_results_and_accounts_for_missing_repeats(tmp_path, fault_mode):
-    count, period = (79200, 80000) if fault_mode == 0 else (96, 1000)
+@pytest.mark.parametrize("tracking_rate", [None, 2500000, 15000000, 30000000, 60000000])
+def test_scheduled_engine_queue_preserves_results_and_accounts_for_missing_repeats(
+        tmp_path, fault_mode, tracking_rate):
+    stride = 60000000//tracking_rate if tracking_rate else 1
+    count = 79200//stride if tracking_rate or not fault_mode else 96
+    period_q16 = round(Fraction(80000*65536, stride)) if tracking_rate or not fault_mode else 1000*65536
+    offset = (1024+stride-1)//stride
+    phases = 4 if tracking_rate == 2500000 else 1
+    fraction = 24576 if phases == 4 else 0
     base, seed, step = 2**55+73, 2**32-711, 7310173
-    bank = bank_for(count)
+    bank = bank_for(79200 if tracking_rate else count)
     bank_path, bench_path, executable = [tmp_path/name for name in ("bank.mem", "tb.sv", "sim")]
     bank_path.write_text("".join(f"{word:027x}\n" for word in packed_words(bank)))
+    direct_path, direct = "", None
+    if phases == 4:
+        direct = [tuple((n*(k+1)*13+37) % 4000-2000 for k in range(4)) for n in range(count*phases)]
+        direct_path = tmp_path/"direct.mem"
+        phase_major = "".join(f"{sum((v & 65535) << (16*n) for n,v in enumerate(c)):016x}\n"
+                              for c in direct).encode()
+        direct_path.write_bytes(pack_phase_rom(phase_major, phases=phases, samples=count))
     bench = BENCH[:BENCH.index("integer fd,rc;")]
     bench = bench.replace("job_valid=0,", "").replace(",result_ready=1;", ";")
     bench = bench.replace("reg [63:0] job_start=0,input_index=0;",
         "wire job_valid,result_ready; wire [63:0] job_start; reg [63:0] input_index=0;")
     bench = bench.replace("reg [31:0] seed=0,step=0;", "wire [31:0] seed,step;")
+    bench = bench.replace("wire [PB-1:0] result_reference_phase;",
+                          "wire [PB-1:0] result_reference_phase,scheduled_phase;")
+    bench = bench.replace(".job_reference_phase(seed[PB-1:0])", ".job_reference_phase(scheduled_phase)")
     bench = bench.replace(".flush(flush)", ".flush(flush || controller_flush)")
     bench = bench.replace(".input_gap(input_gap)", ".input_gap(input_gap || controller_gap)")
     bench += r'''
@@ -42,15 +63,17 @@ reg read_request=0,pop=0;
 reg [4:0] read_word=0;
 wire [31:0] read_data;
 integer cycle,native_index=0,read_count=0;
-starlink_glrt_native_scheduled_results #(.SAMPLE_COUNT(N),.DEPTH_BITS(1)) control (
+starlink_glrt_native_scheduled_results #(.SAMPLE_COUNT(N),.DEPTH_BITS(1),
+ .TRACKING(TRACKING_VALUE),.SOURCE_RATE(RATE_VALUE)) control (
  .clk(clk),.resetn(resetn),.cancel(cancel),.source_good(source_good),.latest_index(input_index),
  .config_valid(config_valid),.config_ready(config_ready),.config_rejected(config_rejected),
- .config_tag(32'd17),.config_start(BASE+64'd1024),.config_expires(BASE+64'dEXPIRY_OFFSET),
- .config_fraction(16'd0),.config_period_q16(48'dPERIOD_Q16),
+ .config_tag(32'd17),.config_start(BASE+64'dSTART_OFFSET),.config_expires(BASE+64'dEXPIRY_OFFSET),
+ .config_fraction(16'dFRACTION_VALUE),.config_period_q16(48'dPERIOD_Q16),
  .config_step_q16(48'dSTEP_Q16),.config_step_delta_q16(48'd88932352),
  .config_phase_seed(32'dSEED_VALUE),.config_repeats(8'd5),.reserved(reserved),
  .engine_ready(job_ready),.job_valid(job_valid),.job_start(job_start),
  .job_phase_seed(seed),.job_phase_step(step),.engine_flush(controller_flush),.engine_gap(controller_gap),
+ .job_reference_phase(scheduled_phase),.result_reference_phase(result_reference_phase),
  .engine_result(result_valid),.engine_result_ready(result_ready),.result_start(result_start),
  .result_seed(result_seed),.result_step(result_step),.result_count(count),.result_fault(fault),
  .ri(ri),.rq(rq),.di(di),.dq(dq),.ti(ti),.tq(tq),.energy(energy),
@@ -68,7 +91,7 @@ initial begin
  fork
   begin
    for(cycle=0;cycle<TOTAL_CYCLES;cycle=cycle+1) begin
-    input_valid=((cycle+1)*3/5 != cycle*3/5);
+    input_valid=((cycle+1)*3/(5*STRIDE_VALUE) != cycle*3/(5*STRIDE_VALUE));
     if(input_valid) begin
      input_index=BASE+native_index;
      ii=(input_index*31)%65536-32768;
@@ -112,11 +135,13 @@ endmodule
 '''
     for key, value in {"COUNT_VALUE": count, "SEGMENT_VALUE": len(bank), "BANK_PATH": bank_path,
                        "BASE_VALUE": base, "STEP_Q16": step*65536, "SEED_VALUE": seed,
-                       "STRIDE_VALUE": 1, "DIRECT_PATH": "", "PHASE_VALUE": 1,
-                       "EXPIRY_OFFSET": 1024+5*period, "PERIOD_Q16": period*65536,
-                       "TOTAL_CYCLES": 669000 if not fault_mode else 10000,
-                       "DRAIN_CYCLE": 399000 if not fault_mode else 8000,
-                       "FAULT_OFFSET": 1024+period+40, "FAULT_MODE": fault_mode,
+                       "STRIDE_VALUE": stride, "DIRECT_PATH": direct_path, "PHASE_VALUE": phases,
+                       "TRACKING_VALUE": int(tracking_rate is not None), "RATE_VALUE": tracking_rate or 60000000,
+                       "START_OFFSET": offset, "FRACTION_VALUE": fraction,
+                       "EXPIRY_OFFSET": offset+(5*period_q16)//65536+1, "PERIOD_Q16": period_q16,
+                       "TOTAL_CYCLES": 669000 if tracking_rate or not fault_mode else 10000,
+                       "DRAIN_CYCLE": 399000 if tracking_rate or not fault_mode else 8000,
+                       "FAULT_OFFSET": offset+period_q16//65536+40, "FAULT_MODE": fault_mode,
                        "NO_SPACE": int(not fault_mode), "RESULTS": 4 if not fault_mode else 2,
                        "UNAVAILABLE": 3 if fault_mode == 2 else 0,
                        "CANCELLED": 3 if fault_mode == 1 else 0}.items():
@@ -136,19 +161,34 @@ endmodule
                for line in run.stdout.splitlines() if line.startswith("Q ")]
     frames = (0, 1, 3, 4) if not fault_mode else (0, 1)
     assert len(records) == len(frames)
-    coefficients = coefficient_oracle(bank, 24, count)
+    coefficients = coefficient_oracle(bank, 24, count, stride) if direct is None else None
     for sequence, (frame, record) in enumerate(zip(frames, records, strict=True)):
-        job = (base+1024+frame*period, seed, step+frame*1357)
+        origin = Fraction((base+offset)*65536+fraction+frame*period_q16, 65536)
+        whole, phase = divmod(round(origin*phases), phases)
+        job = (whole, seed, step+frame*1357)
+        if direct is not None:
+            coefficients = [[n, *c, int(n==count-1), 0]
+                            for n,c in enumerate(direct[phase*count:(phase+1)*count])]
         failed = fault_mode and frame == 1
         if failed:
             assert 0 < record[7] < count
         else:
             assert record[7] == count
         oracle = expected(job, [sample(job[0]+n) for n in range(record[7])], coefficients)
-        assert record[:3] == [0x474c5331, sequence, 17]
+        assert record[:3] == [0x474c5431 if tracking_rate else 0x474c5331, sequence, 17]
         fault = (0x108 if fault_mode == 1 else 0x201) if failed else 0
         assert record[3:9] == [job[0] % 2**32, job[0] >> 32, *job[1:], record[7], fault]
         assert [signed(record[k:k+2]) for k in (9, 11, 13, 15)] == oracle[5:9]
         assert [signed(record[k:k+3]) for k in (17, 20)] == oracle[9:11]
         assert record[23]+(record[24] << 32) == oracle[11]
-        assert record[25:] == [60000000, count, frame, 0, 0, 0, 0]
+        if tracking_rate:
+            assert record[25:] == [tracking_rate, count, frame, phase,
+                                   0xdc509401 if phases == 4 else 0xb04a2fab, 0x10000, 0]
+            # These synthetic coefficients test bit-exact transport, not the
+            # pinned scientific fit. Association must still preserve geometry.
+            b = TrackingBatch(tracking_rate, 3, 17, base+offset, fraction, period_q16,
+                step*65536, 88932352, seed, 5, base+offset+5*period_q16//65536+1)
+            text = "GLT1 00010000 00000003 "+" ".join(f"{w:08x}" for w in record)
+            TrackingResult.from_sysfs(text).require_association(b, sequence=sequence)
+        else:
+            assert record[25:] == [60000000, count, frame, 0, 0, 0, 0]
