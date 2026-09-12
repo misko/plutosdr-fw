@@ -11,6 +11,7 @@ import pytest
 BENCH = r'''
 `timescale 1ns/1ps
 module tb;
+parameter integer LANES=3;
 reg clk=0;always #5 clk=~clk;
 reg resetn=0,flush=0,arm=0,input_valid=0,input_gap=0,job_valid=0;
 reg signed [15:0] input_i=0,input_q=0;
@@ -27,7 +28,7 @@ wire [8:0] output_frequency;
 wire [16:0] output_score;
 wire [2:0] output_support;
 wire [31:0] rejected_arms;
-starlink_glrt_verify_window3 #(.PILOT_FILE("PILOT"),.ENERGY_FILE("ENERGY"),
+starlink_glrt_verify_window3 #(.LANES(LANES),.PILOT_FILE("PILOT"),.ENERGY_FILE("ENERGY"),
  .OSCILLATOR_FILE("WAVE")) dut(.external_ready(1'b0),.external_valid(1'b0),
  .external_first_index(64'd0),.external_offset(14'd0),.external_data(32'd0),
  .sample_read_enable(),.sample_read_address(),.*);
@@ -76,7 +77,7 @@ initial begin
   // Rejected overwrite must preserve the in-flight window and count admission.
   arm=1;@(negedge clk);arm=0;
   waits=0;
-  while(!done && !fault && waits<1500000) begin
+  while(!done && !fault && waits<1500000*((3+LANES-1)/LANES)) begin
    output_ready=waits%7!=0;@(negedge clk);waits=waits+1;
   end
   if(!done || fault || !window_loaded || !job_ready || rejected_arms!=job+1 ||
@@ -140,8 +141,8 @@ def expected_scores(iq, pilot, wave, subsets, jobs):
     return rows
 
 
-@pytest.fixture(scope="module")
-def compiled_window(tmp_path_factory):
+@pytest.fixture(scope="module", params=[3, 2, 1], ids=["three-cfo", "two-cfo", "serial-cfo"])
+def compiled_window(tmp_path_factory, request):
     path=tmp_path_factory.mktemp("verify-window")
     rng=np.random.default_rng(33331024)
     pilot=np.zeros((8192,2),dtype=np.int64)
@@ -152,6 +153,7 @@ def compiled_window(tmp_path_factory):
     (path/"tb.sv").write_text(bench)
     root=Path(__file__).parents[2]/"hdl/library/starlink_glrt"
     build=subprocess.run(["verilator","--binary","--timing","--top-module","tb","-Wno-fatal",
+        f"-GLANES={request.param}",
         "--Mdir",str(path/"obj"),"-o","sim","-j","4",str(path/"tb.sv"),
         *[str(root/f"starlink_glrt_{name}.v") for name in
           ("verify_window3","verify_rotate3","verify_mac3","coarse_norm")]],capture_output=True,text=True,timeout=120)

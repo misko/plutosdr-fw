@@ -66,6 +66,8 @@ foreach {name tag_width original} {coarse_mac6 5 coarse_mac6 verify_mac3 1 verif
   puts $fd [list cd $roms]
   puts $fd [list read_verilog -sv $source]
   set arithmetic_generics [list TAG_WIDTH=$tag_width]
+  set verify_lanes [expr {$shared_window ? 2 : 3}]
+  if {$name in {verify_mac3 verify_rotate3}} { lappend arithmetic_generics LANES=$verify_lanes }
   if {$original eq "coarse_norm"} { lappend arithmetic_generics SHARED_ROOT=1 }
   puts $fd [list synth_design -top $module -mode out_of_context -generic $arithmetic_generics \
       -flatten_hierarchy rebuilt -directive AreaOptimized_high]
@@ -81,6 +83,7 @@ foreach {name tag_width original} {coarse_mac6 5 coarse_mac6 verify_mac3 1 verif
   if {$start<0 || $finish<0} { error "cannot extract arithmetic interface" }
   set header [string range $content $start [expr {$finish+2}]]
   regsub {TAG_WIDTH=[0-9]+} $header TAG_WIDTH=$tag_width header
+  if {$name in {verify_mac3 verify_rotate3}} { regsub {LANES=[0-9]+} $header LANES=$verify_lanes header }
   set stub $output/${module}_stub.v
   set fd [open $stub {WRONLY CREAT EXCL}];puts $fd "(* black_box=\"yes\" *) $header\nendmodule";close $fd
   lappend stubs $stub

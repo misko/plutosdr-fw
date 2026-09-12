@@ -9,9 +9,11 @@ from .test_verify_window_rtl import BENCH, write_roms
 
 
 @pytest.mark.parametrize("failure", ["missing", "offset", "ready", "unsolicited", "unready_arm"])
-def test_shared_sample_port_fences_and_flush_recovers(tmp_path, failure):
+@pytest.mark.parametrize("lanes", [3, 2, 1])
+def test_shared_sample_port_fences_and_flush_recovers(tmp_path, failure, lanes):
     write_roms(tmp_path, np.zeros((8192, 2), dtype=np.int64))
     bench = BENCH[:BENCH.index("integer fd,jobs")]
+    bench = bench.replace("parameter integer LANES=3", f"parameter integer LANES={lanes}")
     bench = bench.replace('.PILOT_FILE("PILOT")', '.EXTERNAL_WINDOW(1),.PILOT_FILE("pilot.mem")')
     bench = bench.replace('"ENERGY"', '"energy.mem"').replace('"WAVE"', '"wave.mem"')
     begin = bench.index(" dut(.external_ready")

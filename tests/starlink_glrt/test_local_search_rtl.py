@@ -259,6 +259,10 @@ def shared_engine(tmp_path_factory, local_engine):
  end''')
     bench = bench.replace('if(n==second_start && busy) overlapped=1;', '''if(n==second_start && busy) $fatal(1,"shared buffer released early");
   if(dut.controller_busy && arm_ready) $fatal(1,"verification buffer overwrite allowed");''')
+    # Two sequential windows may each use the complete 200-ms service budget.
+    # Apply after source-offset substitutions; this is a closure watchdog,
+    # separate from the real-corpus latency gate.
+    bench = bench.replace('cycles>30000000', 'cycles>50000000')
     (path/'tb.sv').write_text(bench)
     root = Path(__file__).parents[2]/'hdl/library/starlink_glrt'
     sources = [root/f'starlink_glrt_{name}.v' for name in ('local_search','coarse_search','coarse_window',
