@@ -3,10 +3,14 @@
 # This script never opens, configures or deploys to a radio.
 set -euo pipefail
 if [[ $# -lt 2 || $# -gt 4 ]]; then
-  echo 'usage: build_glrt_board.sh RATE_HZ NEW_OUTPUT_DIRECTORY [--native-refinement|--native-lean|--native-scheduled|--local-search NETLIST_DIRECTORY|--tracking NETLIST_DIRECTORY]' >&2
+  echo 'usage: build_glrt_board.sh RATE_HZ NEW_OUTPUT_DIRECTORY [--native-refinement|--native-lean|--native-scheduled|--iq-tracking|--local-search NETLIST_DIRECTORY|--tracking NETLIST_DIRECTORY]' >&2
   exit 2
 fi
-case "$1" in 2500000|5000000|10000000|25000000|60000000) ;; *) exit 2 ;; esac
+case "$1" in 2500000|5000000|10000000|25000000|30000000|60000000) ;; *) exit 2 ;; esac
+if [[ "$1" == 30000000 && ( $# -ne 3 || "$3" != --iq-tracking ) ]]; then
+  echo '30000000 Hz requires the explicit GLI1 IQ-tracking profile' >&2
+  exit 2
+fi
 native_refinement=0
 legacy_scorer=1
 native_schedule=0
@@ -35,6 +39,11 @@ if [[ $# -eq 4 ]]; then
     exit 2
   fi
 elif [[ $# -eq 3 ]]; then
+  if [[ "$3" == --iq-tracking ]]; then
+    if [[ "$1" != 30000000 && "$1" != 60000000 ]]; then exit 2; fi
+    tracking=1
+    legacy_scorer=0
+  else
   if [[ ( "$3" != --native-refinement && "$3" != --native-lean && "$3" != --native-scheduled ) || "$1" != 60000000 ]]; then
     echo 'native profiles require 60000000 Hz and an explicit native build selection' >&2
     exit 2
@@ -42,6 +51,7 @@ elif [[ $# -eq 3 ]]; then
   native_refinement=1
   if [[ "$3" == --native-lean || "$3" == --native-scheduled ]]; then legacy_scorer=0; fi
   if [[ "$3" == --native-scheduled ]]; then native_schedule=1; fi
+  fi
 fi
 repository=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 output=$(realpath -m "$2")
@@ -55,6 +65,9 @@ hdl_commit=$(git -C "$repository/hdl" rev-parse HEAD)
 mkdir -p "$output"
 git clone --shared --no-checkout "$repository/hdl" "$output/hdl" >"$output/checkout.log" 2>&1
 git -C "$output/hdl" checkout --detach "$hdl_commit" >>"$output/checkout.log" 2>&1
+if [[ -n "${STARLINK_GLRT_STANDARD_IP_CACHE:-}" ]]; then
+  "$repository/scripts/stage_glrt_standard_ip.sh" "$output/hdl" "$STARLINK_GLRT_STANDARD_IP_CACHE"
+fi
 printf '%s\n' "$hdl_commit" >"$output/hdl_commit.txt"
 printf '%s\n' "$1" >"$output/source_rate_hz.txt"
 printf '%s\n' "$native_refinement" >"$output/native_refinement.txt"

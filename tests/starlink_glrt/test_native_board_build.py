@@ -9,7 +9,9 @@ import pytest
 @pytest.mark.parametrize("rate,flag", [("2500000", "--native-refinement"),
     ("25000000", "--native-refinement"), ("60000000", "--native"), ("60000001", "--native-refinement"),
     ("25000000", "--native-lean"), ("60000001", "--native-lean"),
-    ("25000000", "--native-scheduled"), ("60000001", "--native-scheduled")])
+    ("25000000", "--native-scheduled"), ("60000001", "--native-scheduled"),
+    ("2500000", "--iq-tracking"), ("25000000", "--iq-tracking"),
+    ("30000000", "--native-scheduled"), ("60000001", "--iq-tracking")])
 def test_invalid_native_build_selection_creates_no_evidence_directory(tmp_path, rate, flag):
     repo = Path(__file__).resolve().parents[2]
     output = tmp_path/"board"
@@ -32,6 +34,34 @@ def test_tracking_build_refuses_a_duplicate_window_netlist_before_checkout(tmp_p
     result = subprocess.run(["bash", str(repo/"scripts/build_glrt_board.sh"), "2500000", str(output),
         "--tracking", str(netlist)], capture_output=True, text=True, timeout=10, check=False)
     assert result.returncode == 2 and "storage mode" in result.stderr and not output.exists()
+
+
+@pytest.mark.parametrize("rate,native,legacy,schedule,accepted", [
+    ("30000000", "0", "0", "0", True), ("60000000", "0", "0", "0", True),
+    ("2500000", "0", "0", "0", False), ("25000000", "0", "0", "0", False),
+    ("30000000", "1", "0", "0", False), ("60000000", "0", "1", "0", False),
+    ("60000000", "1", "0", "1", False),
+])
+def test_iq_tracking_board_is_explicit_and_has_no_local_netlist_dependency(
+    tmp_path, rate, native, legacy, schedule, accepted
+):
+    repo = Path(__file__).resolve().parents[2]
+    values = {"RATE_HZ": rate, "NATIVE_REFINEMENT": native, "LEGACY_SCORER": legacy,
+              "NATIVE_SCHEDULE": schedule, "LOCAL_SEARCH": "0", "TRACKING": "1"}
+    bench = tmp_path/"selection.tcl"
+    bench.write_text("\n".join([
+        *(f"set ::env(STARLINK_GLRT_{key}) {{{value}}}" for key, value in values.items()),
+        "proc unknown {args} { return {} }",
+        'proc ad_ip_parameter {cell key value} { puts "$key=$value" }',
+        f"source {{{repo/'hdl/projects/pluto/system_glrt_bd.tcl'}}}",
+    ])+"\n")
+    result = subprocess.run(["tclsh", str(bench)], capture_output=True, text=True, timeout=10)
+    assert (result.returncode == 0) == accepted, result.stdout+result.stderr
+    if accepted:
+        assert "CONFIG.ENABLE_TRACKING=1" in result.stdout
+        assert "CONFIG.ENABLE_LOCAL_SEARCH=0" in result.stdout
+        assert "CONFIG.TRACKING_PACKED_ROM=1" not in result.stdout
+        assert "native_cubic_60000000_upper.mem" in result.stdout
 
 
 @pytest.mark.parametrize("tracking,shared,local,accepted", [

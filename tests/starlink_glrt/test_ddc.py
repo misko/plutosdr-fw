@@ -59,7 +59,7 @@ def test_reset_support_and_impulse_group_delay(rate):
     assert np.array_equal(fresh.supported, fresh.indexes - 9 >= 2 * delay)
 
 
-@pytest.mark.parametrize("fs", [5_000_000, 10_000_000, 15_000_000, 25_000_000, 60_000_000])
+@pytest.mark.parametrize("fs", [5_000_000, 10_000_000, 15_000_000, 25_000_000, 30_000_000, 60_000_000])
 def test_frozen_filter_response(fs):
     h = coefficients(fs)
     frequency, response = freqz(h / 2**17, worN=262144, fs=fs)
@@ -78,7 +78,7 @@ def test_signed_ties_even_and_clipping():
     assert actual.tolist() == [-32768, 32767] and clips == 2
 
 
-@pytest.mark.parametrize("rate", [0, True, 12_500_000, 30_000_000, 61_000_000])
+@pytest.mark.parametrize("rate", [0, True, 12_500_000, 20_000_000, 61_000_000])
 def test_reject_other_rates(rate):
     with pytest.raises(ValueError):
         Ddc(rate)

@@ -7,6 +7,8 @@ import pytest
 
 from .ddc import BANK_ROOT, Ddc, RATES
 
+RATES = (*RATES, 30_000_000)
+
 BENCH = r'''
 `timescale 1ns/1ps
 module tb;
