@@ -1,0 +1,12 @@
+{
+  "path": "/dev/shm/starlink-publication-cone.TOH6EeOT/20260912-product-publication-cone-evidence.tgz",
+  "bytes": 9665309,
+  "sha256": "d0dda3296255df1bb464f6a7bd6b78573c400458a5e51450bbb52bca267f5995",
+  "members": 529,
+  "all_members_verified": true,
+  "full_receiver_or_deployment_claim": false,
+  "verification": "sequential payload SHA256, inventory, regular files, gzip CRC, stable archive SHA256",
+  "verifier_sha256": "c03e82ec7454df7fccba72a20fc958dc839d566094aaa6dfd6233e19b9456b88",
+  "writer_sha256": "a4b8b9394b622322ab9da8e39dd914b7d0ed36621e2a05df5265dde2e97eaca7",
+  "sources_unchanged": true
+}
