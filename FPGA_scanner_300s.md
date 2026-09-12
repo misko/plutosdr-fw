@@ -2,6 +2,24 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-12, retrying held-job admission: **2,299 scoped tests and all
+92 actual FFT fault/reset/stall cases pass**. The request no longer contains
+current cross-block readiness; rejected private snapshots retry while capacity
+settles. All 316 accepted jobs match the original certificate across 1,841,886
+checks. Numerical results and 4,178-clock service remain unchanged.
+Admission snapshot-valid improves -0.711 to +0.009 ns and consumed -0.716 to
+-0.040 ns, but complete timing still FAILS: **WNS -1.269 ns / TNS -295.708 ns /
+811 endpoints**, same-175 MHz -1.001 ns. Not promoted. Remaining same-domain
+critical path runs through global-abort/output-ledger fault handling into
+inverse completion and descriptor locking. Inspect first-fault protection
+versus post-quarantine private bookkeeping before further retiming; preserve
+required cause evidence, current publication fences, reset/recovery, native
+60 MS/s fine search and the independent 2.5 MS/s inspection stream.
+FW `2a5c0a99c`, HDL `05756d03d`, branch
+`codex/starlink-rx-only-do-not-merge-admission-grant`, pushed. Evidence is kept
+on bulk storage. PRIMARY HDL, radios, PPU and main branches remain unchanged.
+See [retrying admission proof and remaining path](reports/experiments/20260912-retry-admission-actual-route.md).
+
 Update 2026-09-12, shared preflight diagnostic history: **2,266 scoped tests
 and all 92 actual FFT fault/reset/stall cases pass**, including X/Z metadata
 and both one-sided raw resets. Each original guard is compared exactly for
