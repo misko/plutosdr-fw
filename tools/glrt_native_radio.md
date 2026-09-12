@@ -122,6 +122,43 @@ The exact search is a numerical/latency reference, not the deployed handoff.
 Its `.21` FFTW benchmark reproduces all 238 saved hypotheses across 14 physical
 development cases but takes about 562 ms per complete resolution. That exceeds
 the sparse-history startup budget before adding moments or I/O. A cheaper
-staged resolver and fresh prediction require qualification; do not extend
+staged resolver or bounded catch-up requires qualification; do not extend
 expiry to hide this cost. The standalone controller still consumes an explicit
 retained seed and does not call this resolver automatically.
+
+## Bounded catch-up bootstrap component
+
+`glrt_tracking_bootstrap.h/.c` adds an internal 2.5-MS/s seed-to-handoff
+controller. It consumes associated software estimates from retained IQ, one
+anchor every nine repeats, and catches up while actual source time advances.
+After the first eight anchors it uses the existing causal trend and its
+unchanged 32-repeat forecast limit. It stops after 200 anchors, rejects
+overwritten history, clock regression, association faults and insufficient
+support, and emits eight future jobs with an explicit admission lead. The
+caller owns IQ retention, source/reference identity, exact moment collection
+and final admission-time revalidation. This component does not enable an
+automatic CLI handoff or map coarse coordinates to a higher native rate.
+
+The owned `test_tracking_catchup.py` suite passes 46 tests; together with the
+existing seed parser/CLI suite, 158 tests pass. An independent Fraction-based
+physical replay matches 2,342 past jobs and 1,152 future jobs across all 70
+cost/case scenarios. Its independent integer audit checks 1,836 unique moment
+records covering all 3,494 occurrences, including every unsupported case.
+
+The bounded saved-IQ ARM benchmark on `.21` includes the full resolver, IQ
+copy, exact moments, solve and catch-up control. Three of eight previously
+accepted acquisition cases emit fresh handoffs in 710.821–713.488 ms; none of
+six controls initialize. One-time FFT planning takes 5.762 ms separately.
+Replaying the actual ARM handoffs on subsequent physical IQ yields 73/128,
+128/128 and 128/128 supported measurements. The five unsupported acquisition
+cases remain visible. These are development results, not a physical accuracy
+or every-repeat deployment pass.
+
+Artifacts are `physical-tracking-catchup-v1`,
+`tracking-bootstrap-port-replay-v2`, `tracking-bootstrap-benchmark-v1` and
+`tracking-arm-handoff-v1` beneath `/srv/bulk/leo/glrt-deployment-20260909`.
+The benchmark's source availability follows measured ARM elapsed time, but
+uses preloaded sparse IQ fixtures. It excludes live IIO ingestion, recent-IQ
+ring ownership, receiver contention and hardware job submission. The radio's
+resident firmware and boot identity are unchanged, TX remains disabled, and
+temporary benchmark files were removed. No RF was collected.
