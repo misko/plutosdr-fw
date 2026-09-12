@@ -2,6 +2,19 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-12, product-local framing cofactor: **2,232 tests and all 88
+actual FFT fault/reset/stall cases pass**, with unchanged 64,512 numerical words
+and 4,178-clock service. Product publication improves slightly to -0.905 ns,
+but aggregate timing REGRESSES: **WNS -1.482 ns / TNS -682.285 ns / 1,420
+endpoints**. The worst same-clock path is reset release through product READY,
+identity refill and kernel readiness into forward replay position CE. Retain
+this candidate as an experiment, not a deployment baseline. Next evaluate a
+registered-capacity/skid boundary to break this backward readiness chain,
+proving conservation, fault cancellation, reset/reuse and sustained throughput.
+Branch `codex/starlink-rx-only-do-not-merge-product-local-framing`, source FW
+`c8cd81e6d`, harness FW `cc55dd11b`, HDL `37b485b5b`. No primary HDL,
+radio or PPU/main changes. See [local framing proof and route](reports/experiments/20260912-product-local-framing-actual-route.md).
+
 Update 2026-09-12, private replay sequence separation: **2,107 regression tests
 and all 82 actual FFT fault/reset/delay cases pass**, with unchanged arithmetic
 and 4,178-clock service. Kernel history now passes +0.375 ns; kernel next-start
