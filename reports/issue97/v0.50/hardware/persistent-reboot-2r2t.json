@@ -1,0 +1,22 @@
+{
+  "serial": "1040007c4a94000211000b009186843ef2",
+  "firmware": "v0.50-plutoplus-spf-counter-rx-v1",
+  "boot_id": "b0a56037-2414-4a17-a7c2-fd4cb8fcfe4f",
+  "qspi_bytes": "31457280",
+  "qspi_sha256": "a68f5fbd484af6bd414b56ae98c72a317d113374c9bad80b4e055d8ab88fec86",
+  "fit_sha256": "a53efc46f3c65d1a15e5063374551d2daa3cb9d0df51257de53b6af80be39493",
+  "all_buffer_enable": "0,0",
+  "dds_present": "1",
+  "tandem_present": "1",
+  "tx_hardwaregain_db": "-89.750000,-89.750000",
+  "tx_lo_powerdown": "0",
+  "tx_buffer_enable": "0",
+  "tx_scan_enable": "0,0,0,0",
+  "tx_dds_raw": "0,0,0,0,0,0,0,0",
+  "tx_dds_scale": "0.000000,0.000000,0.000000,0.000000,0.000000,0.000000,0.000000,0.000000",
+  "root_marker_present": "0",
+  "rx_dma_dt_state": "enabled",
+  "dds_dt_state": "enabled",
+  "tx_dma_dt_state": "enabled",
+  "tandem_dt_state": "enabled"
+}

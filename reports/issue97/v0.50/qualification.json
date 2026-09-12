@@ -1,0 +1,194 @@
+{
+  "firmware": "v0.50-plutoplus-spf-counter-rx-v1",
+  "serial": "1040007c4a94000211000b009186843ef2",
+  "fit_sha256": "a53efc46f3c65d1a15e5063374551d2daa3cb9d0df51257de53b6af80be39493",
+  "fit_size": 12829435,
+  "asset_sha256": "435a26369018e86ee66262b79c32895dbaaacef510a1efb71c566d6409555344",
+  "asset_path": "/home/mouse9911/gits/plutosdr-fw-issue-97/evidence/v050-extracted/plutoplus-spf-counter-rx-v1-619ecedf23a3-pluto.dfu",
+  "ci_run_id": 34722030151,
+  "ci_run_attempt": 1,
+  "sources": {
+    "firmware_base": "619ecedf23a3fd2103e1237d69db830e26d8959c",
+    "linux": "4683cd2e3556448295e03a216a3a7fc6e8bbc474",
+    "libiio": "47a75cbc5e7d24a063b8b54eb531fdba6602b85c"
+  },
+  "schema": "plutosdr-fw.counter-rx-v1-qualification",
+  "schema_version": 1,
+  "hardware_qualified": true,
+  "persistent_qualified": true,
+  "persistent_reboot_qualified": true,
+  "cold_power_cycle_qualified": false,
+  "units_tested": 1,
+  "final_mode": "1r1t",
+  "cells": [
+    {
+      "report": "candidate-1r1t-high.json",
+      "rate_hz": 30000000,
+      "frames": 30,
+      "samples_per_frame": 1000000,
+      "missing_samples": 0,
+      "allocated_kernel_buffers": 50
+    },
+    {
+      "report": "candidate-1r1t-high.json",
+      "rate_hz": 60000000,
+      "frames": 30,
+      "samples_per_frame": 1000000,
+      "missing_samples": 0,
+      "allocated_kernel_buffers": 50
+    },
+    {
+      "report": "candidate-1r1t-loss.json",
+      "rate_hz": 60000000,
+      "frames": 100,
+      "samples_per_frame": 1000000,
+      "missing_samples": 229000000,
+      "allocated_kernel_buffers": 50
+    },
+    {
+      "report": "candidate-1r1t-low-lan.json",
+      "rate_hz": 2500000,
+      "frames": 5,
+      "samples_per_frame": 1000000,
+      "missing_samples": 0,
+      "allocated_kernel_buffers": 50
+    },
+    {
+      "report": "candidate-1r1t-low-lan.json",
+      "rate_hz": 5000000,
+      "frames": 5,
+      "samples_per_frame": 1000000,
+      "missing_samples": 0,
+      "allocated_kernel_buffers": 50
+    },
+    {
+      "report": "paired-0-auto.json",
+      "rate_hz": 5000000,
+      "frames": 5,
+      "samples_per_frame": 100000,
+      "missing_samples": 0,
+      "allocated_kernel_buffers": 0
+    },
+    {
+      "report": "paired-0-hold.json",
+      "rate_hz": 5000000,
+      "frames": 5,
+      "samples_per_frame": 100000,
+      "missing_samples": 0,
+      "allocated_kernel_buffers": 0
+    },
+    {
+      "report": "paired-01-auto.json",
+      "rate_hz": 5000000,
+      "frames": 5,
+      "samples_per_frame": 100000,
+      "missing_samples": 0,
+      "allocated_kernel_buffers": 0
+    },
+    {
+      "report": "paired-01-hold.json",
+      "rate_hz": 5000000,
+      "frames": 5,
+      "samples_per_frame": 100000,
+      "missing_samples": 0,
+      "allocated_kernel_buffers": 0
+    },
+    {
+      "report": "paired-1-auto.json",
+      "rate_hz": 5000000,
+      "frames": 5,
+      "samples_per_frame": 100000,
+      "missing_samples": 0,
+      "allocated_kernel_buffers": 0
+    },
+    {
+      "report": "paired-1-hold.json",
+      "rate_hz": 5000000,
+      "frames": 5,
+      "samples_per_frame": 100000,
+      "missing_samples": 0,
+      "allocated_kernel_buffers": 0
+    },
+    {
+      "report": "persistent-paired-0-auto.json",
+      "rate_hz": 5000000,
+      "frames": 5,
+      "samples_per_frame": 100000,
+      "missing_samples": 0,
+      "allocated_kernel_buffers": 0
+    },
+    {
+      "report": "persistent-paired-0-hold.json",
+      "rate_hz": 5000000,
+      "frames": 5,
+      "samples_per_frame": 100000,
+      "missing_samples": 0,
+      "allocated_kernel_buffers": 0
+    },
+    {
+      "report": "persistent-paired-01-auto.json",
+      "rate_hz": 5000000,
+      "frames": 5,
+      "samples_per_frame": 100000,
+      "missing_samples": 0,
+      "allocated_kernel_buffers": 0
+    },
+    {
+      "report": "persistent-paired-01-hold.json",
+      "rate_hz": 5000000,
+      "frames": 5,
+      "samples_per_frame": 100000,
+      "missing_samples": 0,
+      "allocated_kernel_buffers": 0
+    },
+    {
+      "report": "persistent-paired-1-auto.json",
+      "rate_hz": 5000000,
+      "frames": 5,
+      "samples_per_frame": 100000,
+      "missing_samples": 0,
+      "allocated_kernel_buffers": 0
+    },
+    {
+      "report": "persistent-paired-1-hold.json",
+      "rate_hz": 5000000,
+      "frames": 5,
+      "samples_per_frame": 100000,
+      "missing_samples": 0,
+      "allocated_kernel_buffers": 0
+    }
+  ],
+  "receipts": [
+    {
+      "phase": "ram-2r2t-result.json",
+      "receipt_id": "d68aad555bdc449ca10658a16ace0324",
+      "sha256": "ff2a1638311ce4e43801e2e57799cac58e5858540a6ca9fe1bd70453f8890984"
+    },
+    {
+      "phase": "ram-1r1t-result.json",
+      "receipt_id": "4a7ea206b01949ae878e4d2c9f53db7c",
+      "sha256": "b726801f6ed40510f3ea38f6650eb2762412f2b25c11c3a0a56b3757e3e8b65c"
+    },
+    {
+      "phase": "persistent-result.json",
+      "receipt_id": "8d7d7875-64f6-490a-831d-feb54a0f2bb0",
+      "sha256": "741233309854825cdb2d9e516f3cef41225c918c17fe5bf15344fd508d090343"
+    }
+  ],
+  "offline_tests": {
+    "firmware": 1516,
+    "ppu": 3454,
+    "native_suites": 14
+  },
+  "limitations": [
+    "Finite 60 MS/s capture does not qualify continuous lossless 240 MB/s Ethernet streaming.",
+    "60 MS/s uses 50 MHz analog bandwidth; no analog RF accuracy or detector qualification.",
+    "Counter metadata has no paired AGC, gain or RSSI validity.",
+    "Only this single serial was tested.",
+    "Known FunctionFS supervisor USB unbinding after forced iiOD death required targeted rebind.",
+    "Timestamp packer/XPM functional simulation has startup assertion warnings."
+  ],
+  "ppu_release_source": "d85199a5033e6cdf4ca735e24a440a9ea70d5329",
+  "ppu_release_ref": "refs/tags/counter-rx-v1-host-v1",
+  "post_capture_quiesce": "The final public capture harness explicitly mutes TX and powers down its LO after restoring RX settings."
+}

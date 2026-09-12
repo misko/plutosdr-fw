@@ -1,0 +1,121 @@
+{
+  "serial": "1040007c4a94000211000b009186843ef2",
+  "uri": "ip:192.168.1.18",
+  "native_version": [
+    0,
+    25,
+    "47a75cb"
+  ],
+  "native_sha256": "ff608ac8e97fbb6d3ef67db40ef8fd96a0a93b9580188560013de1a4c865c711",
+  "binding_sha256": "d8986bae5d550549cf5428fd8f6339e2454648b2c105ba6aa4b43c068166ffe1",
+  "counter_only": false,
+  "cells": [
+    {
+      "requested_rate": 5000000,
+      "frames": [
+        {
+          "first": 1763673689,
+          "end": 1763773689,
+          "missing": 0,
+          "flags": 2982931,
+          "shape": [
+            1,
+            100000
+          ],
+          "iq_sha256": "e6863778f82c6af95b8fc0015f80450ea6f67a69dfae0baa224766977401fd35"
+        },
+        {
+          "first": 1763773689,
+          "end": 1763873689,
+          "missing": 0,
+          "flags": 2982931,
+          "shape": [
+            1,
+            100000
+          ],
+          "iq_sha256": "98324ec5501da51c303b862cf7f4fa96d660f8e4d1855b1fda97dfe695c3266f"
+        },
+        {
+          "first": 1763873689,
+          "end": 1763973689,
+          "missing": 0,
+          "flags": 2982931,
+          "shape": [
+            1,
+            100000
+          ],
+          "iq_sha256": "dde7a8ee42f10e1eb9a2ba5ad49e1ecbd8ffca636058e1049c6b3ec64e8c87bb"
+        },
+        {
+          "first": 1763973689,
+          "end": 1764073689,
+          "missing": 0,
+          "flags": 2982931,
+          "shape": [
+            1,
+            100000
+          ],
+          "iq_sha256": "b4c2186c5db40308e88656ec0096dd6696e117f618ec4a68015d29e6ff901540"
+        },
+        {
+          "first": 1764073689,
+          "end": 1764173689,
+          "missing": 0,
+          "flags": 2982931,
+          "shape": [
+            1,
+            100000
+          ],
+          "iq_sha256": "e45bcc05314ecaa8481c952b6547d575d822df0305e3cb4b469b66c0a1b7fc63"
+        }
+      ],
+      "requested_kernel_buffers": 4,
+      "sample_rate": 5000000,
+      "rf_bandwidth": 5000000,
+      "timestamp_control_before": 0,
+      "allocated_kernel_buffers": 0,
+      "elapsed_seconds": 0.2997955158352852,
+      "outcome": "completed",
+      "timestamp_control_after": 0
+    }
+  ],
+  "firmware": "v0.50-plutoplus-spf-counter-rx-v1",
+  "scan_channels": [
+    "voltage0",
+    "voltage1",
+    "voltage2",
+    "voltage3"
+  ],
+  "original": {
+    "sample_rate": 30720000,
+    "rx_rf_bandwidth": 18000000,
+    "rx_lo": 2400000000,
+    "rx_enabled_channels": [
+      0,
+      1
+    ]
+  },
+  "original_gain": [
+    [
+      "voltage0",
+      {
+        "gain_control_mode": "slow_attack",
+        "hardwaregain": "71.000000 dB"
+      }
+    ],
+    [
+      "voltage1",
+      {
+        "gain_control_mode": "slow_attack",
+        "hardwaregain": "71.000000 dB"
+      }
+    ],
+    [
+      "voltage2",
+      {}
+    ]
+  ],
+  "restored": true,
+  "restored_gain": true,
+  "restored_queue": true
+}

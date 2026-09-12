@@ -1,0 +1,11 @@
+PASS: counter wire, real provider dispatch, prefix, exact gaps and cleanup
+SPF tandem event sequence gap: expected=4 observed=5 sample=11
+SPF tandem status did not catch up: expected=2 observed=0 attempts=4 epoch=13
+SPF tandem session tests passed
+SPF tandem metadata tests passed
+SPF temperature cache tests passed
+buffer block leases: PASS
+ERROR: READ LINE: -32
+direct async transport: PASS
+iiOD metadata command batch: PASS
+metadata batch core: PASS

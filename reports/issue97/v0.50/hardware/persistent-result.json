@@ -1,0 +1,31 @@
+{
+  "receipt_id": "8d7d7875-64f6-490a-831d-feb54a0f2bb0",
+  "outcome": "success",
+  "phases": [
+    "preflight_revalidated",
+    "remote_preflight_attested",
+    "source_tx_quiesced",
+    "remote_tx_safe_read_only_attested",
+    "pluto_frm_staged",
+    "staged_hash_verified",
+    "updater_reported_done",
+    "mtd3_fit_verified",
+    "remote_stage_removed",
+    "reboot_dispatched",
+    "lan_iio_disappeared",
+    "lan_iio_reappeared",
+    "return_attested",
+    "tx_safe_attested",
+    "lan_ssh_host_key_rotated",
+    "remote_return_tx_safe_read_only_attested"
+  ],
+  "receipt_path": "/home/mouse9911/gits/plutosdr-fw-issue-97/evidence/v050-harness/evidence/flash-receipts/8d7d7875-64f6-490a-831d-feb54a0f2bb0.json",
+  "returned_serial": "1040007c4a94000211000b009186843ef2",
+  "returned_firmware": "v0.50-plutoplus-spf-counter-rx-v1",
+  "returned_phy": "ad9361",
+  "error": null,
+  "failure_phase": null,
+  "failure_classification": null,
+  "retryable": null,
+  "remediation": null
+}

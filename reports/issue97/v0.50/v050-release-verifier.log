@@ -1,0 +1,26 @@
+
+Verifying v0.50-plutoplus-spf-counter-rx-v1
+  manifest: evidence/v050-harness/build/counter-rx-v1.yaml
+
+  ok  image_sha256 = 435a26369018e86ee66262b79c32895dbaaacef510a1efb71c566d6409555344
+  ok  dfu suffix valid
+  ok  fit_description = Configuration to load fpga before Kernel
+  ok  fpga_bitstream_md5 = b881ef2e412d4fe90ece28d0a305c8a5
+  ok  ramdisk_md5 = 2da7e09f022223db271448b744e055bf
+  ok  device_fw = v0.50-plutoplus-spf-counter-rx-v1
+  ok  versions_hdl = ddr-burst-v1-rc4-source/hdl-v1
+  ok  versions_buildroot = counter-rx-v1-source/buildroot-v2
+  ok  versions_linux = counter-rx-v1-source/linux-v1
+  ok  versions_u_boot_xlnx = gain-series-v4-rc2-source/u-boot-xlnx
+  ok  buildroot pin tag counter-rx-v1-source/buildroot-v2 resolves to pinned fedd002ca16d...
+  ok  linux pin tag counter-rx-v1-source/linux-v1 resolves to pinned 4683cd2e3556...
+  ok  u-boot-xlnx pin tag gain-series-v4-rc2-source/u-boot-xlnx resolves to pinned 1ff0468e9bea...
+  ok  gadget_source = 1bbe9f0ee4a70374964804de09b7503da260b059 (embedded in the shipped binary)
+
+release_verified=true
+image_sha256=435a26369018e86ee66262b79c32895dbaaacef510a1efb71c566d6409555344
+device_fw=v0.50-plutoplus-spf-counter-rx-v1
+firmware_source=619ecedf23a3fd2103e1237d69db830e26d8959c
+gadget_source=1bbe9f0ee4a70374964804de09b7503da260b059
+
+14 checks passed.

@@ -1,0 +1,17 @@
+{
+  "wrong_rate": 95,
+  "automatic_gain": 95,
+  "decimation_enabled": 95,
+  "paired_hold_on_1r1t": 95,
+  "rate_write": 16,
+  "lo_write": 16,
+  "bandwidth_write": 16,
+  "gain_mode_write": 16,
+  "gain_write": 16,
+  "timestamp_write": 16,
+  "second_counter_owner": 16,
+  "normal_close_restores_timestamp": true,
+  "iiod_death_releases_and_recaptures": true,
+  "timestamp_restored": true,
+  "settings_restored": true
+}

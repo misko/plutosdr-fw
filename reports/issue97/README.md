@@ -1,3 +1,7 @@
+> The final v0.50 build and persistent qualification are recorded in
+> [v0.50/qualification.json](v0.50/qualification.json) and [v0.50/RELEASE.md](v0.50/RELEASE.md).
+> The report below preserves the earlier local RC evidence and source revisions.
+
 # Issue 97: explicit physical 1R1T counter metadata
 
 Implemented for the sole authorized radio `1040007c4a94000211000b009186843ef2`.
