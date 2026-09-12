@@ -24,10 +24,12 @@ def round_even(value: int, denominator: int) -> int:
     return floor + int(2*remainder > denominator or (2*remainder == denominator and floor & 1))
 
 
-def coefficients(bank: bytes) -> list[tuple[int, int, int, int]]:
+def coefficients(bank: bytes, *, rate_hz: int = RATE) -> list[tuple[int, int, int, int]]:
+    if type(rate_hz) is not int or rate_hz not in (15000000,30000000,60000000):
+        raise ValueError("unsupported cubic reference output rate")
     if digest(bank) != BANK_SHA256:
         raise ValueError("native template differs from the qualified original-input bank")
-    raw = []
+    raw, segments = [], []
     for text in bank.splitlines():
         word, terms = int(text, 16), []
         for bits, shift in ((12, 13), (13, 9), (14, 4), (15, 0)):
@@ -37,6 +39,7 @@ def coefficients(bank: bytes) -> list[tuple[int, int, int, int]]:
                 pair.append((value-(1 << bits) if value >> (bits-1) else value) << shift)
                 word >>= bits
             terms.append(pair)
+        segments.append(terms)
         # Closed-form polynomial; no finite-width recurrence or RTL state.
         for phase in range(24):
             raw.append(tuple(sum(math.comb(phase, order)*terms[order][axis]
@@ -44,9 +47,14 @@ def coefficients(bank: bytes) -> list[tuple[int, int, int, int]]:
     if len(raw) != SAMPLES+48:
         raise ValueError("native bank lacks the full pilot and both guards")
     result = []
-    for n in range(24, 24+SAMPLES):
+    for n in range(24, 24+SAMPLES, RATE//rate_hz):
+        slope = [30*(raw[n+1][axis]-raw[n-1][axis]) for axis in range(2)]
+        if rate_hz != RATE:
+            phase, terms = n % 24, segments[n//24]
+            weights = (0,60,60*phase-30,30*phase*phase-60*phase+20)
+            slope = [sum(weights[k]*terms[k][axis] for k in range(4)) for axis in range(2)]
         ref_i, ref_q, slope_i, slope_q = (round_even(component, 2048) for component in (
-            *raw[n], 30*(raw[n+1][0]-raw[n-1][0]), 30*(raw[n+1][1]-raw[n-1][1])))
+            *raw[n], *slope))
         quantized = (ref_i, ref_q, slope_i, slope_q)
         if any(component < -32768 or component > 32767 for component in quantized):
             raise ValueError("qualified native coefficient clips")

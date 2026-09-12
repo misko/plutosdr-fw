@@ -7,16 +7,29 @@
 
 #include "glrt_native_gram.inc"
 
+struct tracking_basis {
+    struct glrt_tracking_profile profile;
+    double gram[3][3][2];
+};
+#include "glrt_tracking_gram.inc"
+
 #define NATIVE_SAMPLES 79200U
 #define NATIVE_RATE 60000000U
 #define PI 0x1.921fb54442d18p+1
 
 static int canonical(const uint32_t *w, unsigned count, unsigned bits, int sign)
 {
-    unsigned high_bits = bits-32*(count-1);
-    uint32_t high = w[count-1], mask = UINT32_MAX << high_bits;
-    uint32_t extension = sign && (high & (1U << (high_bits-1))) ? mask : 0;
-    return (high & mask) == extension;
+    unsigned word, high_bits, n;
+    uint32_t high, mask, extension;
+    if (!bits || bits > 32*count) return 0;
+    word = (bits-1)/32;
+    high_bits = bits-32*word;
+    high = w[word];
+    mask = high_bits == 32 ? 0 : UINT32_MAX << high_bits;
+    extension = sign && (high & (1U << (high_bits-1))) ? UINT32_MAX : 0;
+    if ((high & mask) != (extension & mask)) return 0;
+    for (n=word+1; n<count; n++) if (w[n] != extension) return 0;
+    return 1;
 }
 
 static double signed_words(const uint32_t *w, unsigned count)
@@ -33,7 +46,7 @@ static double signed_words(const uint32_t *w, unsigned count)
 /* Compute (N-1)*reference - 2*prefix in exact signed 96-bit arithmetic before
  * conversion. In particular, a nearly cancelled centered moment must not lose
  * its low bits by subtracting two large rounded doubles. No ARM __int128. */
-static double centered(const uint32_t *reference, const uint32_t *prefix)
+static double centered(const uint32_t *reference, const uint32_t *prefix, uint32_t samples)
 {
     uint32_t a[3] = {reference[0], reference[1],
                      reference[1] & 0x80000000U ? UINT32_MAX : 0};
@@ -41,7 +54,7 @@ static double centered(const uint32_t *reference, const uint32_t *prefix)
     uint64_t carry = 0, borrow = 0;
     unsigned n;
     for (n=0; n<3; n++) {
-        uint64_t term = (uint64_t)a[n]*(NATIVE_SAMPLES-1) + carry;
+        uint64_t term = (uint64_t)a[n]*(samples-1) + carry;
         product[n] = (uint32_t)term;
         carry = term >> 32;
         shifted[n] = (prefix[n] << 1) | (n ? prefix[n-1] >> 31 : 0);
@@ -57,55 +70,42 @@ static double centered(const uint32_t *reference, const uint32_t *prefix)
 static double norm2(double complex z) { return creal(z)*creal(z)+cimag(z)*cimag(z); }
 static double clip(double x, double low, double high) { return fmax(low,fmin(high,x)); }
 
-static int solve(const uint32_t w[32], struct glrt_native_estimate *out, int capture)
+static int reduce_moments(const uint32_t w[16], uint32_t count, uint32_t fault,
+    uint32_t step, uint32_t rate, uint32_t samples, const double gram[3][3][2],
+    struct glrt_native_estimate *out)
 {
     double complex g[3][3], p[3], amplitude, residual[2];
     double norm, energy, gain, h00, h01, h11, r0, r1, discriminant, eigen_low, eigen_high;
     double determinant, correction[3] = {1,0,0}, model_norm, predicted;
-    unsigned i,j;
-    uint64_t start;
-    if (!w || !out)
-        return -1;
+    unsigned i,j,bits=0;
+    while ((1U << bits) < samples) bits++;
     memset(out,0,sizeof(*out));
-    if (!w[2] || w[25] != NATIVE_RATE || w[26] != NATIVE_SAMPLES ||
-        w[7] > NATIVE_SAMPLES || (!w[8] && w[7] != NATIVE_SAMPLES))
+    if (count > samples || (!fault && count != samples)) return -1;
+    for (i=0; i<8; i+=2)
+        if (!canonical(w+i,2,35+bits,1)) return -1;
+    if (!canonical(w+8,3,35+2*bits,1) || !canonical(w+11,3,35+2*bits,1) ||
+        !canonical(w+14,2,36+bits,0))
         return -1;
-    if (capture) {
-        if (w[0] != 0x474c4e31U || w[27] != 1 || w[30] || w[31] ||
-            (w[8] & ~0x7ffU) || w[28] != w[29] || w[28] > NATIVE_SAMPLES ||
-            w[7] > w[28] || (!w[8] && w[28] != NATIVE_SAMPLES))
-            return -1;
-    } else if (w[0] != 0x474c5331U || w[27] >= 64 || w[28] || w[29] ||
-               w[30] || w[31] || (w[8] & ~0x3ffU)) {
-        return -1;
-    }
-    start = ((uint64_t)w[4] << 32) | w[3];
-    if ((capture ? w[28] : w[7]) && start > UINT64_MAX-((capture ? w[28] : w[7])-1))
-        return -1;
-    for (i=9; i<17; i+=2)
-        if (!canonical(w+i,2,52,1)) return -1;
-    if (!canonical(w+17,3,69,1) || !canonical(w+20,3,69,1) || !canonical(w+23,2,53,0))
-        return -1;
-    if (!w[7])
-        for (i=9; i<25; i++)
+    if (!count)
+        for (i=0; i<16; i++)
             if (w[i]) return -1;
-    predicted = ((double)w[6] - (w[6] & 0x80000000U ? 0x1p32 : 0))*NATIVE_RATE/0x1p32;
+    predicted = ((double)step - (step & 0x80000000U ? 0x1p32 : 0))*rate/0x1p32;
     out->cfo_hz = predicted;
-    if (w[8]) out->rejection |= GLRT_NATIVE_FAULT;
-    if (w[7] != NATIVE_SAMPLES) out->rejection |= GLRT_NATIVE_INCOMPLETE;
+    if (fault) out->rejection |= GLRT_NATIVE_FAULT;
+    if (count != samples) out->rejection |= GLRT_NATIVE_INCOMPLETE;
     /* Partial moments cannot be paired with the full-pilot Gram matrix. */
     if (out->rejection) return 0;
-    if (fabs(predicted)+250 >= NATIVE_RATE/2) {
+    if (fabs(predicted)+250 >= rate/2) {
         out->rejection |= GLRT_NATIVE_OUTSIDE_LOCAL;
         return 0;
     }
     for (i=0; i<3; i++)
         for (j=0; j<3; j++)
-            g[i][j] = native_gram[i][j][0] + I*native_gram[i][j][1];
-    p[0] = signed_words(w+9,2) + I*signed_words(w+11,2);
-    p[1] = signed_words(w+13,2) + I*signed_words(w+15,2);
-    p[2] = -I*(PI*1000/NATIVE_RATE)*(centered(w+9,w+17) + I*centered(w+11,w+20));
-    energy = (double)w[24]*0x1p32+w[23];
+            g[i][j] = gram[i][j][0] + I*gram[i][j][1];
+    p[0] = signed_words(w,2) + I*signed_words(w+2,2);
+    p[1] = signed_words(w+4,2) + I*signed_words(w+6,2);
+    p[2] = -I*(PI*1000/rate)*(centered(w,w+8,samples) + I*centered(w+2,w+11,samples));
+    energy = (double)w[15]*0x1p32+w[14];
     norm = creal(g[0][0]);
     if (energy <= DBL_MIN || norm <= DBL_MIN) {
         out->rejection |= GLRT_NATIVE_ZERO_ENERGY;
@@ -150,6 +150,56 @@ static int solve(const uint32_t w[32], struct glrt_native_estimate *out, int cap
     }
     if (out->coherence < .05) out->rejection |= GLRT_NATIVE_LOW_COHERENCE;
     return 0;
+}
+
+static int solve(const uint32_t w[32], struct glrt_native_estimate *out, int capture)
+{
+    uint64_t start;
+    if (!w || !out) return -1;
+    memset(out,0,sizeof(*out));
+    if (!w[2] || w[25] != NATIVE_RATE || w[26] != NATIVE_SAMPLES ||
+        w[7] > NATIVE_SAMPLES || (!w[8] && w[7] != NATIVE_SAMPLES)) return -1;
+    if (capture) {
+        if (w[0] != 0x474c4e31U || w[27] != 1 || w[30] || w[31] ||
+            (w[8] & ~0x7ffU) || w[28] != w[29] || w[28] > NATIVE_SAMPLES ||
+            w[7] > w[28] || (!w[8] && w[28] != NATIVE_SAMPLES)) return -1;
+    } else if (w[0] != 0x474c5331U || w[27] >= 64 || w[28] || w[29] ||
+               w[30] || w[31] || (w[8] & ~0x3ffU)) return -1;
+    start = ((uint64_t)w[4] << 32) | w[3];
+    if ((capture ? w[28] : w[7]) && start > UINT64_MAX-((capture ? w[28] : w[7])-1))
+        return -1;
+    return reduce_moments(w+9,w[7],w[8],w[6],NATIVE_RATE,NATIVE_SAMPLES,native_gram,out);
+}
+
+static const struct tracking_basis *tracking_basis_get(uint32_t rate, uint32_t phase)
+{
+    unsigned n;
+    for (n=0; n<sizeof(tracking_bases)/sizeof(tracking_bases[0]); n++)
+        if (tracking_bases[n].profile.rate == rate &&
+            tracking_bases[n].profile.reference_phase == phase) return &tracking_bases[n];
+    return NULL;
+}
+
+const struct glrt_tracking_profile *glrt_tracking_profile_get(uint32_t rate, uint32_t phase)
+{
+    const struct tracking_basis *basis = tracking_basis_get(rate,phase);
+    return basis ? &basis->profile : NULL;
+}
+
+int glrt_tracking_solve(uint32_t rate, uint32_t phase,
+    const struct glrt_tracking_moments *moments, struct glrt_native_estimate *out)
+{
+    const struct tracking_basis *basis = tracking_basis_get(rate,phase);
+    int rc;
+    if (!out) return -1;
+    memset(out,0,sizeof(*out));
+    out->rejection = GLRT_NATIVE_FAULT;
+    if (!moments || !basis || (moments->fault & ~0xffU) ||
+        (moments->count && moments->start > UINT64_MAX-(moments->count-1))) return -1;
+    rc = reduce_moments(moments->words,moments->count,moments->fault,moments->phase_step,
+                        rate,basis->profile.samples,basis->gram,out);
+    if (rc) out->rejection = GLRT_NATIVE_FAULT;
+    return rc;
 }
 
 int glrt_native_solve(const uint32_t w[32], struct glrt_native_estimate *out)

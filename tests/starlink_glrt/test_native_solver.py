@@ -24,7 +24,8 @@ def solver(tmp_path_factory):
     root = tmp_path_factory.mktemp("native-solver")
     # Expose only the integer-centering helper for its carry/cancellation test.
     (root/"wrapper.c").write_text('#include "glrt_native_solver.c"\n'
-        'double exact_center(const uint32_t *r,const uint32_t *t) {return centered(r,t);}\n')
+        'double exact_center(const uint32_t *r,const uint32_t *t) {return centered(r,t,79200);}\n'
+        'double exact_center_count(const uint32_t *r,const uint32_t *t,uint32_t n) {return centered(r,t,n);}\n')
     subprocess.run(["cc","-std=c99","-O2","-Wall","-Wextra","-Werror","-shared","-fPIC",
                     "-I",str(ROOT/"tools"),str(root/"wrapper.c"),"-lm","-o",str(root/"solver.so")],check=True)
     lib = ctypes.CDLL(str(root/"solver.so"))
@@ -34,6 +35,8 @@ def solver(tmp_path_factory):
     lib.glrt_native_solve_capture.restype = ctypes.c_int
     lib.exact_center.argtypes = [ctypes.POINTER(ctypes.c_uint32),ctypes.POINTER(ctypes.c_uint32)]
     lib.exact_center.restype = ctypes.c_double
+    lib.exact_center_count.argtypes = lib.exact_center.argtypes+[ctypes.c_uint32]
+    lib.exact_center_count.restype = ctypes.c_double
     return lib
 
 
