@@ -2,6 +2,22 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-12, ownership-derived descriptor lock: **2,330 scoped tests and
+all 92 actual FFT fault/reset/stall cases pass**. An independent original lock
+matches across 1,841,886 checks, including 2,805 quarantined holds. Numerical
+words and 4,178-clock service remain exact. This simpler representation is
+**rejected physically**: same-175 MHz slack worsens -1.001 to -1.229 ns;
+TNS -713.969 ns and 1,299 failing endpoints, versus parent -295.708 ns / 811.
+The completion-driven lock register is redundant functionally, but removing it
+does not remove the global-fault/ledger/capacity dependency. Do not promote or
+stack this candidate. Next target a registered local ownership/retirement
+boundary while preserving current publication vetoes, diagnostics and reset.
+Native 60 MS/s fine search, 2.5 MS/s inspection and all full-receiver deployment
+gates remain open. No radios, PPU or main branches were touched; PRIMARY HDL
+is unchanged. FW/HDL branch:
+`codex/starlink-rx-only-do-not-merge-ownership-lock`.
+See [ownership-lock proof and rejected route](reports/experiments/20260912-ownership-lock-actual-route.md).
+
 Update 2026-09-12, retrying held-job admission: **2,299 scoped tests and all
 92 actual FFT fault/reset/stall cases pass**. The request no longer contains
 current cross-block readiness; rejected private snapshots retry while capacity
