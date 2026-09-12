@@ -66,13 +66,14 @@ def test_first_tracking_image_has_one_native_engine_and_shared_acquisition(captu
     assert re.search(r'\.scope generate, "g_serial"', source)
 
 
-@pytest.mark.parametrize("termination", ["complete", "mid-pilot", "gap"])
+@pytest.mark.parametrize("termination", ["complete", "mid-pilot", "gap", "cancel"])
 def test_exact_native_results_coexist_with_iq_and_stop_keeps_queued_evidence(captures, tmp_path, termination):
     completed = termination == "complete"
     count = 3 if completed else 2
     rows = [(0, 11, 0, 3, 1), write(8, 4), wait(2000), write(0x20, 517), write(8, 1),
         write(0x808, 16), *configuration(), wait(450000 if completed else 200000)]
     if termination == "gap": rows += [(0, 5, 0, 0x12345678, 0), wait(100)]
+    if termination == "cancel": rows += [write(0x808, 2), wait(500)]
     rows += [write(8, 2), wait(500), *snapshot(), *tracking_snapshot()]
     for _ in range(count): rows += [*head(), write(0x808, 32)]
     rows += [*tracking_snapshot(), write(0x808, 4), wait(100), write(8, 4), wait(100),
@@ -88,7 +89,8 @@ def test_exact_native_results_coexist_with_iq_and_stop_keeps_queued_evidence(cap
     before, after = map(decode_snapshot, groups(reads, 0x900, 24))
     assert before.epoch == 1 and before.faults == 8 and before.configured == 3
     assert (before.admitted, before.committed, before.queued) == (count, count, count)
-    assert before.unavailable == (0 if completed else 1)
+    assert before.unavailable == (0 if completed or termination == "cancel" else 1)
+    assert before.cancelled == (1 if termination == "cancel" else 0)
     after.require_drained()
     b = TrackingBatch(2500000, 1, 71, 1000, 24576, round(Fraction(2500000*65536, 750)),
                       4096*65536, 0, 17, 3, 30000)
@@ -100,7 +102,7 @@ def test_exact_native_results_coexist_with_iq_and_stop_keeps_queued_evidence(cap
         result = TrackingResult.from_sysfs("GLT1 00010000 00000001 "+" ".join(f"{v:08x}" for v in w))
         result.require_association(b, sequence=frame)
         if completed or frame == 0: result.require_complete()
-        else: assert 0 < result.count < 3300 and result.fault & 0x200
+        else: assert 0 < result.count < 3300 and result.fault & (0x100 if termination == "cancel" else 0x200)
         raw = reference_rows(cubic, direct, 2500000, result.reference_phase)
         coefficients = [[n, *c, int(n == 3299), 0] for n, c in enumerate(raw)]
         values = [(result.start+n, *pattern(result.start+n)) for n in range(result.count)]
