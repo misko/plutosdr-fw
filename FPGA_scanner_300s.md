@@ -2,6 +2,22 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-12, local fault views without duplicate global-abort echoes:
+**2,360 scoped tests and all 92 actual FFT fault/reset/stall cases pass**.
+Original mailbox outputs and internal state match over 1,841,886 checks,
+including 102 genuinely removed echoes. No added latency; 64,512 words and
+4,178-clock service remain exact. Routing nevertheless regresses: **-1.309 ns
+WNS / -488.882 ns TNS / 971 endpoints**, same-175 MHz -1.309 ns. Not promoted.
+The worst path is now reset release through ledger/completed-input faults into
+forward final-commit/ACK state. Next prototype private occupancy/ACK storage
+driven by the existing registered completion pulse, preserving effective
+visible state on the original edge, immediate ACK-clear priority and X/Z
+semantics. Do not stack this or the rejected ownership-lock representation.
+Full native 60 MS/s, independent 2.5 MS/s inspection and all deployment gates
+remain required. No radio, PPU, main or PRIMARY HDL changes.
+Branch: `codex/starlink-rx-only-do-not-merge-abort-echo`.
+See [fault-view proof and next registered boundary](reports/experiments/20260912-abort-echo-actual-route.md).
+
 Update 2026-09-12, ownership-derived descriptor lock: **2,330 scoped tests and
 all 92 actual FFT fault/reset/stall cases pass**. An independent original lock
 matches across 1,841,886 checks, including 2,805 quarantined holds. Numerical
