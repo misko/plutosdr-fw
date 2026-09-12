@@ -20,7 +20,7 @@ import product_retirement_receipt_experiment as retirement
 import private_forward_descriptor_experiment as descriptor
 import output_retirement_receipt_experiment_v5 as out_retirement
 import private_replay_sequence_experiment_v3 as publication
-import product_local_framing_experiment as local_framing
+import product_local_framing_experiment_v2 as local_framing
 from staged_fft_experiment import sha, verify, require, fresh
 
 def evidence(actual,synthesis,aux):
