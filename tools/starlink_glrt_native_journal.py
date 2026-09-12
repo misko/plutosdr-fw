@@ -19,7 +19,7 @@ from .starlink_glrt_schedule_abi import (
 )
 
 KINDS = {"bootstrap_seed", "initial", "descriptor", "head", "estimate", "before_submit",
-         "stopping", "drained", "final", "snapshot"}
+         "stopping", "drained", "final", "snapshot", "tracking_handoff"}
 
 
 @dataclass(frozen=True)
@@ -68,6 +68,7 @@ class JournalCodec:
     snapshot: Callable
     head: Callable
     prefix: str
+    handoff: Callable | None = None
 
 
 GLS1 = JournalCodec(batch, ScheduleSnapshot.from_sysfs, ScheduledResult.from_sysfs, "native_schedule_")
@@ -75,16 +76,28 @@ GLS1 = JournalCodec(batch, ScheduleSnapshot.from_sysfs, ScheduledResult.from_sys
 
 def _descriptors(entries: list[JournalRecord], *, epoch: int, codec: JournalCodec) -> dict:
     owners = {}
-    next_frame = 0
+    next_frame, frame_limit = 0, 225000
+    history = None
+    started = False
     for record in entries:
+        if record.kind == "tracking_handoff":
+            if history is not None or started or codec.handoff is None:
+                raise ValueError("duplicate, late or unsupported tracking handoff")
+            history = codec.handoff(record.payload, epoch=epoch)
+            next_frame, frame_limit = history.first, history.limit
+        elif record.kind not in {"bootstrap_seed", "snapshot"}:
+            started = True
         if record.kind != "descriptor":
             continue
         fields = record.payload.decode("ascii").split(maxsplit=2)
-        if len(fields) != 3 or fields[0] != "frame" or not re.fullmatch(r"[0-9]{1,6}", fields[1]):
+        if (len(fields) != 3 or fields[0] != "frame" or
+                not re.fullmatch(r"[0-9]{1,10}" if history else r"[0-9]{1,6}", fields[1])):
             raise ValueError("invalid retained global frame mapping")
         first, b = int(fields[1]), codec.batch(fields[2])
-        if b.epoch != epoch or b.tag in owners or first != next_frame or first+b.repeats > 225000:
+        if b.epoch != epoch or b.tag in owners or first != next_frame or first+b.repeats > frame_limit:
             raise ValueError("retained descriptor ownership is inconsistent")
+        if history is not None and not owners and first+b.repeats-1-history.last_supported > 32:
+            raise ValueError("initial descriptor exceeds retained tracking horizon")
         owners[b.tag] = first, b
         next_frame += b.repeats
     return owners
@@ -164,8 +177,12 @@ def _review(data: bytes, *, epoch: int, codec: JournalCodec) -> dict:
                 final = state
     if pending is not None or final is None or entries[-1].kind != "final":
         raise ValueError("journal has no complete verified ending")
-    return dict(heads=heads, estimates=estimates, descriptors=owners, drained=drained, final=final,
-                supported=sum(e["rejection"] == 0 for e in estimates))
+    result = dict(heads=heads, estimates=estimates, descriptors=owners, drained=drained, final=final,
+                  supported=sum(e["rejection"] == 0 for e in estimates))
+    for entry in entries:
+        if entry.kind == "tracking_handoff":
+            result["handoff"] = codec.handoff(entry.payload, epoch=epoch)
+    return result
 
 
 def review(data: bytes, *, epoch: int) -> dict:

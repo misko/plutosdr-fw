@@ -40,6 +40,7 @@ struct glrt_native_controller {
     int started, stopping, cancelled, clearing, done, failure, bootstrap_active, bootstrap_offset_valid;
     int acquisition_horizon_exhausted;
     int tracking;
+    int handoff_pending;
 };
 /* Bootstrap is a retained acquisition prediction in a freshly rebased source
  * epoch, with zero scheduled counters. It begins at global frame zero. The
@@ -55,6 +56,17 @@ int glrt_native_controller_init(struct glrt_native_controller *,
  * and retention/ownership semantics are shared with the legacy controller. */
 int glrt_tracking_controller_init(struct glrt_native_controller *,
     const struct glrt_native_ports *, const struct glrt_tracking_batch *bootstrap,
+    uint32_t frames, double seconds);
+/* Continue a validated causal history without resetting its frame ordinals.
+ * frames is the additional work budget, not the absolute ending ordinal.
+ * The bootstrap must exactly match a prediction from this same rate/epoch and
+ * history. Copy history on success; leave the controller untouched on error.
+ * The caller has retained the acquisition/past-IQ evidence and attested the
+ * reference bank. First tick retains the transferred history before SUBMIT;
+ * live deadline, source ownership and finite recovery checks still apply. */
+int glrt_tracking_controller_init_handoff(struct glrt_native_controller *,
+    const struct glrt_native_ports *, const struct glrt_tracking_batch *,
+    const struct glrt_tracking_trend *, uint32_t first_frame,
     uint32_t frames, double seconds);
 /* Explicit startup mode: a 17..64-repeat externally validated prediction is
  * an authorization horizon. Submit 12 first, then at most four at a time

@@ -21,4 +21,9 @@ int glrt_tracking_trend_observe(struct glrt_tracking_trend *, uint32_t epoch,
 int glrt_tracking_trend_batch(const struct glrt_tracking_trend *,
     uint32_t first_frame, uint32_t repeats, uint32_t tag, uint32_t seed,
     struct glrt_tracking_batch *, double *cfo_rate_hz_s);
+/* Validate an imported history's bounded storage, chronological ownership and
+ * finite values before using it for a new controller run. This does not attest
+ * RF support or replace the batch predictor's quality/forecast checks. */
+int glrt_tracking_trend_handoff_valid(const struct glrt_tracking_trend *,
+    uint32_t first_frame, uint32_t frames);
 #endif

@@ -215,3 +215,65 @@ requires thirteen modeled one-ms waits. Future support remains weak in case
 the physical tracking release gate. The next integration is one radio-local
 capture owner feeding retention, acquisition/handoff and independent host IQ
 export, followed by loaded ingestion/admission measurement on `.21`.
+
+## Transfer into the finite tracking controller
+
+`glrt_tracking_controller_init_handoff` accepts the qualified bootstrap batch,
+its causal trend, the first absolute frame ordinal, and an additional work
+budget. It validates the rate/epoch, bounded chronological history, finite
+values and remaining forecast horizon. It recomputes the batch from that
+history and requires exact descriptor equality before initialization. It copies
+the history and retains absolute frame numbering. Invalid input leaves the
+controller unchanged; the ordinary initializer still starts with empty history
+at frame zero.
+
+Before the first SUBMIT, the controller retains one `tracking_handoff` record
+in its internal GLRJ1 journal. The payload is:
+
+```
+GLTH1 00010000 RATE EPOCH FIRST LIMIT HISTORY_FIRST LAST_SEEN LAST_SUPPORTED ANCHOR COUNT NEXT
+FRAMEOFFSETCFO
+...
+```
+
+Header numbers are fixed-width lowercase hex: ANCHOR is sixteen digits, all
+others eight. LIMIT is the exclusive absolute frame limit. Each observation
+line concatenates eight hex digits for its frame, sixteen for the IEEE
+binary64 timing-offset bits and sixteen for its CFO bits, followed by newline.
+The COUNT observations retain physical ring order, including the NEXT slot.
+The maximum 96-point payload fits the existing 4,096-byte record limit.
+Implicit initialized/valid/seen state is exactly one; import validation rejects
+other values. Source IQ, accepted estimates and acquisition provenance remain
+separately retained evidence; serializing the trend does not prove RF truth.
+
+`starlink_glrt_tracking_handoff.decode` independently validates the record.
+The GLT1 journal reviewer/recovery path requires this record before permitting
+nonzero initial frame ordinals and enforces its finite work and initial
+forecast bounds. Missing, late, duplicate or damaged handoffs are rejected.
+The GLS1 reviewer rejects this tracking-only extension. GLT1 hardware packets
+and submit/snapshot formats are unchanged.
+
+Tests pass 48 handoff cases, 417 controller/trend/journal regressions and 213
+bootstrap/CLI cases. They cover 2.5/5/15-MS/s continuation, wrapped history,
+large indices/ordinals, lost support, bad state, retention deadlines and
+stopped-writer recovery. The first handoff test run crashed because a Python
+ctypes callback was replaced after C copied its pointer. Installing the
+callback before initialization fixes the test's lifetime error; the corrected
+suite passes. The static ARM executable builds with warnings treated as errors
+and contains the new handoff/validation symbols; it has not run on-radio.
+
+`physical-controller-handoff-v2` restores only previously consumed history
+and drives the actual C controller against a simulated radio port backed by
+the retained physical IQ. Three runs begin at frame 604 and each account for
+128 results through retain/SUBMIT/read/POP/drain/CLEAR. All 384 moment records
+match independent scalar CORDIC/integer calculation, all three journals pass
+independent review, and queue high-water is one. Support remains 73/128,
+128/128 and 128/128. The other eleven cases retain their missing-handoff result.
+The v1 attempt stopped on a summary attribute typo after its first run; v2
+changes that field name without altering simulation or numerical gates.
+
+The simulation uses 50-us polling and 100-us descriptor-retention delays.
+These are declared model inputs, not measurements of loaded Linux behavior.
+This closes the tested controller-history transfer gap. Connecting the live
+radio capture owner, measuring admission under receiver load, qualifying the
+remaining startup cases, and deployment still remain.

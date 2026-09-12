@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 #include "glrt_native_controller.h"
 #include "glrt_tracking_transport.h"
+#include <float.h>
 #include <inttypes.h>
 #include <math.h>
 #include <stdio.h>
@@ -110,6 +111,61 @@ int glrt_tracking_controller_init(struct glrt_native_controller *c,
     c->next_tag = b->prediction.tag+1;
     c->tracking = 1;
     return glrt_tracking_trend_reset(&c->trend,b->prediction.epoch,b->rate);
+}
+
+int glrt_tracking_controller_init_handoff(struct glrt_native_controller *c,
+    const struct glrt_native_ports *p, const struct glrt_tracking_batch *b,
+    const struct glrt_tracking_trend *history, uint32_t first,
+    uint32_t frames, double seconds)
+{
+    struct glrt_tracking_batch predicted;
+    struct glrt_tracking_trend retained;
+    char expected[256], supplied[256];
+    double slope;
+    if (!glrt_tracking_batch_valid(b) ||
+        !glrt_tracking_trend_handoff_valid(history,first,frames) ||
+        history->rate!=b->rate || history->history.epoch!=b->prediction.epoch ||
+        glrt_tracking_trend_batch(history,first,b->prediction.repeats,
+            b->prediction.tag,b->prediction.seed,&predicted,&slope) ||
+        glrt_tracking_batch_encode(&predicted,expected,sizeof(expected))<0 ||
+        glrt_tracking_batch_encode(b,supplied,sizeof(supplied))<0 || strcmp(expected,supplied)) return -1;
+    retained=*history;
+    if (glrt_tracking_controller_init(c,p,b,frames,seconds)) return -1;
+    c->trend=retained;
+    c->next_frame=first; c->frames=first+frames; c->handoff_pending=1;
+    return 0;
+}
+
+/* Canonical internal GLTH1 history: IEEE binary64 bits avoid decimal rounding
+ * and preserve the predictor's physical ring order. 96 rows plus the fixed
+ * header fit the existing 4096-byte retained-record bound. No native padding
+ * or memory-endian representation is persisted. */
+static int retain_handoff(struct glrt_native_controller *c)
+{
+    const struct glrt_native_trend *h=&c->trend.history;
+    char raw[4096];
+    size_t length;
+    unsigned i;
+    int n;
+    if (sizeof(double)!=8 || DBL_MANT_DIG!=53 || DBL_MAX_EXP!=1024)
+        return GLRT_NATIVE_PROTOCOL_ERROR;
+    n=snprintf(raw,sizeof(raw),"GLTH1 00010000 %08" PRIx32 " %08" PRIx32
+        " %08" PRIx32 " %08" PRIx32 " %08" PRIx32 " %08" PRIx32 " %08" PRIx32
+        " %016" PRIx64 " %08" PRIx32 " %08" PRIx32 "\n",c->trend.rate,h->epoch,
+        c->next_frame,c->frames,h->first_frame,h->last_seen,h->last_supported,h->anchor,h->count,h->next);
+    if (n<0 || (size_t)n>=sizeof(raw)) return GLRT_NATIVE_PROTOCOL_ERROR;
+    length=(size_t)n;
+    for (i=0;i<h->count;i++) {
+        uint64_t offset, cfo;
+        memcpy(&offset,&h->observations[i].offset_samples,8);
+        memcpy(&cfo,&h->observations[i].cfo_hz,8);
+        n=snprintf(raw+length,sizeof(raw)-length,"%08" PRIx32 "%016" PRIx64 "%016" PRIx64 "\n",
+            h->observations[i].frame,offset,cfo);
+        if (n<0 || (size_t)n>=sizeof(raw)-length) return GLRT_NATIVE_PROTOCOL_ERROR;
+        length+=(size_t)n;
+    }
+    return c->ports.retain(c->ports.context,"tracking_handoff",raw,length) ?
+        GLRT_NATIVE_RETENTION_ERROR : 0;
 }
 
 static int bootstrap_slice(const struct glrt_native_batch *original,
@@ -319,10 +375,15 @@ int glrt_native_controller_tick(struct glrt_native_controller *c)
     if (!c->started) {
         if (c->stopping || !snapshot_drained(c,w) || w[7] || !(w[5]&1))
             return finish_error(c,GLRT_NATIVE_PROTOCOL_ERROR);
+        if (c->handoff_pending) {
+            rc=retain_handoff(c);
+            if (rc) return finish_error(c,rc);
+            c->handoff_pending=0;
+        }
         if (c->ports.retain(c->ports.context,"initial",raw,(size_t)n))
             return finish_error(c,GLRT_NATIVE_RETENTION_ERROR);
         c->started = 1;
-        rc = submit(c,0,&c->slots[0].batch,0,latest);
+        rc = submit(c,0,&c->slots[0].batch,c->next_frame,latest);
         if (rc) stop(c,rc);
         return GLRT_NATIVE_RUNNING;
     }

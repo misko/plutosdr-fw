@@ -9,6 +9,7 @@ import re
 import time
 
 from .starlink_glrt_native_journal import JournalCodec, _descriptors, _recover, _review
+from .starlink_glrt_tracking_handoff import decode as decode_handoff
 from .starlink_glrt_tracking_abi import (
     VERSION,
     TrackingBatch,
@@ -46,7 +47,8 @@ def _codec(rate: int) -> JournalCodec:
             raise ValueError("tracking head crosses sample-rate profile")
         return result
 
-    return JournalCodec(lambda text: batch(text, rate=rate), snapshot, head, "tracking_")
+    return JournalCodec(lambda text: batch(text, rate=rate), snapshot, head, "tracking_",
+                        lambda raw, epoch: decode_handoff(raw, epoch=epoch, rate=rate))
 
 
 def descriptors(entries, *, epoch: int, rate: int) -> dict[int, tuple[int, TrackingBatch]]:

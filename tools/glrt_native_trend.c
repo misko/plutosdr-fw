@@ -197,3 +197,31 @@ int glrt_tracking_trend_batch(const struct glrt_tracking_trend *t,
     *out=b;
     return 0;
 }
+
+int glrt_tracking_trend_handoff_valid(const struct glrt_tracking_trend *t,
+    uint32_t first, uint32_t frames)
+{
+    const struct glrt_native_trend *h;
+    uint32_t previous=0, recent=0;
+    unsigned i, origin;
+    if (!t || !glrt_tracking_profile_get(t->rate,0)) return 0;
+    h=&t->history;
+    if (h->valid!=1 || h->initialized!=1 || h->seen!=1 || !h->epoch ||
+        h->count<8 || h->count>GLRT_NATIVE_TREND_WINDOW ||
+        h->next>=GLRT_NATIVE_TREND_WINDOW ||
+        (h->count<GLRT_NATIVE_TREND_WINDOW && h->next!=h->count) ||
+        h->last_seen<h->last_supported || h->last_supported<h->first_frame ||
+        first<=h->last_seen || !frames || frames>225000 || first>UINT32_MAX-frames ||
+        first-h->first_frame>MAX_FRAMES || frames-1>MAX_FRAMES-(first-h->first_frame)) return 0;
+    origin=h->count==GLRT_NATIVE_TREND_WINDOW ? h->next : 0;
+    for (i=0;i<h->count;i++) {
+        const struct glrt_native_observation *o=h->observations+(origin+i)%GLRT_NATIVE_TREND_WINDOW;
+        if (o->frame<h->first_frame || o->frame>h->last_supported ||
+            (i && o->frame<=previous) || !isfinite(o->offset_samples) || !isfinite(o->cfo_hz) ||
+            fabs(o->offset_samples)>t->rate*(5.0/3+250e-9)+1 ||
+            fabs(o->cfo_hz)+250>=t->rate/2.0) return 0;
+        previous=o->frame;
+        if (h->last_supported-o->frame<GLRT_NATIVE_TREND_WINDOW) recent++;
+    }
+    return previous==h->last_supported && recent>=8;
+}
