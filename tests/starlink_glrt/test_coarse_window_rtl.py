@@ -71,6 +71,14 @@ initial begin
     $fatal(1,"copy mismatch at %d",cycles);
  end
  copy_enable=0;@(negedge clk);if(copy_valid) $fatal(1,"unexpected copy response");
+ // The first unallocated word and the top address must never yield a response.
+ // Both boundaries are exercised across the existing CI16 stimulus variants.
+ copy_enable=1;copy_address=COPY_BAD;@(negedge clk);
+ if(copy_valid) $fatal(1,"out-of-window copy published data");
+ copy_enable=0;repeat(2) @(negedge clk);
+ if(!fault || copy_ready || output_valid) $fatal(1,"copy boundary not fenced");
+ flush=1;@(negedge clk);flush=0;@(negedge clk);
+ if(fault || busy || copy_valid) $fatal(1,"copy fault recovery failed");
  // A source gap during capture must fence the job before any result.
  arm=1;@(negedge clk);arm=0;input_valid=1;input_gap=1;
  @(negedge clk);input_valid=0;input_gap=0;
@@ -127,7 +135,7 @@ def test_complete_coarse_grid_prefix_reuse_backpressure_and_source_gap(tmp_path,
                     denominator=math.isqrt(energy*int(np.sum(c*c)))
                     totals[frequency]+=min(65536,(numerator<<16)//denominator) if denominator else 0
         expected.extend((epoch,f,total//support,support) for f,total in enumerate(totals))
-    source = BENCH
+    source = BENCH.replace('COPY_BAD', '16383' if full_scale else '14000')
     names = ['window', 'mac6', 'norm']
     if with_peaks:
         source = source.replace('starlink_glrt_coarse_window #', 'starlink_glrt_coarse_search #')
