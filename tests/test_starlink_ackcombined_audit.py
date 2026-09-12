@@ -13,7 +13,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'tools'))
 import staged_fft_experiment as experiment
 import route_starlink_staged_fft as route
-BASE=ROOT.parent/'staged-ackcombined-prepared-v1'
+BASE=(ROOT.parent/'staged-ackcombined-prepared-v1').resolve()
 MAIN=ROOT.parent/'staged-ackcombined-actual-v1'
 AUX=ROOT.parent/'staged-ackcombined-aux-v1'
 SIM=Path('project/staged_fft.sim/sim_1/behav/xsim')
