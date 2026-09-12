@@ -12,6 +12,7 @@ BENCH = r'''
 `timescale 1ns/1ps
 module tb;
 parameter integer LANES=3;
+parameter integer EXTERNAL=0;
 reg clk=0;always #5 clk=~clk;
 reg resetn=0,flush=0,arm=0,input_valid=0,input_gap=0,job_valid=0;
 reg signed [15:0] input_i=0,input_q=0;
@@ -28,10 +29,21 @@ wire [8:0] output_frequency;
 wire [16:0] output_score;
 wire [2:0] output_support;
 wire [31:0] rejected_arms;
-starlink_glrt_verify_window3 #(.LANES(LANES),.PILOT_FILE("PILOT"),.ENERGY_FILE("ENERGY"),
- .OSCILLATOR_FILE("WAVE")) dut(.external_ready(1'b0),.external_valid(1'b0),
- .external_first_index(64'd0),.external_offset(14'd0),.external_data(32'd0),
- .sample_read_enable(),.sample_read_address(),.*);
+reg external_ready=0,external_valid=0;
+reg [13:0] external_offset=0;
+reg [31:0] external_data=0;
+wire sample_read_enable;
+wire [13:0] sample_read_address;
+reg [31:0] external_samples[0:13999];
+always @(posedge clk) begin
+ external_valid<=resetn && !flush && external_ready && sample_read_enable;
+ if(sample_read_enable) begin
+  external_offset<=sample_read_address;external_data<=external_samples[sample_read_address];
+ end
+end
+starlink_glrt_verify_window3 #(.LANES(LANES),.EXTERNAL_WINDOW(EXTERNAL),
+ .PILOT_FILE("PILOT"),.ENERGY_FILE("ENERGY"),.OSCILLATOR_FILE("WAVE")) dut(
+ .external_first_index(64'h10000000000001),.*);
 integer fd,jobs,rc,si,sq,n=0,waits=0,job=0,invalid=0;
 reg [4095:0] path;
 reg held=0;
@@ -50,15 +62,22 @@ initial begin
  fd=$fopen(path,"r");
  if(!$value$plusargs("JOBS=%s",path)) $fatal;
  jobs=$fopen(path,"r");
- repeat(3) @(negedge clk);resetn=1;arm=1;@(negedge clk);arm=0;
+ repeat(3) @(negedge clk);resetn=1;arm=!EXTERNAL;@(negedge clk);arm=0;
  while(!$feof(fd)) begin
   rc=$fscanf(fd,"%d %d\n",si,sq);if(rc!=2) $fatal;
   input_valid=1;input_i=si;input_q=sq;input_index=64'h10000000000001+n;
+  external_samples[n]={input_q,input_i};
   @(negedge clk);n=n+1;
   if(n%7==0) begin input_valid=0;@(negedge clk);end
  end
  input_valid=0;
- if(n!=14000 || !window_loaded || !job_ready || busy) $fatal(1,"load failed");
+ if(EXTERNAL) begin
+  external_ready=1;arm=1;@(negedge clk);arm=0;
+  // In shared mode only the attested memory response supplies samples.
+  // A hostile unused loading port must not contaminate that observation.
+  input_valid=1;input_gap=1;input_index=64'hffffffffffffffff;
+ end
+ #1;if(n!=14000 || !window_loaded || !job_ready || busy) $fatal(1,"load failed");
  if($value$plusargs("INVALID=%d",invalid) && invalid!=0) begin
   rc=$fscanf(jobs,"%d %d %d %d %d\n",job_epoch,job_cfo_units,job_step_500,job_frequency_count,job_subset);
   if(rc!=5) $fatal;
@@ -90,13 +109,19 @@ initial begin
  repeat(220) @(negedge clk);flush=1;@(negedge clk);flush=0;
  repeat(100) @(negedge clk);
  if(fault || busy || window_loaded || job_ready || output_valid) $fatal(1,"flush failed");
- // Reload with explicit gap, then with an implicit sample-index discontinuity.
- arm=1;@(negedge clk);arm=0;input_valid=1;input_gap=1;
- @(negedge clk);input_valid=0;input_gap=0;
- if(!fault || window_loaded || output_valid) $fatal(1,"gap not fenced");
- flush=1;@(negedge clk);flush=0;arm=1;@(negedge clk);arm=0;input_valid=1;input_index=42;
- @(negedge clk);input_index=44;@(negedge clk);input_valid=0;
- if(!fault || window_loaded || output_valid) $fatal(1,"index discontinuity not fenced");
+ if(EXTERNAL) begin
+  // Conversely, loss of the real shared-window owner must remain fatal.
+  arm=1;@(negedge clk);arm=0;external_ready=0;@(negedge clk);
+  if(!fault || window_loaded || output_valid) $fatal(1,"shared owner loss not fenced");
+ end else begin
+  // Reload with explicit gap, then with an implicit sample-index discontinuity.
+  arm=1;@(negedge clk);arm=0;input_valid=1;input_gap=1;
+  @(negedge clk);input_valid=0;input_gap=0;
+  if(!fault || window_loaded || output_valid) $fatal(1,"gap not fenced");
+  flush=1;@(negedge clk);flush=0;arm=1;@(negedge clk);arm=0;input_valid=1;input_index=42;
+  @(negedge clk);input_index=44;@(negedge clk);input_valid=0;
+  if(!fault || window_loaded || output_valid) $fatal(1,"index discontinuity not fenced");
+ end
  $display("PASS");$finish;
 end
 endmodule
@@ -141,7 +166,8 @@ def expected_scores(iq, pilot, wave, subsets, jobs):
     return rows
 
 
-@pytest.fixture(scope="module", params=[3, 2, 1], ids=["three-cfo", "two-cfo", "serial-cfo"])
+@pytest.fixture(scope="module", params=[(lanes, shared) for shared in (False, True) for lanes in (3, 2, 1)],
+                ids=[f"{mode}-{lanes}-cfo" for mode in ("private", "shared") for lanes in (3, 2, 1)])
 def compiled_window(tmp_path_factory, request):
     path=tmp_path_factory.mktemp("verify-window")
     rng=np.random.default_rng(33331024)
@@ -153,7 +179,7 @@ def compiled_window(tmp_path_factory, request):
     (path/"tb.sv").write_text(bench)
     root=Path(__file__).parents[2]/"hdl/library/starlink_glrt"
     build=subprocess.run(["verilator","--binary","--timing","--top-module","tb","-Wno-fatal",
-        f"-GLANES={request.param}",
+        f"-GLANES={request.param[0]}", f"-GEXTERNAL={int(request.param[1])}",
         "--Mdir",str(path/"obj"),"-o","sim","-j","4",str(path/"tb.sv"),
         *[str(root/f"starlink_glrt_{name}.v") for name in
           ("verify_window3","verify_rotate3","verify_mac3","coarse_norm")]],capture_output=True,text=True,timeout=120)
