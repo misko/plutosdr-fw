@@ -15,14 +15,17 @@ from pathlib import Path
 import numpy as np
 
 RATES = (2_500_000, 5_000_000, 10_000_000, 25_000_000, 60_000_000)
+# DDC-only qualification does not enable a new whole-receiver profile.
+COMPONENT_RATES = tuple(sorted((*RATES, 15_000_000)))
 OUTPUT_RATE = 2_500_000
 FRACTION_BITS = 17
 BANK_ROOT = Path(__file__).resolve().parents[2] / "hdl/library/starlink_glrt"
 
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=5)
 def coefficients(rate: int) -> np.ndarray:
-    manifest = json.loads((BANK_ROOT / "ddc_coefficients.json").read_text())
+    manifest_name = "ddc_15000000_coefficients.json" if rate == 15_000_000 else "ddc_coefficients.json"
+    manifest = json.loads((BANK_ROOT / manifest_name).read_text())
     spec = manifest["banks"][str(rate)]
     raw = (BANK_ROOT / spec["file"]).read_bytes()
     if hashlib.sha256(raw).hexdigest() != spec["sha256"]:
@@ -38,8 +41,8 @@ def coefficients(rate: int) -> np.ndarray:
 
 
 def stages(rate: int) -> tuple[tuple[int, int], ...]:
-    if isinstance(rate, bool) or rate not in RATES:
-        raise ValueError("source rate must be 2.5/5/10/25/60 MS/s")
+    if isinstance(rate, bool) or rate not in COMPONENT_RATES:
+        raise ValueError("DDC source rate must be 2.5/5/10/15/25/60 MS/s")
     if rate == OUTPUT_RATE:
         return ()
     return (() if rate == 5_000_000 else ((rate, rate // 5_000_000),)) + ((5_000_000, 2),)

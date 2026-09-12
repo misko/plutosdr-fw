@@ -6,7 +6,7 @@ import subprocess
 import numpy as np
 import pytest
 
-from .ddc import BANK_ROOT, Ddc, RATES
+from .ddc import BANK_ROOT, Ddc, COMPONENT_RATES as RATES
 
 BENCH = r'''
 `timescale 1ns/1ps
