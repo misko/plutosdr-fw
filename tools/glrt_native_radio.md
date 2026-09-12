@@ -108,3 +108,20 @@ source loss, deadlines, acquisition rejection and stale storage timing.
 `test_native_radio.py` checks strict finite seed parsing and launch rejection.
 The nonlinear receive-filter, real 25/2.5 MS/s and live loaded-radio gates remain
 separate release requirements.
+
+`glrt_tracking_resolver.c` ports the development bootstrap timing/CFO search
+over four saved 3,300-sample pilots. It evaluates 17 integer timing offsets and
+68 full-Nyquist 16,384-point FFTs, averaging normalized correlation power and
+interpolating each strongest bin. An explicit FFT callback keeps the numerical
+component independent of an FFT library, allocation and radio I/O. The caller
+owns a 384-KiB workspace and separately attests reference identity, continuity,
+source coordinates and causal availability. The result is a software search
+estimate; it supplies no detector acceptance or prediction-expiry decision.
+
+The exact search is a numerical/latency reference, not the deployed handoff.
+Its `.21` FFTW benchmark reproduces all 238 saved hypotheses across 14 physical
+development cases but takes about 562 ms per complete resolution. That exceeds
+the sparse-history startup budget before adding moments or I/O. A cheaper
+staged resolver and fresh prediction require qualification; do not extend
+expiry to hide this cost. The standalone controller still consumes an explicit
+retained seed and does not call this resolver automatically.
