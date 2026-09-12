@@ -68,7 +68,7 @@ foreach {name tag_width original} {coarse_mac6 5 coarse_mac6 verify_mac3 1 verif
   set arithmetic_generics [list TAG_WIDTH=$tag_width]
   set verify_lanes [expr {$shared_window ? 2 : 3}]
   if {$name in {verify_mac3 verify_rotate3}} { lappend arithmetic_generics LANES=$verify_lanes }
-  if {$original eq "coarse_norm"} { lappend arithmetic_generics SHARED_ROOT=1 }
+  if {$original eq "coarse_norm"} { lappend arithmetic_generics SHARED_ROOT=1 FOLDED_ROOT=$shared_window }
   puts $fd [list synth_design -top $module -mode out_of_context -generic $arithmetic_generics \
       -flatten_hierarchy rebuilt -directive AreaOptimized_high]
   puts $fd [list report_utilization -hierarchical -file $output/${module}_synthesis.rpt]

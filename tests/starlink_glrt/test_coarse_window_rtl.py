@@ -86,7 +86,8 @@ endmodule
 @pytest.mark.parametrize("with_peaks", [False, True])
 @pytest.mark.parametrize("stride", [1,24])
 @pytest.mark.parametrize("full_scale", [False, True])
-def test_complete_coarse_grid_prefix_reuse_backpressure_and_source_gap(tmp_path, with_peaks, stride, full_scale):
+@pytest.mark.parametrize("folded", [False, True])
+def test_complete_coarse_grid_prefix_reuse_backpressure_and_source_gap(tmp_path, with_peaks, stride, full_scale, folded):
     rng=np.random.default_rng(6014250)
     values=rng.integers(-128,129,(14000,2),dtype=np.int16)
     if full_scale:
@@ -149,6 +150,7 @@ def test_complete_coarse_grid_prefix_reuse_backpressure_and_source_gap(tmp_path,
         rows = [[item[2] for item in expected[e*11:e*11+11]] for e in range(12)]
         expected = [(epoch, frequency, score, rank) for rank, epoch, frequency, score in retained_reference(rows)]
     source=source.replace('(STRIDE)',f'({stride})').replace('cycles*24',f'cycles*{stride}').replace('14001*24',f'14001*{stride}')
+    source=source.replace('.EPOCH_COUNT(12)',f'.EPOCH_COUNT(12),.FOLDED_NORM({int(folded)})')
     bench=tmp_path/'tb.sv';bench.write_text(source.replace('"COEFF"',f'"{coeff_path}"').replace('"ENERGY"',f'"{energy_path}"'))
     executable=tmp_path/'sim'
     root=Path(__file__).parents[2]/'hdl/library/starlink_glrt'
