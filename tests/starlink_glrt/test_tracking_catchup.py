@@ -164,3 +164,39 @@ def test_invalid_seed_cannot_initialize(bootstrap, epoch, start, fraction, cfo):
     state = fresh(bootstrap)
     assert bootstrap.glrt_tracking_bootstrap_init(c.byref(state),epoch,start,fraction,cfo) == -1
     assert not state.valid and not state.ready and not state.pending
+
+
+@pytest.mark.parametrize('slope', [-5000,0,5000])
+def test_initial_carrier_ramp_uses_only_three_or_more_earlier_supported_pilots(bootstrap,slope):
+    state=fresh(bootstrap)
+    for index in range(8):
+        rc,frame,job,_=next_job(bootstrap,state,0,3000000)
+        assert rc==1 and frame==index*9
+        hz=(job.phase_step if job.phase_step<2**31 else job.phase_step-2**32)*RATE/2**32
+        expected=400000+slope*(frame if index>=3 else max(0,frame-9))/750
+        assert hz==pytest.approx(expected,abs=.001)
+        # The estimate at this frame is supplied only after inspecting the
+        # proposed carrier. It cannot influence this same job's prediction.
+        truth=400000+slope*frame/750
+        assert observe(bootstrap,state,frame,job,Estimate(0,truth-hz,truth,.9,.91,0))==1
+        assert state.trend.history.count==index+1
+    assert state.jobs==8 and not state.ready
+
+
+@pytest.mark.parametrize('mode', ['rejected','extrapolation_bound','nyquist_bound'])
+def test_startup_forecast_falls_back_without_relaxing_history_or_frequency_guards(bootstrap,mode):
+    values=[400000,400060,400120] if mode=='rejected' else (
+        [400000,400240,400480,400960,401440] if mode=='extrapolation_bound' else [1249550,1249630,1249710])
+    state=fresh(bootstrap,cfo=values[0])
+    for index,value in enumerate(values):
+        rc,frame,job,_=next_job(bootstrap,state,0,3000000)
+        assert rc==1
+        reject=mode=='rejected' and index==1
+        predicted=(job.phase_step if job.phase_step<2**31 else job.phase_step-2**32)*RATE/2**32
+        assert abs(value-predicted)<250
+        assert observe(bootstrap,state,frame,job,Estimate(0,value-predicted,value,.01 if reject else .9,.91,64 if reject else 0))==int(not reject)
+    rc,frame,job,_=next_job(bootstrap,state,0,3000000)
+    assert rc==1 and frame==9*len(values)
+    hz=(job.phase_step if job.phase_step<2**31 else job.phase_step-2**32)*RATE/2**32
+    assert hz==pytest.approx(values[-1],abs=.001)
+    assert not state.ready

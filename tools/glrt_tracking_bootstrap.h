@@ -16,7 +16,13 @@ enum glrt_bootstrap_failure { GLRT_BOOTSTRAP_NONE, GLRT_BOOTSTRAP_INVALID,
  * owns continuous recent IQ and four reference phases. Software past-job
  * moments are never labeled FPGA results. Epoch/gap/retune resets are required.
  * One job may be outstanding. The existing trend's acceptance and 32-repeat
- * forecast limits are unchanged. This is not a higher-rate coordinate mapping. */
+ * forecast limits are unchanged. During initial jobs 3..7, three or more
+ * earlier accepted pilots can predict the next carrier using a linear ramp.
+ * All prior startup jobs must be accepted, the lead is at most nine frames,
+ * and the forecast must remain within 250 Hz of the last accepted carrier.
+ * Otherwise startup holds that carrier. No future batch is authorized before
+ * the existing eight-observation history gate. This is not a higher-rate
+ * coordinate mapping. */
 struct glrt_tracking_bootstrap {
     struct glrt_tracking_trend trend;
     struct glrt_tracking_job pending_job;

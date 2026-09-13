@@ -129,6 +129,15 @@ after retaining a descriptor and before SUBMIT. `handoffs` counts runs with
 at least one completed descriptor write, not local initialization. It still
 does not claim that returned native measurements were supported.
 
+Before that eight-observation history is available, startup can use three to
+seven earlier accepted pilots to predict the next carrier frequency with a
+linear fit versus frame. This corrects a measured hold-last-frequency lag on
+drifting pilots. It requires all earlier startup jobs accepted and predicts
+only the next nine-frame step, within 250 Hz of the last accepted carrier and
+the existing Nyquist guard. Otherwise the previous hold-last behavior applies.
+This adds no per-pilot FFT or phase search, changes no support gate and uses no
+future measurement. Timing propagation and full-history handoff stay unchanged.
+
 Candidate ordering uses one original 3300-sample pilot per basin, at its
 unrefined timing. The journal retains all eight powers and the selected coarse
 rank without modifying the integer grid. This is an ordering heuristic, not a

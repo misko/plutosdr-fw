@@ -25,6 +25,34 @@ static uint64_t phase(double hz)
     return (uint64_t)value;
 }
 
+/* Before the eight-point timing/carrier trend is eligible, account for a
+ * measured carrier ramp without inventing support. Use only earlier accepted
+ * startup measurements; a rejection keeps the old hold-last behavior. The
+ * next measurement still passes the same coherence/local-correction gates. */
+static double startup_carrier(const struct glrt_tracking_bootstrap *s,uint32_t target)
+{
+    const struct glrt_native_trend *h=&s->trend.history;
+    double mx=0,mf=0,xx=0,xf=0,predicted;
+    unsigned n;
+    if(s->jobs<3 || s->jobs>=8 || h->count!=s->jobs || !h->valid ||
+       target<=h->last_supported || target-h->last_supported>GLRT_BOOTSTRAP_SPACING)
+        return s->seed_cfo;
+    for(n=0;n<h->count;n++) {
+        mx-=(double)(h->last_supported-h->observations[n].frame);
+        mf+=h->observations[n].cfo_hz;
+    }
+    mx/=h->count;mf/=h->count;
+    for(n=0;n<h->count;n++) {
+        double x=-(double)(h->last_supported-h->observations[n].frame)-mx;
+        xx+=x*x;xf+=x*(h->observations[n].cfo_hz-mf);
+    }
+    if(!(xx>0)) return s->seed_cfo;
+    predicted=mf+xf/xx*((double)(target-h->last_supported)-mx);
+    if(!isfinite(predicted) || fabs(predicted)+250>=RATE/2.0 ||
+       fabs(predicted-s->seed_cfo)>250) return s->seed_cfo;
+    return predicted;
+}
+
 int glrt_tracking_bootstrap_init(struct glrt_tracking_bootstrap *s, uint32_t epoch,
     uint64_t start, uint32_t fraction, double cfo)
 {
@@ -63,7 +91,7 @@ static int next(struct glrt_tracking_bootstrap *s, uint64_t earliest,
         batch=(struct glrt_tracking_batch){.rate=RATE,.prediction={
             .epoch=s->trend.history.epoch,.tag=1,.start=s->seed_start+advance,
             .fraction=s->seed_fraction,.period=UINT64_C(218453333),
-            .step=phase(s->seed_cfo),.expires=UINT64_MAX,.repeats=1}};
+            .step=phase(startup_carrier(s,target)),.expires=UINT64_MAX,.repeats=1}};
     } else if (glrt_tracking_trend_batch(&s->trend,target,1,1,0,&batch,&slope))
         return fail(s,GLRT_BOOTSTRAP_HISTORY);
     if (glrt_tracking_prediction(&batch,0,&job) || job.start>UINT64_MAX-SAMPLES)
