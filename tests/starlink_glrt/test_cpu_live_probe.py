@@ -618,7 +618,7 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
 
 @pytest.mark.parametrize('rate', [30000000,60000000])
 @pytest.mark.parametrize('mode', [
-    'loss_then_supported','four_losses','attempt_budget','full_profile','visit_full_profile','visit_selected_profile','short_observer3','short_scan64','worker_error',
+    'loss_then_supported','four_losses','attempt_budget','full_profile','visit_full_profile','visit_selected_profile','short_observer3','short_scan64','visit_scan64','worker_error',
     'retention_error','restart_budget','cancel','deadline','uncleared','source_gap',
     'wrong_epoch','wrong_rate','unread_head','read_failure','rebase_same_epoch',
     'rebase_short_write',
@@ -662,8 +662,9 @@ def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
         lib.live_visit_mode(handle)
     if mode=='short_observer3':
         assert lib.live_set_dwell(handle,b'1536-selected-observer3',(c.c_uint64*4)())==0
-    if mode=='short_scan64':
+    if mode in ('short_scan64','visit_scan64'):
         assert lib.live_set_dwell(handle,b'1536-selected-observer3-scan64',(c.c_uint64*4)())==0
+        if mode=='visit_scan64': lib.live_visit_mode(handle)
     iq=np.zeros((10_000_000,2),dtype=np.int16)
     for frame in range(3000):
         start=22+(frame*10000+1)//3
@@ -685,7 +686,7 @@ def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
                 else: time.sleep(.001)
             # This is the same capture-thread ordering as the executable:
             # finished worker -> join -> retained/drained source check -> release owner.
-            if mode in ('visit_full_profile','visit_selected_profile'): assert lib.live_capture_done(handle)==1
+            if mode in ('visit_full_profile','visit_selected_profile','visit_scan64'): assert lib.live_capture_done(handle)==1
             lib.live_join(handle)
             assert lib.live_visit_loss(handle)==int(not (mode=='loss_then_supported' and episode==1))
             totals=(c.c_uint64*8)();lib.live_totals(handle,totals)
@@ -703,11 +704,11 @@ def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
             episodes.append(reviewed)
             assert totals[3]==sum(len(r['heads']) for r in episodes)
             assert totals[4]==int(mode=='loss_then_supported' and episode==1)
-            if mode in ('full_profile','visit_full_profile','visit_selected_profile'):
+            if mode in ('full_profile','visit_full_profile','visit_selected_profile','visit_scan64'):
                 rows=[json.loads(line) for line in (tmp_path/'worker.jsonl').read_text().splitlines()]
                 observer_rows=[json.loads(line) for line in (tmp_path/'observer.jsonl').read_text().splitlines()]
                 disposition=dict(status=3,stage='worker_complete',worker_complete=1,
-                    retention_mode='selected_windows' if mode=='visit_selected_profile' else 'full',reacquisitions=0,native_completed_runs=0,
+                    retention_mode='selected_windows' if mode in ('visit_selected_profile','visit_scan64') else 'full',reacquisitions=0,native_completed_runs=0,
                     handoffs=1,native_runs=1,completed_refills=count//16384,blocks=count//16384,
                     attempts=int(totals[0]),rate=rate,native_results=int(totals[3]))
                 result=review_clean_loss(rows,data,disposition,observer_rows)
@@ -748,7 +749,7 @@ def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
             if fault or mode=='attempt_budget' or episode==3:
                 assert admitted==0
                 break
-            if mode in ('visit_selected_profile','short_observer3','short_scan64'):
+            if mode in ('visit_selected_profile','short_observer3','short_scan64','visit_scan64'):
                 assert admitted==0  # Return clean loss to the LO owner, without same-LO REBASE.
                 break
             if mode in ('uncleared','source_gap','wrong_epoch','wrong_rate','unread_head','read_failure'):
@@ -780,8 +781,8 @@ def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
         out=(c.c_uint64*5)();lib.live_finish(handle,out)
     assert not radio.errors,radio.errors
     rows=[json.loads(line) for line in (tmp_path/'worker.jsonl').read_text().splitlines()]
-    check_observer_evidence(tmp_path,iq,1000000,rows,rate,3 if mode in ('short_observer3','short_scan64') else 9)
-    if mode=='short_scan64':
+    check_observer_evidence(tmp_path,iq,1000000,rows,rate,3 if mode in ('short_observer3','short_scan64','visit_scan64') else 9)
+    if mode in ('short_scan64','visit_scan64'):
         scans=[r for r in rows if r['kind']=='scan']
         ranks=[r for r in rows if r['kind']=='candidate_order']
         assert scans and ranks and len(scans)==len(ranks)
