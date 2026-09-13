@@ -3,9 +3,9 @@
 #define GLRT_TRACKING_VISIT_H
 #include <stdint.h>
 
-/* Internal two-visit supervisor. References are upper-edge only; the caller
+/* Internal bounded visit supervisor. References are upper-edge only; the caller
  * attests the fixed native image, reference banks and RX calibration. Each
- * run is the existing finite 1536-block probe (10.0663296 s of coarse IQ).
+ * run is a finite 1536-block probe (at most 10.0663296 s of coarse IQ).
  * This controller never changes clocks, bandwidth, gain, TX or tracking gates.
  */
 struct glrt_visit_state {
@@ -37,4 +37,9 @@ enum glrt_visit_result {
  * time regression, cancellation, failed run, or undrained source. */
 int glrt_tracking_visit_run(const struct glrt_visit_ports *,uint32_t,
     const uint64_t lo_hz[2]);
+/* Bounded scan/revisit plan: 2..4 centers, adjacent visits must differ.
+ * Repeated nonadjacent centers are intentional revisits. All validation is
+ * performed before the first port call; the shared deadline remains 60 s. */
+int glrt_tracking_visit_plan_run(const struct glrt_visit_ports *,uint32_t,
+    const uint64_t *lo_hz,unsigned count);
 #endif

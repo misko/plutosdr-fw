@@ -48,21 +48,22 @@ static int run(void *p,unsigned n,uint64_t deadline) {
     if(strcmp(t->mode,"no_samples")) t->state.native_latest+=UINT64_C(300000000);
     t->now+=UINT64_C(10000000000);
     if(!strcmp(t->mode,"run_rf")) t->state.lo_hz++;
-    if(!strcmp(t->mode,"deadline")) t->now=deadline;
+    if(!strcmp(t->mode,"deadline") || (!strcmp(t->mode,"late_deadline") && t->runs==3)) t->now=deadline;
     if(!strcmp(t->mode,"clock_regress")) t->now=999;
-    return !strcmp(t->mode,"child_fail") ? -1 :
+    return (!strcmp(t->mode,"child_fail") || (!strcmp(t->mode,"late_failure") && t->runs==3)) ? -1 :
         t->loss ? GLRT_VISIT_CLEAN_LOSS :
         !strcmp(t->mode,"unknown_result") ? 2 : 0;
 }
 static int retain(void *p,const char *kind,unsigned n,int result,const struct glrt_visit_state *s) {
     struct test *t=p;(void)s;assert(n==t->retained/3);
     const char *names[]={"before_tune","tuned","after_run"};assert(!strcmp(kind,names[t->retained%3]));
-    if(!strcmp(kind,"after_run")) assert(result==(!strcmp(t->mode,"child_fail") ? -1 :
+    if(!strcmp(kind,"after_run")) assert(result==((!strcmp(t->mode,"child_fail") || (!strcmp(t->mode,"late_failure") && t->runs==3)) ? -1 :
         t->loss ? GLRT_VISIT_CLEAN_LOSS : !strcmp(t->mode,"unknown_result") ? 2 : 0));
     t->retained++;
     return (!strcmp(t->mode,"retention_before") && t->retained==1) ||
         (!strcmp(t->mode,"retention_tuned") && t->retained==2) ||
-        (!strcmp(t->mode,"retention_after") && t->retained==3) ? -1 : 0;
+        (!strcmp(t->mode,"retention_after") && t->retained==3) ||
+        (!strcmp(t->mode,"late_retention") && t->retained==9) ? -1 : 0;
 }
 int main(int argc,char **argv) {
     assert(argc==3);struct test t={0};t.mode=argv[1];t.now=1000;
@@ -71,12 +72,19 @@ int main(int argc,char **argv) {
     unsigned rate=(unsigned)strtoul(argv[2],NULL,10);
     t.state=(struct glrt_visit_state){1690312496,1000000,rate,3,1,1};
     struct glrt_visit_ports p={&t,clock_ns,cancelled,inspect,tune,run,retain};
-    uint64_t frequencies[]={1690312500,1940312500};
+    uint64_t frequencies[]={1690312500,1940312500,1690312500,1940312500};unsigned count=2;
+    if(!strcmp(t.mode,"revisit")) count=3;
+    if(!strcmp(t.mode,"four") || !strncmp(t.mode,"late_",5)) count=4;
+    if(!strcmp(t.mode,"sweep")) { count=4;frequencies[0]=1190312500;frequencies[1]=1440312500; }
+    if(!strcmp(t.mode,"bad_last")) { count=4;frequencies[3]=123; }
+    if(!strcmp(t.mode,"adjacent_repeat")) { count=4;frequencies[3]=frequencies[2]; }
+    if(!strcmp(t.mode,"too_many")) count=5;
+    if(!strcmp(t.mode,"too_few")) count=1;
     if(!strcmp(t.mode,"lower_edge")) frequencies[1]=1709687500;
     if(!strcmp(t.mode,"duplicate")) frequencies[1]=frequencies[0];
     if(!strcmp(t.mode,"invalid_rate")) rate=2500000;
     if(!strcmp(t.mode,"missing_port")) p.inspect=NULL;
-    int rc=glrt_tracking_visit_run(&p,rate,frequencies);
+    int rc=count==2 ? glrt_tracking_visit_run(&p,rate,frequencies) : glrt_tracking_visit_plan_run(&p,rate,frequencies,count);
     printf("%d %u %u %u %u\n",rc,t.inspections,t.tunes,t.runs,t.retained);
 }
 '''
@@ -106,6 +114,9 @@ def probe(tmp_path_factory):
     ('loss_no_samples',-2,1,1),('loss_run_rf',-2,1,1),
     ('loss_retention_after',-5,1,1),('loss_deadline',-6,1,1),
     ('loss_clock_regress',-6,1,1),('loss_between_epoch',-2,1,1),
+    ('revisit',0,3,3),('four',0,4,4),('sweep',0,4,4),('loss_four',0,4,4),
+    ('bad_last',-1,0,0),('adjacent_repeat',-1,0,0),('too_many',-1,0,0),('too_few',-1,0,0),
+    ('late_deadline',-6,3,3),('late_failure',-4,3,3),('late_retention',-5,3,3),
 ])
 def test_two_visits_preserve_fixed_rate_and_require_idle_retained_boundaries(probe,rate,mode,result,tunes,runs):
     row=list(map(int,subprocess.check_output([str(probe),mode,str(rate)],text=True).split()))

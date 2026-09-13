@@ -376,3 +376,28 @@ the real visit profile. The corrected path has a full-IQ worker-completion
 test at both rates. `review_glrt_cpu_visit_loss.py` independently checks the
 retained drain/clear, exhausted support horizon and observer join. It must be
 combined with final source/IQ, numerical and parent-transition reviews.
+
+### Bounded frequency revisits
+
+The ARM visit executable accepts two, three or four nominal upper-edge LO
+centers. Nonadjacent repeats are intentional revisits; adjacent duplicates and
+unknown centers are rejected before creating evidence or calling radio ports.
+The legacy two-center controller entry point and two-visit wire output remain
+compatible. Every plan shares one 60-second wall deadline; it is not reset at
+a revisit. Four visits admit at most 100,663,296 coarse samples (40.2653184 s).
+
+Two visits retain full returned IQ. Three/four visits pass `1536-selected` to
+each child: six acquisition attempts, 1,536 capture blocks, a 12-second worker
+budget and a 25-second child alarm, retaining scan windows, worker windows,
+native/observer evidence and source counters. This reduces evidence storage
+but does not retain an independent complete IQ stream. The longer selected
+profile keeps its existing limits. Native loss in visit mode returns to the
+parent after cleanup, instead of initiating an unplanned same-LO REBASE.
+
+Tests cover sweep/revisit ordering at both rates, full-plan preflight, late
+deadline/run/retention failure, selected-profile loss ownership and actual
+four-child fork/wait/evidence isolation. These are host tests with simulated
+radio ports, plus an ARM build. Before physical qualification, the operator
+and evidence reviewer must support the selected-IQ multi-visit plan and its
+resource budget. No sustained tracking or adaptive frequency ranking is
+established by this extension.

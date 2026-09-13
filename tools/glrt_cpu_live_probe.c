@@ -37,6 +37,8 @@ static int dwell_limits(const char *blocks,struct dwell_limits *out)
         *out=(struct dwell_limits){4096,16,45,UINT64_C(30000000000),0};
     else if(!strcmp(blocks,"45000"))
         *out=(struct dwell_limits){45000,200,325,UINT64_C(300000000000),1};
+    else if(!strcmp(blocks,"1536-selected"))
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1};
     else return -1;
     return 0;
 }
@@ -533,7 +535,7 @@ static void *worker_thread(void *pointer)
 static int restart_owner(struct live *s,FILE *capture_journal)
 {
     char raw[4096];uint32_t w[24];int n;
-    if(s->started || s->observer_started || !s->done || !s->selected_iq || !s->native_clean_loss ||
+    if(s->visit_mode || s->started || s->observer_started || !s->done || !s->selected_iq || !s->native_clean_loss ||
        s->result!=GLRT_NATIVE_ACQUISITION_LOST || s->restarts>=RESTART_LIMIT ||
        s->attempts>=s->attempt_limit || cancelled(s)) return 0;
     n=s->native.read(s->native.context,"tracking_snapshot",raw,sizeof(raw));
@@ -636,7 +638,7 @@ static int live_probe_run(int argc,char **argv,int visit_mode)
 #define NEED(x,name) do { stage=name; if(!(x)) goto done; } while(0)
     if((argc!=6 && argc!=7) || (strcmp(argv[1],"30000000") && strcmp(argv[1],"60000000")) ||
        dwell_limits(argc==7 ? argv[6] : NULL,&limits)) {
-        fprintf(stderr,"usage: %s 30000000|60000000 SERIAL BANK REFERENCES NEW_OUTPUT_DIRECTORY [1536|4096|45000]\n",argv[0]);return 2;
+        fprintf(stderr,"usage: %s 30000000|60000000 SERIAL BANK REFERENCES NEW_OUTPUT_DIRECTORY [1536|4096|45000|1536-selected]\n",argv[0]);return 2;
     }
     rate=(uint32_t)strtoul(argv[1],NULL,10);
     action.sa_handler=signal_stop;sigemptyset(&action.sa_mask);

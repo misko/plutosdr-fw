@@ -30,7 +30,9 @@ int iio_channel_attr_read_longlong(const struct iio_channel *c,const char *n,lon
 int iio_channel_attr_write_longlong(const struct iio_channel *c,const char *n,long long out)
 { (void)c;(void)n;(void)out;return -1; }
 static int simulated_child(int argc,char **argv) {
-    if(argc!=6) return 9;
+    if(!strcmp(argv[1],"selected")) {
+        if(argc!=7 || strcmp(argv[6],"1536-selected")) return 9;
+    } else if(argc!=6) return 9;
     printf("retained child output\n");fprintf(stderr,"retained child diagnostics\n");
     if(!strcmp(argv[1],"fail")) return 1;
     if(!strcmp(argv[1],"clean_loss")) return LIVE_VISIT_CLEAN_LOSS_EXIT;
@@ -45,11 +47,25 @@ static int simulated_child(int argc,char **argv) {
 int exercise_child(const char *directory,const char *mode) {
     char *args[]={"probe",(char *)mode,"serial","bank","refs",(char *)directory};
     struct visit_context context={.args=args,.probe_main=simulated_child};
+    context.visit_count=!strcmp(mode,"selected") ? 4 : 2;
     uint64_t budget=!strcmp(mode,"hang") ? UINT64_C(100000000) : UINT64_C(2000000000);
     interrupted=0;
     int rc=visit_child(&context,0,clock_ns(NULL)+budget),status;
     if(waitpid(-1,&status,WNOHANG)!=-1 || errno!=ECHILD) return 99;
     return rc;
+}
+int invalid_plan(const char *directory,unsigned count,int adjacent) {
+    char *args[]={"probe","30000000","1040005e0b100007100010000bf33a5d4d","bank","refs",
+        (char *)directory,"1190312500","1440312500","1690312500","1940312500",NULL};
+    args[5+count]=adjacent ? args[4+count] : "123";
+    return main((int)count+6,args);
+}
+int exercise_four_children(const char *directory) {
+    char *args[]={"probe","selected","serial","bank","refs",(char *)directory};
+    struct visit_context context={.args=args,.probe_main=simulated_child,.visit_count=4};
+    interrupted=0;
+    for(unsigned n=0;n<4;n++) if(visit_child(&context,n,clock_ns(NULL)+UINT64_C(2000000000))) return -1;
+    int status;return waitpid(-1,&status,WNOHANG)==-1 && errno==ECHILD ? 0 : -1;
 }
 '''
 
@@ -75,14 +91,16 @@ def probe(tmp_path_factory):
         *(str(root/'tools'/name) for name in names),*libraries,'-lfftw3','-lm','-o',str(out/'visit.so')],check=True)
     lib=c.CDLL(str(out/'visit.so'));lib.exercise_child.argtypes=[c.c_char_p,c.c_char_p]
     lib.inspect_idle_words.argtypes=[c.POINTER(c.c_uint32),c.c_uint32]
+    lib.invalid_plan.argtypes=[c.c_char_p,c.c_uint,c.c_int]
+    lib.exercise_four_children.argtypes=[c.c_char_p]
     return lib
 
 
-@pytest.mark.parametrize('mode',['pass','fail','hang','existing','clean_loss','unknown','signal'])
+@pytest.mark.parametrize('mode',['pass','fail','hang','existing','clean_loss','unknown','signal','selected'])
 def test_child_is_reaped_before_return_and_evidence_is_never_overwritten(probe,tmp_path,mode):
     if mode=='existing':
         (tmp_path/'visit-0').mkdir();(tmp_path/'visit-0/stdout.json').write_text('preserved')
-    assert probe.exercise_child(os.fsencode(tmp_path),mode.encode())==({'pass':0,'clean_loss':1}.get(mode,-1))
+    assert probe.exercise_child(os.fsencode(tmp_path),mode.encode())==({'pass':0,'selected':0,'clean_loss':1}.get(mode,-1))
     if mode=='existing': assert (tmp_path/'visit-0/stdout.json').read_text()=='preserved'
     elif mode not in ('hang','signal'):
         assert (tmp_path/'visit-0/stdout.json').read_text()=='retained child output\n'
@@ -92,6 +110,20 @@ def test_child_is_reaped_before_return_and_evidence_is_never_overwritten(probe,t
 @pytest.mark.parametrize('fault',range(10))
 def test_clean_loss_requires_terminal_joined_native_provenance(probe,fault):
     assert probe.loss_disposition(fault)==int(fault==0)
+
+
+@pytest.mark.parametrize('count',[2,3,4])
+@pytest.mark.parametrize('adjacent',[0,1])
+def test_entire_plan_is_checked_before_creating_evidence(probe,tmp_path,count,adjacent):
+    assert probe.invalid_plan(os.fsencode(tmp_path),count,adjacent)==2
+    assert not list(tmp_path.iterdir())
+
+
+def test_four_selected_children_have_separate_evidence_and_are_all_reaped(probe,tmp_path):
+    assert probe.exercise_four_children(os.fsencode(tmp_path))==0
+    assert sorted(p.name for p in tmp_path.iterdir())==[f'visit-{n}' for n in range(4)]
+    for n in range(4):
+        assert (tmp_path/f'visit-{n}/stdout.json').read_text()=='retained child output\n'
 
 
 @pytest.mark.parametrize('rate',[30000000,60000000])

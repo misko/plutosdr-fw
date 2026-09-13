@@ -13,6 +13,7 @@ struct visit_context {
     char **args;
     FILE *journal;
     uint32_t rate;
+    unsigned visit_count;
     int (*probe_main)(int,char **);
 };
 static int visit_cancelled(void *unused) { (void)unused;return interrupted!=0; }
@@ -95,7 +96,8 @@ static int visit_retain(void *pointer,const char *kind,unsigned number,int resul
 static int visit_child(void *pointer,unsigned number,uint64_t deadline)
 {
     struct visit_context *v=pointer;char directory[PATH_MAX],out[PATH_MAX],err[PATH_MAX];
-    char *args[]={v->args[0],v->args[1],v->args[2],v->args[3],v->args[4],directory,NULL};
+    char *args[]={v->args[0],v->args[1],v->args[2],v->args[3],v->args[4],directory,
+        v->visit_count>2 ? "1536-selected" : NULL,NULL};
     int stdout_fd=-1,stderr_fd=-1,status=0,stopping=0;pid_t pid,waited;uint64_t stop_at=0,now=clock_ns(NULL);
     if(snprintf(directory,sizeof(directory),"%s/visit-%u",v->args[5],number)<=0 || mkdir(directory,0700) ||
        snprintf(out,sizeof(out),"%s/stdout.json",directory)<=0 || snprintf(err,sizeof(err),"%s/stderr.txt",directory)<=0) return -1;
@@ -107,7 +109,7 @@ static int visit_child(void *pointer,unsigned number,uint64_t deadline)
         int rc;
         if(dup2(stdout_fd,STDOUT_FILENO)<0 || dup2(stderr_fd,STDERR_FILENO)<0) _exit(2);
         close(stdout_fd);close(stderr_fd);
-        rc=v->probe_main(6,args);
+        rc=v->probe_main(v->visit_count>2 ? 7 : 6,args);
         if(fflush(stdout) || fflush(stderr)) rc=2;
         _exit(rc);
     }
@@ -135,12 +137,15 @@ fail:
 int main(int argc,char **argv)
 {
     struct visit_context context={0};struct glrt_visit_ports ports;
-    char path[PATH_MAX],*end;uint64_t lo[2];struct sigaction action={0};int rc;
-    if(argc!=8 || (strcmp(argv[1],"30000000") && strcmp(argv[1],"60000000")) ||
+    char path[PATH_MAX],*end;uint64_t lo[4];struct sigaction action={0};int rc;
+    if(argc<8 || argc>10 || (strcmp(argv[1],"30000000") && strcmp(argv[1],"60000000")) ||
        strcmp(argv[2],"1040005e0b100007100010000bf33a5d4d")) return 2;
-    for(unsigned n=0;n<2;n++) {
+    context.visit_count=(unsigned)argc-6;
+    for(unsigned n=0;n<context.visit_count;n++) {
         errno=0;lo[n]=strtoull(argv[6+n],&end,10);
         if(errno || *end || !*argv[6+n]) return 2;
+        if((lo[n]!=1190312500 && lo[n]!=1440312500 && lo[n]!=1690312500 && lo[n]!=1940312500) ||
+           (n && lo[n]==lo[n-1])) return 2;
     }
     context.args=argv;context.rate=(uint32_t)strtoul(argv[1],NULL,10);context.probe_main=visit_probe_main;
     if(snprintf(path,sizeof(path),"%s/visits.txt",argv[5])<=0 || !(context.journal=fopen(path,"wx"))) return 2;
@@ -148,11 +153,16 @@ int main(int argc,char **argv)
     if(sigaction(SIGALRM,&action,NULL) || sigaction(SIGTERM,&action,NULL) || sigaction(SIGINT,&action,NULL)) return 2;
     alarm(60);
     ports=(struct glrt_visit_ports){&context,clock_ns,visit_cancelled,visit_inspect,visit_tune,visit_child,visit_retain};
-    if(fprintf(context.journal,"plan %u %s %" PRIu64 " %" PRIu64 " 1536 2 60000000000\n",context.rate,argv[2],lo[0],lo[1])<0 ||
+    rc=fprintf(context.journal,"plan %u %s",context.rate,argv[2])<0 ? GLRT_VISIT_RETENTION : 0;
+    for(unsigned n=0;n<context.visit_count;n++)
+        if(fprintf(context.journal," %" PRIu64,lo[n])<0) rc=GLRT_VISIT_RETENTION;
+    if(fprintf(context.journal," %s %u 60000000000\n",context.visit_count>2 ? "1536-selected" : "1536",context.visit_count)<0 ||
        fflush(context.journal)) rc=GLRT_VISIT_RETENTION;
-    else rc=glrt_tracking_visit_run(&ports,context.rate,lo);
+    if(!rc) rc=glrt_tracking_visit_plan_run(&ports,context.rate,lo,context.visit_count);
     if(fprintf(context.journal,"terminal %d\n",rc)<0 || fclose(context.journal)) rc=GLRT_VISIT_RETENTION;
     alarm(0);
-    printf("{\"scope\":\"bounded_arm_two_frequency_visits\",\"rate\":%u,\"result\":%d,\"rf_sample_limit\":50331648}\n",context.rate,rc);
+    printf("{\"scope\":\"%s\",\"rate\":%u,\"result\":%d,\"rf_sample_limit\":%u}\n",
+        context.visit_count==2 ? "bounded_arm_two_frequency_visits" : "bounded_arm_frequency_revisits",
+        context.rate,rc,context.visit_count*25165824U);
     return rc ? 1 : 0;
 }

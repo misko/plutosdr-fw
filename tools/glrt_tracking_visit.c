@@ -23,17 +23,19 @@ static int inspect(const struct glrt_visit_ports *p,uint32_t rate,struct glrt_vi
 }
 static int close_lo(uint64_t a,uint64_t b) { return a>=b ? a-b<=16 : b-a<=16; }
 
-int glrt_tracking_visit_run(const struct glrt_visit_ports *p,uint32_t rate,const uint64_t lo[2])
+int glrt_tracking_visit_plan_run(const struct glrt_visit_ports *p,uint32_t rate,const uint64_t *lo,unsigned count)
 {
     struct glrt_visit_state before,tuned,after;
     uint64_t last,deadline;int rc;
     if(!p || !p->clock_ns || !p->cancelled || !p->inspect || !p->tune || !p->run || !p->retain ||
-       !lo || !upper(lo[0]) || !upper(lo[1]) || lo[0]==lo[1] ||
+       !lo || count<2 || count>4 ||
        (rate!=30000000 && rate!=60000000)) return GLRT_VISIT_INVALID;
+    for(unsigned n=0;n<count;n++)
+        if(!upper(lo[n]) || (n && lo[n]==lo[n-1])) return GLRT_VISIT_INVALID;
     last=p->clock_ns(p->context);
     if(!last || last>UINT64_MAX-UINT64_C(60000000000)) return GLRT_VISIT_DEADLINE;
     deadline=last+UINT64_C(60000000000);
-    for(unsigned n=0;n<2;n++) {
+    for(unsigned n=0;n<count;n++) {
         if((rc=guard(p,deadline,&last)) || (rc=inspect(p,rate,&before))) return rc;
         if(n && (before.epoch!=after.epoch || before.native_latest<after.native_latest || before.lo_hz!=after.lo_hz))
             return GLRT_VISIT_SOURCE;
@@ -59,3 +61,5 @@ int glrt_tracking_visit_run(const struct glrt_visit_ports *p,uint32_t rate,const
     }
     return GLRT_VISIT_DONE;
 }
+int glrt_tracking_visit_run(const struct glrt_visit_ports *p,uint32_t rate,const uint64_t lo[2])
+{ return glrt_tracking_visit_plan_run(p,rate,lo,2); }

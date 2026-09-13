@@ -268,6 +268,7 @@ def live_api(tmp_path_factory):
     (None, [1536,6,25,12000000000]), (b'1536', [1536,6,25,12000000000]),
     (b'4096', [4096,16,45,30000000000]),
     (b'45000', [45000,200,325,300000000000]),
+    (b'1536-selected', [1536,6,25,12000000000]),
 ])
 def test_dwell_profiles_have_finite_capture_and_worker_limits(live_api, blocks, expected):
     lib, _ = live_api
@@ -592,7 +593,7 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
 
 @pytest.mark.parametrize('rate', [30000000,60000000])
 @pytest.mark.parametrize('mode', [
-    'loss_then_supported','four_losses','attempt_budget','full_profile','visit_full_profile','worker_error',
+    'loss_then_supported','four_losses','attempt_budget','full_profile','visit_full_profile','visit_selected_profile','worker_error',
     'retention_error','restart_budget','cancel','deadline','uncleared','source_gap',
     'wrong_epoch','wrong_rate','unread_head','read_failure','rebase_same_epoch',
     'rebase_short_write',
@@ -631,6 +632,9 @@ def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
     if mode=='visit_full_profile':
         lib.live_restart_fault(handle,1)  # Full IQ, not the selected-window profile.
         lib.live_visit_mode(handle)
+    if mode=='visit_selected_profile':
+        assert lib.live_set_dwell(handle,b'1536-selected',(c.c_uint64*4)())==0
+        lib.live_visit_mode(handle)
     iq=np.zeros((10_000_000,2),dtype=np.int16)
     for frame in range(3000):
         start=22+(frame*10000+1)//3
@@ -652,7 +656,7 @@ def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
                 else: time.sleep(.001)
             # This is the same capture-thread ordering as the executable:
             # finished worker -> join -> retained/drained source check -> release owner.
-            if mode=='visit_full_profile': assert lib.live_capture_done(handle)==1
+            if mode in ('visit_full_profile','visit_selected_profile'): assert lib.live_capture_done(handle)==1
             lib.live_join(handle)
             assert lib.live_visit_loss(handle)==int(not (mode=='loss_then_supported' and episode==1))
             totals=(c.c_uint64*8)();lib.live_totals(handle,totals)
@@ -714,6 +718,9 @@ def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
             assert len(radio.writes('command'))==prior_writes
             if fault or mode=='attempt_budget' or episode==3:
                 assert admitted==0
+                break
+            if mode=='visit_selected_profile':
+                assert admitted==0  # Return clean loss to the LO owner, without same-LO REBASE.
                 break
             if mode in ('uncleared','source_gap','wrong_epoch','wrong_rate','unread_head','read_failure'):
                 assert admitted==(-1 if mode=='read_failure' else -3)
