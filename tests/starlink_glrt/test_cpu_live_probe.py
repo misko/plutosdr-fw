@@ -44,7 +44,8 @@ void *live_new(const int16_t *refs,const int16_t *bank,const char *directory,
     snprintf(path,sizeof(path),"%s/worker.jsonl",directory);s->journal=fopen(path,"wx");
     snprintf(path,sizeof(path),"%s/worker.iq",directory);s->worker_iq=fopen(path,"wbx");
     snprintf(path,sizeof(path),"%s/grids",directory);s->grids=fopen(path,"wbx");
-    if(!s->journal || !s->worker_iq || !s->grids) abort();
+    snprintf(path,sizeof(path),"%s/native.coarse.ci16",directory);s->native_coarse_iq=fopen(path,"wbx");
+    if(!s->journal || !s->worker_iq || !s->grids || !s->native_coarse_iq) abort();
     return t;
 }
 int live_publish(struct test_live *t,const int16_t *iq,size_t count)
@@ -75,6 +76,17 @@ int live_final(unsigned admitted,unsigned delivered,unsigned flags,unsigned retu
 {
     struct glrt_capture_snapshot s={0};s.words[4]=admitted;s.words[6]=delivered;s.words[19]=flags;
     return capture_early_final(&s,returned,limit);
+}
+void live_pair_stage(struct test_live *t,uint64_t native_start,int fail)
+{
+    struct live *s=&t->live;uint32_t *w=s->paired[0].words;
+    w[3]=(uint32_t)native_start;w[4]=(uint32_t)(native_start>>32);w[7]=s->rate*33/25000;
+    s->paired_queued=1;
+    if(fail) { fclose(s->native_coarse_iq);s->native_coarse_iq=fopen("/dev/full","wb");if(!s->native_coarse_iq) abort(); }
+}
+int live_pair_copy(struct test_live *t,unsigned *copied)
+{
+    int result=paired_copy(&t->live);*copied=t->live.paired_copied;return result;
 }
 void live_start(struct test_live *t)
 {
@@ -109,6 +121,7 @@ void live_free_unstarted(struct test_live *t)
     struct live *s=&t->live;
     if(glrt_tracking_iq_owner_close(&s->owner,0) || glrt_tracking_iq_owner_destroy(&s->owner)) abort();
     fclose(s->journal);fclose(s->worker_iq);fclose(s->grids);
+    fclose(s->native_coarse_iq);
     if(s->scan_samples) fclose(s->scan_samples);
     fftw_destroy_plan(s->fft);fftw_free(t->fft);free(t->ring);
     if(pthread_mutex_destroy(&s->mutex)) abort();
@@ -122,6 +135,7 @@ void live_finish(struct test_live *t,uint64_t out[5])
     out[3]=s->controller.configured;out[4]=s->controller.sequence;
     if(glrt_tracking_iq_owner_close(&s->owner,0) || glrt_tracking_iq_owner_destroy(&s->owner)) abort();
     fclose(s->journal);fclose(s->worker_iq);fclose(s->grids);
+    fclose(s->native_coarse_iq);
     if(s->scan_samples) fclose(s->scan_samples);
     fftw_destroy_plan(s->fft);fftw_free(t->fft);free(t->ring);
     if(pthread_mutex_destroy(&s->mutex)) abort();
@@ -156,6 +170,8 @@ def live_api(tmp_path_factory):
     lib.live_select_windows.argtypes = [c.c_void_p,c.c_char_p,c.c_uint,c.c_int]
     lib.live_capture_done.argtypes = [c.c_void_p]
     lib.live_final.argtypes = [c.c_uint]*5
+    lib.live_pair_stage.argtypes = [c.c_void_p,c.c_uint64,c.c_int]
+    lib.live_pair_copy.argtypes = [c.c_void_p,c.c_void_p]
     lib.unused_probe_main.argtypes = [c.c_int, c.POINTER(c.c_char_p)]
     lib.live_rank.argtypes = [c.c_void_p,c.c_void_p,c.c_void_p,c.c_uint,c.c_void_p,c.c_void_p]
     lib.live_free_unstarted.argtypes = [c.c_void_p]
@@ -199,6 +215,37 @@ def test_invalid_dwell_rejected_before_opening_evidence_or_radio(live_api, tmp_p
 def test_early_stop_requires_idle_complete_counters_with_bounded_tail(live_api, admitted, delivered, flags, expected):
     lib,_=live_api
     assert lib.live_final(admitted,delivered,flags,2,4)==expected
+
+
+@pytest.mark.parametrize('rate', [30000000,60000000])
+@pytest.mark.parametrize('mode', ['delayed','closed','overwritten','retention'])
+def test_paired_iq_waits_for_real_publication_and_rejects_lost_inputs(live_api, tmp_path, rate, mode):
+    lib,refs=live_api; coefficients=bank();ports=Ports()
+    handle=lib.live_new(refs.ctypes.data,coefficients.ctypes.data,os.fsencode(tmp_path),c.byref(ports),rate)
+    iq=np.random.default_rng(718).integers(-1000,1001,(3333,2),dtype=np.int16)
+    copied=c.c_uint(999)
+    try:
+        lib.live_pair_stage(handle,1000016*(rate//2500000)+3,mode=='retention')
+        assert lib.live_publish(handle,iq.ctypes.data,2000)==0
+        assert lib.live_pair_copy(handle,c.byref(copied))==0 and copied.value==0
+        assert (tmp_path/'native.coarse.ci16').stat().st_size==0
+        if mode=='closed':
+            lib.live_close_source(handle)
+        elif mode=='overwritten':
+            extra=np.zeros((5000000,2),dtype=np.int16)
+            assert lib.live_publish(handle,extra.ctypes.data,len(extra))==0
+        else:
+            extra=np.ascontiguousarray(iq[2000:])
+            assert lib.live_publish(handle,extra.ctypes.data,len(extra))==0
+        rc=lib.live_pair_copy(handle,c.byref(copied))
+        assert rc=={'delayed':0,'closed':-3,'overwritten':-3,'retention':-6}[mode]
+        assert copied.value==int(mode=='delayed')
+    finally:
+        lib.live_free_unstarted(handle)
+    if mode=='delayed':
+        np.testing.assert_array_equal(np.fromfile(tmp_path/'native.coarse.ci16',dtype='<i2').reshape(-1,2),iq)
+        row=json.loads((tmp_path/'worker.jsonl').read_text())
+        assert row['first']==1000000 and row['native_start']==1000016*(rate//2500000)+3
 
 
 @pytest.mark.parametrize('mode', ['secondary_pilot', 'noise', 'zero', 'cancel', 'invalid_epoch'])
@@ -296,6 +343,16 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
         out = (c.c_uint64*5)();lib.live_finish(handle, out)
     assert not radio.errors, radio.errors
     rows = [json.loads(s) for s in (tmp_path/"worker.jsonl").read_text().splitlines()]
+    pairs = [r for r in rows if r['kind']=='native_coarse_iq']
+    paired_iq = np.fromfile(tmp_path/'native.coarse.ci16',dtype='<i2').reshape(-1,2)
+    assert len(paired_iq)==len(pairs)*3333 and len(pairs)<=64
+    for index,row in enumerate(pairs):
+        assert row['native_sequence']==index and row['iq_offset']==index*3333 and row['iq_samples']==3333
+        assert row['first']==row['native_start']//(rate//2500000)-16
+        first=row['first']-1000000
+        np.testing.assert_array_equal(paired_iq[index*3333:(index+1)*3333],iq[first:first+3333])
+        assert row['source']['first']<=row['first'] and row['first']+3333<=row['source']['end']
+        assert row['source']['epoch']==3 and not row['source']['closed']
     assert capture_done == int(mode.startswith('selected_'))
     if mode.startswith('selected_'):
         scans = [r for r in rows if r['kind'] == 'scan']
@@ -320,6 +377,13 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
         assert len(radio.writes("submit")) > 1 and len(radio.writes("pop")) == 1500
         reviewed = review_native_journal(native_journal(radio), epoch=3, rate=rate)
         assert len(reviewed['heads']) == reviewed['supported'] == 1500
+        assert len(pairs)==64
+        for row,head in zip(pairs,reviewed['heads'][:64],strict=True):
+            assert (row['native_start'],row['native_phase_step'],row['native_phase_seed'])==(
+                head.start,head.phase_step,head.phase_seed)
+            assert row['native_count']==head.count and row['native_fault']==head.fault
+        pair_terminal=next(r for r in rows if r['kind']=='native_terminal')
+        assert pair_terminal['paired_result']==0 and pair_terminal['paired_copied']==64
         assert reviewed['handoff'].rate == rate
         assert not radio.pending and not radio.queue and not radio.valid
         first = next(row for row in rows if row["kind"] == "scan")

@@ -23,6 +23,9 @@
 #define BLOCKS 1536U
 #define RING 5000000U
 #define ATTEMPTS 6U
+#define PAIR_LIMIT 64U
+#define PAIR_SAMPLES 3333U
+struct paired_head { uint32_t words[32]; };
 struct dwell_limits { unsigned blocks,attempts,alarm_seconds; uint64_t worker_ns; int selected_iq; };
 static int dwell_limits(const char *blocks,struct dwell_limits *out)
 {
@@ -56,8 +59,10 @@ struct live {
     struct glrt_native_ports native;
     int16_t bank[12][11][11][2],refs[52800],scan_iq[28000];
     fftw_plan fft;
-    FILE *journal,*worker_iq,*grids,*scan_samples;
+    FILE *journal,*worker_iq,*grids,*scan_samples,*native_coarse_iq;
     uint64_t iq_samples,deadline_ns,scan_iq_samples;
+    struct paired_head paired[PAIR_LIMIT];
+    uint32_t paired_queued,paired_copied;
     int selected_iq;
 };
 static int cancelled(void *pointer)
@@ -218,13 +223,70 @@ static int rank_candidates(struct live *s,double scores[8],unsigned *selected)
     if(cancelled(s)) return -1;
     memcpy(scores,pending,sizeof(pending));*selected=best;return 0;
 }
+/* Observe the first 64 retained native heads without changing their authority.
+ * Forward exact evidence before remembering metadata; the controller still
+ * associates the head, retains its estimate and performs POP itself. */
+static int paired_read(void *context,const char *key,char *raw,size_t size)
+{
+    struct live *s=context;return s->native.read(s->native.context,key,raw,size);
+}
+static int paired_write(void *context,const char *key,const char *raw,size_t size)
+{
+    struct live *s=context;return s->native.write(s->native.context,key,raw,size);
+}
+static double paired_clock(void *context)
+{
+    struct live *s=context;return s->native.clock(s->native.context);
+}
+static int paired_retain(void *context,const char *kind,const char *raw,size_t size)
+{
+    struct live *s=context;uint32_t epoch,w[32];
+    if(s->native.retain(s->native.context,kind,raw,size)) return -1;
+    if(strcmp(kind,"head") || s->paired_queued==PAIR_LIMIT) return 0;
+    if(glrt_tracking_head_parse(raw,size,&epoch,w) || epoch!=s->epoch ||
+       w[25]!=s->rate || w[1]!=s->paired_queued) return -1;
+    memcpy(s->paired[s->paired_queued++].words,w,sizeof(w));return 0;
+}
+/* GLI1 owner coordinates already describe delayed-filter signal centers.
+ * Convert native start to that same coordinate system, keeping 16 leading
+ * coarse samples and 17 trailing samples for diagnostic timing refinement.
+ * A head can precede publication of its matching coarse IQ. Leave it queued
+ * until a later tick; never block native submission waiting for a refill. */
+static int paired_copy(struct live *s)
+{
+    struct glrt_tracking_iq_view v;int16_t iq[2*PAIR_SAMPLES];
+    while(s->paired_copied<s->paired_queued) {
+        const uint32_t *w=s->paired[s->paired_copied].words;
+        uint64_t first=wide(w+3)/(s->rate/2500000);
+        if(first<16 || first>UINT64_MAX-PAIR_SAMPLES) return GLRT_NATIVE_PROTOCOL_ERROR;
+        first-=16;
+        if(glrt_tracking_iq_owner_copy(&s->owner,s->epoch,0,NULL,0,&v) ||
+           !v.valid || v.closed || first<v.first) return GLRT_NATIVE_SOURCE_LOST;
+        if(first+PAIR_SAMPLES>v.end) return 0;
+        if(glrt_tracking_iq_owner_copy(&s->owner,s->epoch,first,iq,PAIR_SAMPLES,&v) || v.closed)
+            return GLRT_NATIVE_SOURCE_LOST;
+        if(!s->native_coarse_iq || fwrite(iq,4,PAIR_SAMPLES,s->native_coarse_iq)!=PAIR_SAMPLES ||
+           fflush(s->native_coarse_iq)) return GLRT_NATIVE_RETENTION_ERROR;
+        fprintf(s->journal,"{\"kind\":\"native_coarse_iq\",\"attempt\":%u,\"recorded_ns\":%" PRIu64
+            ",\"native_sequence\":%u,\"native_start\":%" PRIu64 ",\"native_phase_step\":%u,\"native_phase_seed\":%u,"
+            "\"native_reference_phase\":%u,\"native_count\":%u,\"native_fault\":%u,\"first\":%" PRIu64
+            ",\"iq_offset\":%u,\"iq_samples\":%u,\"source\":",
+            s->attempts,clock_ns(NULL),w[1],wide(w+3),w[6],w[5],w[28],w[7],w[8],first,
+            s->paired_copied*PAIR_SAMPLES,PAIR_SAMPLES);
+        view(s->journal,&v);fputs("}\n",s->journal);
+        if(ferror(s->journal) || fflush(s->journal)) return GLRT_NATIVE_RETENTION_ERROR;
+        s->paired_copied++;
+    }
+    return 0;
+}
 static int run_feedback(struct live *s)
 {
     struct glrt_tracking_trend native;
     struct glrt_tracking_batch batch;
     struct glrt_tracking_job job;
     char raw[4096];uint32_t words[24];uint64_t earliest;
-    double slope;int rc,n;
+    double slope;int rc,n,pair_result=0;
+    struct glrt_native_ports ports={s,paired_read,paired_write,paired_retain,paired_clock};
     uint32_t frame=s->worker.trace.frame;
     if(glrt_tracking_trend_from_coarse(&s->worker.live.core.trend,s->rate,frame,1500,&native)) return -1;
     n=s->native.read(s->native.context,"tracking_snapshot",raw,sizeof(raw));
@@ -243,19 +305,31 @@ static int run_feedback(struct live *s)
            !glrt_tracking_prediction(&batch,0,&job) && job.start>=earliest) break;
     }
     if(frame>native.history.last_supported+25) return GLRT_NATIVE_DEADLINE;
-    if(glrt_tracking_controller_init_handoff(&s->controller,&s->native,&batch,&native,frame,1500,3)) return -1;
+    if(glrt_tracking_controller_init_handoff(&s->controller,&ports,&batch,&native,frame,1500,3)) return -1;
     do {
         struct timespec pause={0,100000};
         if(cancelled(s)) glrt_native_controller_request_stop(&s->controller);
         rc=glrt_native_controller_tick(&s->controller);
+        if(!pair_result) pair_result=paired_copy(s);
+        if(pair_result) glrt_native_controller_request_stop(&s->controller);
         if(rc==GLRT_NATIVE_RUNNING) nanosleep(&pause,NULL);
     } while(rc==GLRT_NATIVE_RUNNING);
+    {
+        uint64_t deadline=clock_ns(NULL)+UINT64_C(100000000);
+        while(!pair_result && s->paired_copied<s->paired_queued) {
+            if(cancelled(s) || clock_ns(NULL)>=deadline) { pair_result=GLRT_NATIVE_DEADLINE;break; }
+            pair_result=paired_copy(s);
+            if(!pair_result && s->paired_copied<s->paired_queued && pause_worker(s))
+                pair_result=GLRT_NATIVE_IO_ERROR;
+        }
+    }
     /* Local initialization is only a proposal; count a handoff after at least
      * one descriptor write completed. Native support still needs real heads. */
     s->handoffs+=s->controller.configured!=0;
-    fprintf(s->journal,"{\"kind\":\"native_terminal\",\"result\":%d,\"configured\":%u,\"retained_popped\":%u}\n",
-        rc,s->controller.configured,s->controller.sequence);
-    return ferror(s->journal) || fflush(s->journal) ? -1 : rc;
+    fprintf(s->journal,"{\"kind\":\"native_terminal\",\"result\":%d,\"configured\":%u,\"retained_popped\":%u,"
+        "\"paired_result\":%d,\"paired_queued\":%u,\"paired_copied\":%u}\n",
+        rc,s->controller.configured,s->controller.sequence,pair_result,s->paired_queued,s->paired_copied);
+    return ferror(s->journal) || fflush(s->journal) ? -1 : pair_result ? pair_result : rc;
 }
 static void *worker_thread(void *pointer)
 {
@@ -392,6 +466,7 @@ int main(int argc,char **argv)
     if(s->selected_iq) { FILE_NEW(s->scan_samples,"scan.iq.ci16","wbx"); }
     else { FILE_NEW(samples,"iq.ci16","wbx"); }
     FILE_NEW(s->journal,"worker.jsonl","wx");FILE_NEW(s->worker_iq,"worker.iq.ci16","wbx");FILE_NEW(s->grids,"grids.u32","wbx");
+    FILE_NEW(s->native_coarse_iq,"native.coarse.ci16","wbx");
     NEED((ctx=iio_create_local_context())!=NULL,"local_context");
     snprintf(label,sizeof(label),"glrt-iq-tracking-r%u-v1",rate);
     NEED(iio_context_get_attr_value(ctx,"hw_serial") && !strcmp(iio_context_get_attr_value(ctx,"hw_serial"),argv[2]) &&
@@ -496,6 +571,7 @@ done:
         if(s->worker_iq && fclose(s->worker_iq)) rc=1;
         if(s->grids && fclose(s->grids)) rc=1;
         if(s->scan_samples && fclose(s->scan_samples)) rc=1;
+        if(s->native_coarse_iq && fclose(s->native_coarse_iq)) rc=1;
         if(s->fft) fftw_destroy_plan(s->fft);
         if(mutex && pthread_mutex_destroy(&s->mutex)) rc=1;
     }

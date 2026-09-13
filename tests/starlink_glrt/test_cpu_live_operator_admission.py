@@ -202,3 +202,25 @@ def test_selected_capture_budget_and_artifacts_are_explicit(storage_operator):
         assert storage_operator.capture_artifacts(blocks) == storage_operator.ARTIFACTS
     for blocks in (0,45001):
         with pytest.raises(ValueError): storage_operator.capture_artifacts(blocks)
+
+
+@pytest.mark.parametrize('failed', [False,True])
+@pytest.mark.parametrize('changed', [False,True])
+def test_failed_capture_still_records_final_rf_comparison(storage_operator, failed, changed):
+    calls=[]
+    context=SimpleNamespace(attrs={'hw_serial':'serial20','fw_version':'image'},find_device=lambda _: object())
+    def rf_state(_):
+        calls.append('rf_read');return {'lo': 2 if changed else 1}
+    def check_exit():
+        calls.append('check_exit')
+        if failed: raise RuntimeError('capture failed')
+    storage_operator.g=SimpleNamespace(rf_state=rf_state)
+    evidence={'configured':{'rf_state':{'lo':1}}}
+    result=SimpleNamespace(check_returncode=check_exit)
+    if failed or changed:
+        with pytest.raises(ValueError if changed else RuntimeError):
+            storage_operator.check_terminal_capture(context,result,'image',evidence)
+    else:
+        storage_operator.check_terminal_capture(context,result,'image',evidence)
+    assert evidence['rf_after']=={'lo':2 if changed else 1}
+    assert calls==(['rf_read'] if changed else ['rf_read','check_exit'])

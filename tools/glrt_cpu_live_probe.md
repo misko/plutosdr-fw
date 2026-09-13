@@ -64,6 +64,23 @@ count. Source counters may include a final exported tail beyond the last
 returned refill; all duration/loss review must use those actual final counters.
 The two shorter full-IQ profiles continue to capture their entire fixed length.
 
+For the first 64 retained native heads, `native.coarse.ci16` records 3333 coarse
+samples beginning 16 samples before `floor(native_start / decimation_ratio)`.
+These owner coordinates already account for DDC group delay. Each
+`native_coarse_iq` journal record binds the window to native sequence, start,
+phase seed/step, reference phase, count and fault, plus the copied source view.
+The additional payload is capped at 853248 bytes. It is diagnostic evidence;
+these copies do not update feedback or change the support gate.
+
+The native port wrapper first forwards the exact head to the existing journal.
+The controller continues to own association, estimate retention, POP and
+stop/drain. Matching coarse samples may lag the native head by a refill, so
+copies are deferred until the owner publishes them. Native scheduling never
+waits for future IQ. After controller termination, pending copies have at most
+100 ms to finish. Missing/overwritten samples or retention failure fail the
+qualification and are recorded separately from the native-controller result.
+No later native head is claimed to have matching retained coarse IQ.
+
 REBASE occurs only after capture starts. Its returned native counter defines
 a conservative new-epoch boundary. Samples whose signal centers precede that
 boundary are recorded but excluded from the worker's IQ owner. The journal
@@ -134,6 +151,9 @@ The operator accepts `--lo-hz` for separately bounded frequency revisits and
 checks RF state again after capture. Autonomous revisit selection,
 reacquisition after a native run and longer refinement remain beyond this
 single-loop qualification executable.
+The final RF-state comparison also runs when the executable exits nonzero;
+that exit remains a failure even when the radio has returned to its expected
+receive configuration and TX-safe idle state.
 
 ## Invocation
 

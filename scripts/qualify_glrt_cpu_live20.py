@@ -22,7 +22,7 @@ from pluto_plus.radio_lock import acquire_radio_lock
 from pluto_plus.release_candidate_rx_only_linux import _close_iio_context
 from deploy_glrt_iq_tracking20 import EVIDENCE, PASSWORD
 
-ARTIFACTS = ('capture.txt', 'iq.ci16', 'worker.jsonl', 'worker.iq.ci16', 'grids.u32', 'native.journal')
+ARTIFACTS = ('capture.txt', 'iq.ci16', 'worker.jsonl', 'worker.iq.ci16', 'grids.u32', 'native.journal', 'native.coarse.ci16')
 
 
 def retention_budget_kib(blocks):
@@ -90,6 +90,17 @@ def configure_idle_rx(context, *, rate, lo_hz, evidence, memory_info, blocks):
     return g.configure_checked_rx(context, lo=lo_hz, bandwidth=2500000, gain=30,
                                   port='A_BALANCED', source_rate=rate,
                                   base_abi='GLI1-1.0-upper-only')
+
+
+def check_terminal_capture(context, result, expected_firmware, evidence):
+    # Retain the final RF comparison even when the executable reports a
+    # tracking failure. A nonzero exit remains a failed qualification.
+    if context.attrs['hw_serial'] != ENDPOINT[0] or context.attrs['fw_version'] != expected_firmware:
+        raise ValueError('post-capture radio identity differs')
+    evidence['rf_after'] = g.rf_state(context.find_device('ad9361-phy'))
+    if evidence['rf_after'] != evidence['configured']['rf_state']:
+        raise ValueError('RF settings changed during the bounded capture')
+    result.check_returncode()
 
 
 def main():
@@ -206,15 +217,10 @@ def main():
                 (args.output/name).write_bytes(data.stdout)
                 evidence['artifacts'][name] = {'bytes': len(data.stdout), 'sha256': hashlib.sha256(data.stdout).hexdigest()}
             retrieved = True
-            result.check_returncode()
             context = iio.Context('ip:'+ENDPOINT[1])
             try:
                 context.set_timeout(5000)
-                if context.attrs['hw_serial'] != ENDPOINT[0] or context.attrs['fw_version'] != plan['expected_firmware']:
-                    raise ValueError('post-capture radio identity differs')
-                evidence['rf_after'] = g.rf_state(context.find_device('ad9361-phy'))
-                if evidence['rf_after'] != evidence['configured']['rf_state']:
-                    raise ValueError('RF settings changed during the bounded capture')
+                check_terminal_capture(context,result,plan['expected_firmware'],evidence)
             finally:
                 _close_iio_context(iio, context)
             evidence['status'] = 'bounded_capture_review_pending' if args.blocks == 45000 else 'capture_complete_review_pending'
