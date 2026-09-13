@@ -2,6 +2,39 @@
 #include "glrt_cpu_coarse.h"
 #include <math.h>
 #include <string.h>
+#ifdef __ARM_NEON
+#include <arm_neon.h>
+#endif
+
+static void dot11(const int16_t *iq,const int16_t c[11][2],int32_t *real,int32_t *imag)
+{
+    unsigned t=0;
+    int32_t re=0,im=0;
+#ifdef __ARM_NEON
+    int32x4_t vr=vdupq_n_s32(0),vi=vdupq_n_s32(0);
+    for(;t<8;t+=4) {
+        int16x4x2_t x=vld2_s16(iq+2*t),a=vld2_s16(c[t]);
+        vr=vmlal_s16(vr,x.val[0],a.val[0]);
+        vr=vmlal_s16(vr,x.val[1],a.val[1]);
+        vi=vmlal_s16(vi,x.val[1],a.val[0]);
+        vi=vmlsl_s16(vi,x.val[0],a.val[1]);
+    }
+    {
+        int32x2_t r=vadd_s32(vget_low_s32(vr),vget_high_s32(vr));
+        int32x2_t i=vadd_s32(vget_low_s32(vi),vget_high_s32(vi));
+        re=vget_lane_s32(vpadd_s32(r,r),0);
+        im=vget_lane_s32(vpadd_s32(i,i),0);
+    }
+#endif
+    /* Even CI16 rails with full CI12 coefficients fit signed i32:
+     * 11 * 2 * 32768 * 2048 = 1,476,395,008. Every SIMD lane and
+     * intermediate horizontal sum is bounded by a subset of those terms. */
+    for(;t<11;t++) {
+        int32_t i=iq[2*t],q=iq[2*t+1],a=c[t][0],b=c[t][1];
+        re+=i*a+q*b;im+=q*a-i*b;
+    }
+    *real=re;*imag=im;
+}
 
 static uint32_t root(uint64_t n)
 {
@@ -82,11 +115,7 @@ int glrt_cpu_coarse_grid(uint32_t grid[11][GLRT_CPU_COARSE_EPOCHS], const int16_
                  * Keep the dot products in bounded i32, widen before squaring. */
                 int32_t re=0,im=0;
                 uint32_t numerator,denominator;
-                for(t=0;t<11;t++) {
-                    int32_t i=iq[2*(start+t)],q=iq[2*(start+t)+1];
-                    int32_t a=c[s][f][t][0],b=c[s][f][t][1];
-                    re+=i*a+q*b;im+=q*a-i*b;
-                }
+                dot11(iq+2*start,c[s][f],&re,&im);
                 numerator=root((uint64_t)((int64_t)re*re)+(uint64_t)((int64_t)im*im));
                 denominator=root(observed*energy[s][f]);
                 totals[f]+=ratio_q16(numerator,denominator);

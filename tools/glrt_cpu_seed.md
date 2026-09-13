@@ -75,6 +75,19 @@ cancellation, retention failure and handoff expiry, for both worker entries.
 
 ## Building and testing
 
+On ARM NEON builds, the coarse scanner uses signed widening vector products
+for the first eight taps of each eleven-tap complex dot product. The three
+remaining taps and the exact square-root/ratio scoring are unchanged. CI16
+samples and checked CI12 coefficients bound the full sum to 1,476,395,008,
+so every SIMD lane and horizontal intermediate fits signed 32 bits.
+
+A paired saved-IQ test on `.20`'s ARM measured 456.90–463.46 ms/window versus
+638.54–645.63 ms for the scalar baseline: 28.58% less mean scan time. Both
+146,652-value grids and selected peaks match the independent integer oracle.
+The ARM executable also passed 10,064 component-owned dot-product cases using
+wide-integer expected values, rails and varied input alignment. These are
+saved-IQ timings, not a measurement of concurrent live capture performance.
+
 Link the worker with `glrt_cpu_seed.c` as well as its existing GLA seed source.
 The saved-IQ benchmark additionally needs `glrt_cpu_coarse.c`, pthreads and
 FFTW3. It uses FFTW's estimate plan; its recorded timing excludes plan creation.

@@ -149,3 +149,13 @@ def test_actual_two_thread_benchmark_matches_complete_serial_grid(api,tmp_path):
         w=Workspace();cut=iq[i*14000:(i+1)*14000]
         assert api.glrt_cpu_coarse_search(C.byref(w),cut.ctypes.data,c.ctypes.data,POLL(lambda _:0),None)==0
         np.testing.assert_array_equal(grids[i],np.ctypeslib.as_array(w.grid))
+
+
+def test_dot_products_match_wide_integer_arithmetic_across_rails_and_alignments(tmp_path):
+    source=tmp_path/'dot.c'; binary=tmp_path/'dot'
+    source.write_text('#include "glrt_cpu_coarse.c"\n#include "cpu_coarse_dot_check.c"\n'
+                      'int main(void) { return check_dot11()!=0; }\n')
+    subprocess.run(['cc','-O2','-std=c99','-Wall','-Wextra','-Werror',
+        '-I',str(ROOT/'tools'),'-I',str(ROOT/'tests/starlink_glrt'),str(source),
+        '-lm','-o',str(binary)],check=True)
+    subprocess.run([str(binary)],check=True,timeout=10)
