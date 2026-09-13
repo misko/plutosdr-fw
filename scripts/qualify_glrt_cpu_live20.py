@@ -22,7 +22,8 @@ from pluto_plus.radio_lock import acquire_radio_lock
 from pluto_plus.release_candidate_rx_only_linux import _close_iio_context
 from deploy_glrt_iq_tracking20 import EVIDENCE, PASSWORD
 
-ARTIFACTS = ('capture.txt', 'iq.ci16', 'worker.jsonl', 'worker.iq.ci16', 'grids.u32', 'native.journal', 'native.coarse.ci16')
+ARTIFACTS = ('capture.txt', 'iq.ci16', 'worker.jsonl', 'worker.iq.ci16', 'grids.u32', 'native.journal',
+             'native.coarse.ci16', 'observer.jsonl', 'observer.iq.ci16')
 
 
 def retention_budget_kib(blocks):
@@ -30,7 +31,9 @@ def retention_budget_kib(blocks):
         raise ValueError('unsupported capture length')
     # Selected mode bounds worker IQ to 80 MB, searched IQ to 11.2 MB and
     # grids to 29.4 MB. The 256-MiB allowance also covers capture/worker
-    # journals and native evidence without retaining all 2.95 GB of raw IQ.
+    # journals, native evidence and <= 10.56 MB of observer IQ (4*200*3300*4)
+    # without retaining all 2.95 GB of raw IQ. Short profiles permit one episode
+    # (2.64 MB); their existing 40-MiB filesystem / 80-MiB memory margin covers it.
     return 256*1024 if blocks == 45000 else 16384*blocks*4//1024
 
 
@@ -106,6 +109,14 @@ def check_terminal_capture(context, result, expected_firmware, evidence):
     result.check_returncode()
 
 
+def require_observer_artifacts(evidence):
+    # Even a dwell with no acquisition creates two empty observer files.
+    # An older executable cannot qualify this composition by omitting them.
+    for name in ('observer.jsonl', 'observer.iq.ci16'):
+        if evidence['artifacts'].get(name) is None:
+            raise ValueError('missing passive observer evidence: '+name)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--deployment', type=Path, required=True)
@@ -135,6 +146,8 @@ def main():
                 'rf_sample_limit': 16384*args.blocks,
                 'rf_duration_limit_s': 16384*args.blocks/2500000, 'payload_sha256': hashes,
                 'retention_mode': 'selected_windows' if args.blocks == 45000 else 'full',
+                'passive_observer': {'rate': 2500000, 'feedback_authority': False,
+                                     'maximum_measurements_per_episode': 200, 'maximum_episodes': 4 if args.blocks == 45000 else 1},
                 'status': 'started', 'live_tracking_qualified': False}
     remote = '/tmp/gli-live20-'+uuid.uuid4().hex
     evidence['remote_directory'] = remote
@@ -224,6 +237,7 @@ def main():
             try:
                 context.set_timeout(5000)
                 check_terminal_capture(context,result,plan['expected_firmware'],evidence)
+                require_observer_artifacts(evidence)
             finally:
                 _close_iio_context(iio, context)
             evidence['status'] = 'bounded_capture_review_pending' if args.blocks == 45000 else 'capture_complete_review_pending'

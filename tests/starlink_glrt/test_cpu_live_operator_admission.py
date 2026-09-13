@@ -199,10 +199,23 @@ def test_selected_capture_budget_and_artifacts_are_explicit(storage_operator):
     assert 'scan.iq.ci16' in selected and 'iq.ci16' not in selected
     assert selected[-3:] == ('native-1.journal','native-2.journal','native-3.journal')
     assert storage_operator.retention_budget_kib(45000) == 256*1024
+    assert {'observer.jsonl','observer.iq.ci16'} <= set(selected)
+    # The additional worst-case IQ uses 10.56 MB, inside the unchanged allowance.
+    assert 80_000_000+11_200_000+29_400_000+4*200*3300*4+4*8*1024**2 < 256*1024**2
     for blocks in (1536,4096):
         assert storage_operator.capture_artifacts(blocks) == storage_operator.ARTIFACTS
     for blocks in (0,45001):
         with pytest.raises(ValueError): storage_operator.capture_artifacts(blocks)
+
+
+@pytest.mark.parametrize('missing',[None,'observer.jsonl','observer.iq.ci16'])
+def test_observer_artifacts_are_required_even_without_handoff(storage_operator,missing):
+    evidence={'artifacts':{name:{'bytes':0} for name in ('observer.jsonl','observer.iq.ci16')}}
+    if missing:
+        evidence['artifacts'][missing]=None
+        with pytest.raises(ValueError,match='missing passive observer evidence'):
+            storage_operator.require_observer_artifacts(evidence)
+    else: storage_operator.require_observer_artifacts(evidence)
 
 
 @pytest.mark.parametrize('failed', [False,True])

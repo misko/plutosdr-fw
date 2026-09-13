@@ -302,3 +302,22 @@ native gates, qualify a new support policy or establish sustained tracking.
 `tests/starlink_glrt/test_tracking_observer.py` exercises actual copied IQ,
 all four reference phases, large source coordinates, finite loss, retention
 transactions, cancellation and concurrent-publication timestamp ordering.
+
+The live CPU probe starts a separate observer thread at native handoff, from
+the acquired history's last-seen frame plus nine. Its imported history is the
+same attempt/epoch's kind-4 record in `worker.jsonl`. The observer runs at
+2.5 MS/s with a 200-measurement, three-second wall/source limit per episode.
+It writes `observer.jsonl` and `observer.iq.ci16`; these files never contain
+native heads. A start record binds the seed and budgets, each measurement
+retains exact IQ, moments and estimates, and a terminal record distinguishes
+retained records from committed observations. Cancellation after retention
+may leave one final uncommitted record, which must not count as support.
+
+The native controller continues to use only its own native history. After
+its terminal recovery, the worker cancels and joins the observer before
+declaring itself done. Failed joins prohibit owner destruction or rebase.
+Observer history exhaustion and ordinary cancellation remain diagnostic
+outcomes; source, deadline, I/O and retention failures fail the qualification
+after native recovery. Up to four episodes retain at most 10.56 MB of observer
+IQ, within the selected capture's existing 256-MiB evidence allowance. The
+operator requires both observer files even for a dwell without acquisition.

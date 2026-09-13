@@ -6,6 +6,7 @@
 #include "glrt_tracking_worker.h"
 #include "glrt_tracking_transport.h"
 #include "glrt_native_posix.h"
+#include "glrt_tracking_observer.h"
 #include <fftw3.h>
 #include <iio.h>
 #include <errno.h>
@@ -67,6 +68,12 @@ struct live {
     struct paired_head paired[PAIR_LIMIT];
     uint32_t paired_queued,paired_copied,paired_episode_first;
     int selected_iq;
+    pthread_t observer_thread;
+    int observer_started,observer_stop,observer_result;
+    struct glrt_tracking_observer observer;
+    int16_t observer_scratch[6600];
+    FILE *observer_journal,*observer_iq;
+    uint32_t observer_retained;
 };
 static int cancelled(void *pointer)
 {
@@ -90,6 +97,99 @@ static void view(FILE *f,const struct glrt_tracking_iq_view *v)
     fprintf(f,"{\"first\":%" PRIu64 ",\"end\":%" PRIu64 ",\"source_now\":%" PRIu64
         ",\"observed_ns\":%" PRIu64 ",\"generation\":%" PRIu64 ",\"epoch\":%u,\"valid\":%u,\"closed\":%u}",
         v->first,v->end,v->source_now,v->observed_ns,v->generation,v->epoch,v->valid,v->closed);
+}
+static int observer_cancelled(void *pointer)
+{
+    struct live *s=pointer;int stop,rc=cancelled(s);
+    if(rc) return rc;
+    if(pthread_mutex_lock(&s->mutex)) return -1;
+    stop=s->observer_stop;
+    return pthread_mutex_unlock(&s->mutex) ? -1 : stop;
+}
+/* Only this worker writes observer files. The acquired history is retained in
+ * worker.jsonl kind 4, bound here by attempt and epoch. Native history, ports
+ * and evidence are never accessed from the observer thread. */
+static int observer_retain(void *pointer,const struct glrt_tracking_observer_trace *t,const int16_t *iq)
+{
+    struct live *s=pointer;FILE *f=s->observer_journal;
+    if(!f || !s->observer_iq || s->observer_retained>=200*(RESTART_LIMIT+1) ||
+       fwrite(iq,4,3300,s->observer_iq)!=3300 || fflush(s->observer_iq)) return -1;
+    fprintf(f,"{\"kind\":\"measurement\",\"attempt\":%u,\"episode\":%u,\"epoch\":%u,\"rate\":2500000,"
+        "\"recorded_ns\":%" PRIu64 ",\"sequence\":%u,\"frame\":%u,\"first\":%" PRIu64
+        ",\"phase_step\":%u,\"reference_phase\":%u,\"accepted\":%d,\"rejection\":%u,"
+        "\"coherence\":%.17g,\"linearized_coherence\":%.17g,\"delay_correction_s\":%.17g,"
+        "\"residual_cfo_hz\":%.17g,\"cfo_hz\":%.17g,\"iq_offset\":%u,\"iq_samples\":3300,\"source\":",
+        s->attempts,s->restarts,s->epoch,clock_ns(NULL),s->observer.measurements,t->frame,t->job.start,
+        t->job.phase_step,t->job.reference_phase,t->accepted,t->estimate.rejection,t->estimate.coherence,
+        t->estimate.linearized_coherence,t->estimate.delay_correction_s,t->estimate.residual_cfo_hz,
+        t->estimate.cfo_hz,s->observer_retained*3300);
+    view(f,&t->source);fputs(",\"moments\":[",f);
+    for(unsigned k=0;k<16;k++) fprintf(f,"%s%u",k ? "," : "",t->moments.words[k]);
+    fputs("]}\n",f);
+    if(ferror(f) || fflush(f)) return -1;
+    s->observer_retained++;return 0;
+}
+static void *observer_thread(void *pointer)
+{
+    struct live *s=pointer;struct glrt_tracking_observer_trace trace;int rc;
+    struct glrt_tracking_observer_ports ports={s,clock_ns,observer_cancelled,observer_retain};
+    do {
+        rc=glrt_tracking_observer_step(&s->observer,&s->owner,s->refs,s->observer_scratch,&ports,&trace);
+        if(rc==GLRT_OBSERVER_WAIT && pause_worker(s)) {
+            s->observer.status=rc=GLRT_OBSERVER_INVALID;
+        }
+    } while(rc==GLRT_OBSERVER_WAIT || rc==GLRT_OBSERVER_MEASURED);
+    fprintf(s->observer_journal,"{\"kind\":\"terminal\",\"attempt\":%u,\"episode\":%u,\"epoch\":%u,"
+        "\"recorded_ns\":%" PRIu64 ",\"status\":%d,\"measurements\":%u,\"retained_total\":%u,"
+        "\"last_seen\":%u,\"last_supported\":%u}\n",
+        s->attempts,s->restarts,s->epoch,clock_ns(NULL),rc,s->observer.measurements,
+        s->observer_retained,s->observer.trend.history.last_seen,s->observer.trend.history.last_supported);
+    s->observer_result=ferror(s->observer_journal) || fflush(s->observer_journal) ?
+        GLRT_OBSERVER_RETENTION : rc;
+    return NULL;
+}
+static int start_observer(struct live *s)
+{
+    const struct glrt_tracking_trend *history=&s->worker.live.core.trend;
+    struct glrt_tracking_batch batch;struct glrt_tracking_job job;double slope;
+    uint64_t now=clock_ns(NULL);uint32_t first=history->history.last_seen;
+    if(s->observer_started || !s->observer_journal || !s->observer_iq || first>UINT32_MAX-9)
+        return GLRT_NATIVE_RETENTION_ERROR;
+    first+=9;
+    if(glrt_tracking_trend_batch(history,first,1,1,0,&batch,&slope) ||
+       glrt_tracking_prediction(&batch,0,&job) || job.start>UINT64_MAX-7500000 ||
+       glrt_tracking_observer_init(&s->observer,history,first,200,job.start+7500000,now,UINT64_C(3000000000)))
+        return GLRT_NATIVE_PROTOCOL_ERROR;
+    fprintf(s->observer_journal,"{\"kind\":\"start\",\"attempt\":%u,\"episode\":%u,\"epoch\":%u,"
+        "\"rate\":2500000,\"native_rate\":%u,\"first_frame\":%u,\"maximum_measurements\":200,"
+        "\"source_limit\":%" PRIu64 ",\"started_ns\":%" PRIu64 ",\"deadline_ns\":%" PRIu64
+        ",\"retained_total\":%u}\n",s->attempts,s->restarts,s->epoch,s->rate,first,
+        s->observer.source_limit,now,s->observer.deadline_ns,s->observer_retained);
+    if(ferror(s->observer_journal) || fflush(s->observer_journal)) return GLRT_NATIVE_RETENTION_ERROR;
+    s->observer_stop=0;s->observer_result=GLRT_OBSERVER_WAIT;
+    if(pthread_create(&s->observer_thread,NULL,observer_thread,s)) return GLRT_NATIVE_IO_ERROR;
+    s->observer_started=1;return 0;
+}
+/* Called by the native worker after its controller has terminated, including
+ * error recovery. A failed join keeps observer_started set: nobody may destroy
+ * or rebase its owner. Diagnostic history exhaustion does not change native
+ * support; infrastructure/evidence failures still fail the qualification. */
+static int join_observer(struct live *s)
+{
+    void *result=NULL;
+    if(!s->observer_started) return 0;
+    if(pthread_mutex_lock(&s->mutex)) return GLRT_NATIVE_IO_ERROR;
+    s->observer_stop=1;
+    if(pthread_mutex_unlock(&s->mutex) || pthread_join(s->observer_thread,&result)) return GLRT_NATIVE_IO_ERROR;
+    s->observer_started=0;
+    if(result) return GLRT_NATIVE_IO_ERROR;
+    switch(s->observer_result) {
+    case GLRT_OBSERVER_DONE: case GLRT_OBSERVER_HISTORY: case GLRT_OBSERVER_CANCELLED: return 0;
+    case GLRT_OBSERVER_RETENTION: return GLRT_NATIVE_RETENTION_ERROR;
+    case GLRT_OBSERVER_SOURCE: return GLRT_NATIVE_SOURCE_LOST;
+    case GLRT_OBSERVER_DEADLINE: return GLRT_NATIVE_DEADLINE;
+    default: return GLRT_NATIVE_IO_ERROR;
+    }
 }
 static int retain(void *pointer,enum glrt_tracking_worker_record kind,const struct glrt_tracking_worker *w)
 {
@@ -282,7 +382,7 @@ static int paired_copy(struct live *s)
     }
     return 0;
 }
-static int run_feedback(struct live *s)
+static int run_native_feedback(struct live *s)
 {
     struct glrt_tracking_trend native;
     struct glrt_tracking_batch batch;
@@ -339,8 +439,24 @@ static int run_feedback(struct live *s)
         !pair_result && s->paired_copied==s->paired_queued;
     fprintf(s->journal,"{\"kind\":\"native_terminal\",\"attempt\":%u,\"native_episode\":%u,\"epoch\":%u,\"result\":%d,\"configured\":%u,\"retained_popped\":%u,"
         "\"paired_result\":%d,\"paired_queued\":%u,\"paired_copied\":%u}\n",
-        s->attempts,s->restarts,s->epoch,rc,s->controller.configured,s->controller.sequence,pair_result,s->paired_queued,s->paired_copied);
+        s->attempts,s->restarts,s->epoch,rc,s->controller.configured,s->controller.sequence,pair_result,
+        s->paired_queued,s->paired_copied);
     return ferror(s->journal) || fflush(s->journal) ? -1 : pair_result ? pair_result : rc;
+}
+static int run_feedback(struct live *s)
+{
+    int rc,observer_result=start_observer(s);
+    if(observer_result) return observer_result;
+    /* Thread creation and start retention precede the native freshness read.
+     * Do not spend the native admission lead on observer initialization. Every
+     * native return, including failed preflight, now passes through this join. */
+    rc=run_native_feedback(s);
+    observer_result=join_observer(s);
+    if(observer_result || s->observer_started) s->native_clean_loss=0;
+    fprintf(s->journal,"{\"kind\":\"observer_join\",\"attempt\":%u,\"episode\":%u,\"epoch\":%u,"
+        "\"native_result\":%d,\"observer_result\":%d,\"observer_status\":%d,\"observer_joined\":%d}\n",
+        s->attempts,s->restarts,s->epoch,rc,observer_result,s->observer_result,!s->observer_started);
+    return ferror(s->journal) || fflush(s->journal) ? GLRT_NATIVE_RETENTION_ERROR : observer_result ? observer_result : rc;
 }
 static void *worker_thread(void *pointer)
 {
@@ -417,7 +533,7 @@ static void *worker_thread(void *pointer)
 static int restart_owner(struct live *s,FILE *capture_journal)
 {
     char raw[4096];uint32_t w[24];int n;
-    if(s->started || !s->done || !s->selected_iq || !s->native_clean_loss ||
+    if(s->started || s->observer_started || !s->done || !s->selected_iq || !s->native_clean_loss ||
        s->result!=GLRT_NATIVE_ACQUISITION_LOST || s->restarts>=RESTART_LIMIT ||
        s->attempts>=s->attempt_limit || cancelled(s)) return 0;
     n=s->native.read(s->native.context,"tracking_snapshot",raw,sizeof(raw));
@@ -534,6 +650,7 @@ int main(int argc,char **argv)
     else { FILE_NEW(samples,"iq.ci16","wbx"); }
     FILE_NEW(s->journal,"worker.jsonl","wx");FILE_NEW(s->worker_iq,"worker.iq.ci16","wbx");FILE_NEW(s->grids,"grids.u32","wbx");
     FILE_NEW(s->native_coarse_iq,"native.coarse.ci16","wbx");
+    FILE_NEW(s->observer_journal,"observer.jsonl","wx");FILE_NEW(s->observer_iq,"observer.iq.ci16","wbx");
     NEED((ctx=iio_create_local_context())!=NULL,"local_context");
     snprintf(label,sizeof(label),"glrt-iq-tracking-r%u-v1",rate);
     NEED(iio_context_get_attr_value(ctx,"hw_serial") && !strcmp(iio_context_get_attr_value(ctx,"hw_serial"),argv[2]) &&
@@ -636,7 +753,7 @@ done:
                     !glrt_tracking_snapshot_drained(w) || (w[5]&16) || w[6] || w[7]) rc=1;
         }
     }
-    if(!joined) _exit(2); /* Keep all worker-reachable storage alive until process exit. */
+    if(!joined || (s && s->observer_started)) _exit(2); /* Keep all worker-reachable storage alive until process exit. */
     if(owned) { if(glrt_tracking_iq_owner_close(&s->owner,0) || glrt_tracking_iq_owner_destroy(&s->owner)) rc=1; }
     if(glrt_native_posix_close(&posix)) rc=1;
     if(ctx) iio_context_destroy(ctx);
@@ -648,6 +765,8 @@ done:
         if(s->grids && fclose(s->grids)) rc=1;
         if(s->scan_samples && fclose(s->scan_samples)) rc=1;
         if(s->native_coarse_iq && fclose(s->native_coarse_iq)) rc=1;
+        if(s->observer_journal && fclose(s->observer_journal)) rc=1;
+        if(s->observer_iq && fclose(s->observer_iq)) rc=1;
         if(s->fft) fftw_destroy_plan(s->fft);
         if(mutex && pthread_mutex_destroy(&s->mutex)) rc=1;
     }
