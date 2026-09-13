@@ -1,0 +1,11 @@
+{
+  "schema": "plutosdr-fw.flash-layout.v1",
+  "target": "pluto",
+  "profile": "legacy-update",
+  "flash_bytes": 33554432,
+  "address_limit": 16777216,
+  "firmware_start": 2097152,
+  "firmware_bytes": 31457280,
+  "erase_bytes": 65536,
+  "firmware_node": "/amba/spi@e000d000/ps7-qspi@0/partition@qspi-linux"
+}

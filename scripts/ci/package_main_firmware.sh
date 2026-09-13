@@ -112,6 +112,9 @@ grep -Eq 'Length:[[:space:]]+16$' "$ARTIFACT_ROOT/dfu-suffix-check.txt" ||
 # trailer: a 16-byte DFU suffix versus a 32-hex-character MD5 plus newline.
 dfu_bytes="$(stat -c %s "$dfu")"
 frm_bytes="$(stat -c %s "$frm")"
+python3 scripts/validate_flash_artifact.py --frm "$frm" \
+    --profile "${FLASH_LAYOUT_PROFILE:-manifests/pluto-legacy-flash-layout.json}" \
+    --target pluto > "$ARTIFACT_ROOT/flash-layout-verdict.json"
 [[ "$dfu_bytes" -gt 16 && "$frm_bytes" -gt 33 ]] ||
     fail "DFU/FRM is too small to contain its required trailer"
 dfu_fit_bytes="$((dfu_bytes - 16))"
@@ -554,6 +557,7 @@ read -r wns tns tns_failing _ whs ths ths_failing _ wpws tpws tpws_failing _ \
         packed-fpga.bit
         system-top-bit.sha256
         frm-layout.txt
+        flash-layout-verdict.json
         system_top_timing_summary_routed.rpt
         system_top_route_status.rpt
         system_top_drc_routed.rpt

@@ -43,6 +43,7 @@ $(error "      3] export VIVADO_VERSION=v20xx.x")
 endif
 
 TARGET ?= pluto
+FLASH_LAYOUT_PROFILE ?= manifests/$(TARGET)-legacy-flash-layout.json
 SUPPORTED_TARGETS:=pluto sidekiqz2
 
 # Include target specific constants
@@ -174,7 +175,8 @@ build/boot.bin: build/sdk/fsbl/Release/fsbl.elf build/u-boot.elf
 
 ### MSD update firmware file ###
 
-build/$(TARGET).frm: build/$(TARGET).itb
+build/$(TARGET).frm: build/$(TARGET).itb scripts/validate_flash_artifact.py $(FLASH_LAYOUT_PROFILE) buildroot/board/pluto/pluto-flash-range
+	$(TOOLS_PATH) python3 scripts/validate_flash_artifact.py --fit $< --profile $(FLASH_LAYOUT_PROFILE) --target $(TARGET)
 	md5sum $< | cut -d ' ' -f 1 > $@.md5
 	cat $< $@.md5 > $@
 
