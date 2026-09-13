@@ -10,7 +10,7 @@ not an installed autonomous service.
 | Component | Input sample rate | Work and location |
 | --- | --- | --- |
 | FPGA DDC and native source counter | 30 or 60 MS/s | Exports 2.5-MS/s GLI1 IQ and its original source coordinates |
-| ARM capture thread | 2.5 MS/s | Attests each 16384-sample refill; retains full IQ and a two-second ring |
+| ARM capture thread | 2.5 MS/s | Attests each 16384-sample refill; maintains a two-second ring and records full IQ or explicitly selected windows |
 | ARM coarse search | 2.5-MS/s IQ windows | Two threads evaluate each complete 14000-sample window; a full-pilot FFT orders eight basins before one proposal is resolved |
 | ARM resolver/catch-up | 2.5-MS/s retained IQ | Four full 3300-sample pilots, 17 timing hypotheses; then supported past pilots every nine frames |
 | FPGA scheduled measurements | 30 or 60 MS/s | 39600 or 79200 samples per 1.32-ms pilot, scheduled from supported history |
@@ -28,8 +28,8 @@ uncleared for retained recovery.
 The optional `--blocks 4096` operator argument selects a 26.8435456-second
 dwell (67108864 complex samples), at most sixteen coarse attempts, a
 30-second worker deadline and a 45-second cancellation alarm. The C executable
-accepts the corresponding final positional argument `4096`; only `1536` and
-`4096` are admitted. Resolver and native-controller budgets are unchanged.
+accepts the corresponding final positional argument `4096`. Resolver and
+native-controller budgets are unchanged.
 Before RF configuration, both profiles require `/proc/meminfo` to report enough
 `MemAvailable` for the full retained CI16 capture plus 80 MiB of worker and
 system headroom: 176 MiB for the default or 336 MiB for the longer dwell.
@@ -42,6 +42,27 @@ for worker IQ, journals, grids and payloads before any RF reconfiguration.
 After verified process exit, artifact retrieval and radio idle attestation,
 cleanup removes only this invocation's files and unmounts its private tmpfs.
 An uncertain process or incomplete retrieval preserves the directory and mount.
+
+The opt-in `--blocks 45000` profile captures at most 294.912 seconds and makes
+at most 200 coarse attempts. It retains **selected windows only**, not the
+full raw-IQ stream. `scan.iq.ci16` contains each completed 14000-sample search
+input; its `scan` journal record includes the sample offset, length, source
+coordinates and owned source view. Catch-up inputs remain in `worker.iq.ci16`,
+bounded to 20 million complex samples (80 MB); searched IQ is bounded to
+2.8 million complex samples (11.2 MB). Complete search grids, per-refill source
+counters and native journals are also retained. A retention failure stops the
+worker and fails qualification. This profile provides arithmetic and source
+counter evidence, but cannot support arbitrary re-analysis of unretained IQ.
+
+The selected profile uses the same private 320-MiB filesystem, with a 256-MiB
+evidence allowance, 80 MiB of memory headroom and 40 MiB of filesystem headroom.
+Its worker deadline is 300 seconds, cancellation alarm 325 seconds and operator
+timeout 340 seconds. Capture stops when the worker terminates, including after
+a native run, instead of continuing until the sample limit. The output records
+`retention_mode`, `completed_refills`, `worker_complete` and searched-sample
+count. Source counters may include a final exported tail beyond the last
+returned refill; all duration/loss review must use those actual final counters.
+The two shorter full-IQ profiles continue to capture their entire fixed length.
 
 REBASE occurs only after capture starts. Its returned native counter defines
 a conservative new-epoch boundary. Samples whose signal centers precede that

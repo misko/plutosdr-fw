@@ -25,10 +25,23 @@ from deploy_glrt_iq_tracking20 import EVIDENCE, PASSWORD
 ARTIFACTS = ('capture.txt', 'iq.ci16', 'worker.jsonl', 'worker.iq.ci16', 'grids.u32', 'native.journal')
 
 
-def preflight_memory(memory_info, blocks, evidence):
-    if blocks not in (1536, 4096):
+def retention_budget_kib(blocks):
+    if blocks not in (1536, 4096, 45000):
         raise ValueError('unsupported capture length')
-    required_kib = 16384*blocks*4//1024 + 80*1024
+    # Selected mode bounds worker IQ to 80 MB, searched IQ to 11.2 MB and
+    # grids to 29.4 MB. The 256-MiB allowance also covers capture/worker
+    # journals and native evidence without retaining all 2.95 GB of raw IQ.
+    return 256*1024 if blocks == 45000 else 16384*blocks*4//1024
+
+
+def capture_artifacts(blocks):
+    retention_budget_kib(blocks)
+    return tuple('scan.iq.ci16' if blocks == 45000 and name == 'iq.ci16' else name
+                 for name in ARTIFACTS)
+
+
+def preflight_memory(memory_info, blocks, evidence):
+    required_kib = retention_budget_kib(blocks) + 80*1024
     matches = re.findall(r'^MemAvailable:\s+(\d+) kB$', memory_info, re.MULTILINE)
     if len(matches) != 1:
         raise ValueError('missing or malformed MemAvailable')
@@ -44,9 +57,9 @@ def preflight_filesystem(output, remote, blocks, evidence):
     lines = output.splitlines()
     fields = lines[1].split() if len(lines) == 2 else []
     if len(fields) != 6 or fields[0] != 'tmpfs' or not fields[3].isdigit() or \
-       fields[5] != (remote if blocks == 4096 else '/tmp'):
+       fields[5] != (remote if blocks != 1536 else '/tmp'):
         raise ValueError('unexpected evidence filesystem')
-    required_kib = 16384*blocks*4//1024 + 40*1024
+    required_kib = retention_budget_kib(blocks) + 40*1024
     evidence['filesystem_preflight'] = {'available_kib': int(fields[3]),
         'required_kib': required_kib, 'mountpoint': fields[5], 'df': output}
     if int(fields[3]) < required_kib:
@@ -84,12 +97,14 @@ def main():
     parser.add_argument('--deployment', type=Path, required=True)
     parser.add_argument('--rate', type=int, choices=(30000000, 60000000), required=True)
     parser.add_argument('--binary', type=Path, required=True)
-    parser.add_argument('--blocks', type=int, choices=(1536, 4096), default=1536,
-                        help='16384-sample refills: 10.066 or 26.844 seconds at 2.5 MS/s')
+    parser.add_argument('--blocks', type=int, choices=(1536, 4096, 45000), default=1536,
+                        help='1536/4096 retain full IQ for 10.066/26.844 s; '
+                             '45000 retains searched windows for at most 294.912 s or 200 attempts')
     parser.add_argument('--lo-hz', type=int, default=1690312496,
                         help='Receive LO for this one bounded dwell; default is the historical .20 upper edge')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
+    artifacts = capture_artifacts(args.blocks)
     if not 70000000 <= args.lo_hz <= 6000000000:
         raise ValueError('receive LO is outside the AD9361 range')
     plan, profile = g.deployment_identity(args.deployment, serial=ENDPOINT[0], host=ENDPOINT[1])
@@ -105,6 +120,7 @@ def main():
     evidence = {'rate': args.rate, 'requested_lo_hz': args.lo_hz, 'blocks': args.blocks,
                 'rf_sample_limit': 16384*args.blocks,
                 'rf_duration_limit_s': 16384*args.blocks/2500000, 'payload_sha256': hashes,
+                'retention_mode': 'selected_windows' if args.blocks == 45000 else 'full',
                 'status': 'started', 'live_tracking_qualified': False}
     remote = '/tmp/gli-live20-'+uuid.uuid4().hex
     evidence['remote_directory'] = remote
@@ -140,7 +156,7 @@ def main():
             preflight_memory(evidence['memory_before'], args.blocks, evidence)
             run('mkdir '+shlex.quote(remote)).check_returncode()
             staged = True
-            if args.blocks == 4096:
+            if args.blocks != 1536:
                 run('mount -t tmpfs -o size=320m,nosuid,nodev tmpfs '+shlex.quote(remote)).check_returncode()
                 mounted = True
                 evidence['private_tmpfs_kib'] = 320*1024
@@ -174,13 +190,13 @@ def main():
             if args.blocks != 1536:
                 command.append(str(args.blocks))
             execution_attempted = True
-            result = run(shlex.join(command), timeout=60 if args.blocks == 4096 else 45)
+            result = run(shlex.join(command), timeout=340 if args.blocks == 45000 else 60 if args.blocks == 4096 else 45)
             terminal = True
             evidence['probe_exit_code'] = result.returncode
             (args.output/'stdout.json').write_bytes(result.stdout)
             (args.output/'stderr.txt').write_bytes(result.stderr)
             evidence['artifacts'] = {}
-            for name in ARTIFACTS:
+            for name in artifacts:
                 present = run('test -f '+shlex.quote(remote+'/'+name))
                 if present.returncode == 1:
                     evidence['artifacts'][name] = None
@@ -201,7 +217,7 @@ def main():
                     raise ValueError('RF settings changed during the bounded capture')
             finally:
                 _close_iio_context(iio, context)
-            evidence['status'] = 'capture_complete_review_pending'
+            evidence['status'] = 'bounded_capture_review_pending' if args.blocks == 45000 else 'capture_complete_review_pending'
         except BaseException as error:
             evidence.update(status='failed', error=f'{type(error).__name__}: {error}')
             raise
@@ -210,7 +226,7 @@ def main():
                 evidence['after'] = g.attest_tx_safe_idle(transport, plan, serial=ENDPOINT[0],
                     host=ENDPOINT[1], layout=profile.return_iio_layout)
                 if staged:
-                    names = (*payload, *ARTIFACTS)
+                    names = (*payload, *artifacts)
                     evidence['temporary_files_removed'] = cleanup_evidence(run, remote, names,
                         mounted=mounted, execution_attempted=execution_attempted,
                         terminal=terminal, retrieved=retrieved)

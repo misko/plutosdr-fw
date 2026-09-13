@@ -31,12 +31,12 @@ def storage_operator(tmp_path, monkeypatch):
     return operator
 
 
-@pytest.mark.parametrize('blocks', [1536,4096])
+@pytest.mark.parametrize('blocks', [1536,4096,45000])
 @pytest.mark.parametrize('case', ['ready','short','wrong_mount','wrong_fs','malformed'])
 def test_filesystem_capacity_is_separate_from_available_memory(storage_operator, blocks, case):
     remote = '/tmp/gli-live20-test'
-    mount = remote if blocks == 4096 else '/tmp'
-    required = blocks*64 + 40*1024
+    mount = remote if blocks != 1536 else '/tmp'
+    required = (256*1024 if blocks == 45000 else blocks*64) + 40*1024
     free = required-1 if case == 'short' else required
     if case == 'wrong_mount': mount = '/mnt/jffs2'
     filesystem = 'mtd2' if case == 'wrong_fs' else 'tmpfs'
@@ -133,7 +133,7 @@ def test_refusal_precedes_radio_contact_and_records_busy_receipt(tmp_path, monke
     'epoch_valid', 'uncleared', 'wrong_rate', 'malformed', 'missing',
     'memory_short', 'memory_missing', 'memory_unit', 'memory_duplicate',
 ])
-@pytest.mark.parametrize('blocks', [1536,4096])
+@pytest.mark.parametrize('blocks', [1536,4096,45000])
 def test_native_preflight_precedes_every_rf_mutation(tmp_path, monkeypatch, case, blocks):
     """A prior failed controller's retained results survive a later invocation."""
     def module(name, **values):
@@ -174,7 +174,7 @@ def test_native_preflight_precedes_every_rf_mutation(tmp_path, monkeypatch, case
         'tracking_snapshot': SimpleNamespace(value=wire)})
     context = SimpleNamespace(find_device=lambda name: device)
     evidence = {}
-    required_kib = 16384*blocks*4//1024 + 80*1024
+    required_kib = (256*1024 if blocks == 45000 else blocks*64) + 80*1024
     memory_info = f'MemAvailable:    {required_kib} kB\n'
     if case == 'memory_short': memory_info = f'MemAvailable: {required_kib-1} kB\n'
     if case == 'memory_missing': memory_info = 'MemFree: 500000 kB\n'
@@ -192,3 +192,13 @@ def test_native_preflight_precedes_every_rf_mutation(tmp_path, monkeypatch, case
         assert mutations == []
     if case != 'missing' and not case.startswith('memory_'):
         assert evidence['tracking_before_configuration'] == wire
+
+
+def test_selected_capture_budget_and_artifacts_are_explicit(storage_operator):
+    selected = storage_operator.capture_artifacts(45000)
+    assert 'scan.iq.ci16' in selected and 'iq.ci16' not in selected
+    assert storage_operator.retention_budget_kib(45000) == 256*1024
+    for blocks in (1536,4096):
+        assert storage_operator.capture_artifacts(blocks) == storage_operator.ARTIFACTS
+    for blocks in (0,45001):
+        with pytest.raises(ValueError): storage_operator.capture_artifacts(blocks)

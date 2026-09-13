@@ -57,15 +57,30 @@ int live_set_dwell(struct test_live *t,const char *blocks,uint64_t out[4])
 {
     struct dwell_limits limits;
     if(dwell_limits(blocks,&limits)) return -1;
-    if(t) t->live.attempt_limit=limits.attempts;
+    if(t) { t->live.attempt_limit=limits.attempts;t->live.selected_iq=limits.selected_iq; }
     out[0]=limits.blocks;out[1]=limits.attempts;
     out[2]=limits.alarm_seconds;out[3]=limits.worker_ns;
     return 0;
+}
+void live_select_windows(struct test_live *t,const char *directory,unsigned attempts,int fail)
+{
+    char path[4096];struct live *s=&t->live;
+    s->selected_iq=1;s->attempt_limit=attempts;
+    snprintf(path,sizeof(path),"%s/scan.iq.ci16",directory);
+    s->scan_samples=fopen(fail ? "/dev/full" : path,fail ? "wb" : "wbx");
+    if(!s->scan_samples) abort();
+}
+int live_capture_done(struct test_live *t) { return capture_worker_done(&t->live); }
+int live_final(unsigned admitted,unsigned delivered,unsigned flags,unsigned returned,unsigned limit)
+{
+    struct glrt_capture_snapshot s={0};s.words[4]=admitted;s.words[6]=delivered;s.words[19]=flags;
+    return capture_early_final(&s,returned,limit);
 }
 void live_start(struct test_live *t)
 {
     t->live.deadline_ns=clock_ns(NULL)+UINT64_C(5000000000);
     if(pthread_create(&t->live.thread,NULL,worker_thread,&t->live)) abort();
+    t->live.started=1;
 }
 int live_done(struct test_live *t)
 {
@@ -94,6 +109,7 @@ void live_free_unstarted(struct test_live *t)
     struct live *s=&t->live;
     if(glrt_tracking_iq_owner_close(&s->owner,0) || glrt_tracking_iq_owner_destroy(&s->owner)) abort();
     fclose(s->journal);fclose(s->worker_iq);fclose(s->grids);
+    if(s->scan_samples) fclose(s->scan_samples);
     fftw_destroy_plan(s->fft);fftw_free(t->fft);free(t->ring);
     if(pthread_mutex_destroy(&s->mutex)) abort();
     free(t);
@@ -106,6 +122,7 @@ void live_finish(struct test_live *t,uint64_t out[5])
     out[3]=s->controller.configured;out[4]=s->controller.sequence;
     if(glrt_tracking_iq_owner_close(&s->owner,0) || glrt_tracking_iq_owner_destroy(&s->owner)) abort();
     fclose(s->journal);fclose(s->worker_iq);fclose(s->grids);
+    if(s->scan_samples) fclose(s->scan_samples);
     fftw_destroy_plan(s->fft);fftw_free(t->fft);free(t->ring);
     if(pthread_mutex_destroy(&s->mutex)) abort();
     free(t);
@@ -136,6 +153,9 @@ def live_api(tmp_path_factory):
     lib.live_new.restype = c.c_void_p
     lib.live_publish.argtypes = [c.c_void_p, c.c_void_p, c.c_size_t]
     lib.live_set_dwell.argtypes = [c.c_void_p, c.c_char_p, c.c_void_p]
+    lib.live_select_windows.argtypes = [c.c_void_p,c.c_char_p,c.c_uint,c.c_int]
+    lib.live_capture_done.argtypes = [c.c_void_p]
+    lib.live_final.argtypes = [c.c_uint]*5
     lib.unused_probe_main.argtypes = [c.c_int, c.POINTER(c.c_char_p)]
     lib.live_rank.argtypes = [c.c_void_p,c.c_void_p,c.c_void_p,c.c_uint,c.c_void_p,c.c_void_p]
     lib.live_free_unstarted.argtypes = [c.c_void_p]
@@ -152,13 +172,14 @@ def live_api(tmp_path_factory):
 @pytest.mark.parametrize('blocks,expected', [
     (None, [1536,6,25,12000000000]), (b'1536', [1536,6,25,12000000000]),
     (b'4096', [4096,16,45,30000000000]),
+    (b'45000', [45000,200,325,300000000000]),
 ])
 def test_dwell_profiles_have_finite_capture_and_worker_limits(live_api, blocks, expected):
     lib, _ = live_api
     out = (c.c_uint64*4)()
     assert lib.live_set_dwell(None, blocks, out) == 0
     assert list(out) == expected
-    assert out[0]*16384/2500000 < 30
+    assert out[0]*16384/2500000 < 300
 
 
 @pytest.mark.parametrize('blocks', [b'0', b'4097', b'-1', b'4096garbage', b'4294967296'])
@@ -167,6 +188,17 @@ def test_invalid_dwell_rejected_before_opening_evidence_or_radio(live_api, tmp_p
     args = [b'probe', b'30000000', b'serial', b'missing-bank', b'missing-refs', os.fsencode(tmp_path), blocks]
     assert lib.unused_probe_main(len(args), (c.c_char_p*len(args))(*args)) == 2
     assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize('admitted,delivered,flags,expected', [
+    (32768,32768,8,1), (32891,32891,8,1),
+    (32891,32890,8,0), (32767,32767,8,0),
+    (32768,32768,9,0), (32768,32768,10,0),
+    (65537,65537,8,0),
+])
+def test_early_stop_requires_idle_complete_counters_with_bounded_tail(live_api, admitted, delivered, flags, expected):
+    lib,_=live_api
+    assert lib.live_final(admitted,delivered,flags,2,4)==expected
 
 
 @pytest.mark.parametrize('mode', ['secondary_pilot', 'noise', 'zero', 'cancel', 'invalid_epoch'])
@@ -207,6 +239,8 @@ def test_original_pilot_order_matches_independent_fft(live_api, tmp_path, mode):
 @pytest.mark.parametrize("rate,mode", [(30000000,"signal"),(60000000,"signal"),
     (60000000,"publication_lag"),(60000000,"handoff_horizon_expired"),
     (30000000,"zero"),(30000000,"zero_long"),(30000000,"cancel"),(30000000,"source_loss"),
+    (30000000,"selected_signal"),(60000000,"selected_signal"),
+    (60000000,"selected_zero"),(60000000,"selected_retention"),
     (30000000,"native_rejection"),(30000000,"native_retention"),(30000000,"late_handoff")])
 def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilot_moments, tmp_path, rate, mode):
     lib, refs = live_api
@@ -230,8 +264,11 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
     handle = lib.live_new(refs.ctypes.data, coefficients.ctypes.data, os.fsencode(tmp_path), c.byref(ports), rate)
     if mode == 'zero_long':
         assert lib.live_set_dwell(handle, b'4096', (c.c_uint64*4)()) == 0
+    if mode.startswith('selected_'):
+        lib.live_select_windows(handle, os.fsencode(tmp_path), 3, mode == 'selected_retention')
+    assert lib.live_capture_done(handle) == 0
     iq = np.zeros((10_000_000, 2), dtype=np.int16)
-    if mode in ("signal", "publication_lag", "handoff_horizon_expired", "native_rejection", "native_retention", "late_handoff"):
+    if mode in ("signal", "selected_signal", "publication_lag", "handoff_horizon_expired", "native_rejection", "native_retention", "late_handoff"):
         for frame in range(3000):
             start = 22+(frame*10000+1)//3
             if start+3300 <= len(iq): iq[start:start+3300] = refs[0, :, :2]
@@ -254,14 +291,30 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
             else:
                 time.sleep(.001)
     finally:
+        capture_done = lib.live_capture_done(handle)
         lib.live_stop(handle)
         out = (c.c_uint64*5)();lib.live_finish(handle, out)
     assert not radio.errors, radio.errors
     rows = [json.loads(s) for s in (tmp_path/"worker.jsonl").read_text().splitlines()]
+    assert capture_done == int(mode.startswith('selected_'))
+    if mode.startswith('selected_'):
+        scans = [r for r in rows if r['kind'] == 'scan']
+        if mode == 'selected_retention':
+            assert not scans and c.c_int64(out[0]).value == -5
+        else:
+            searched = np.fromfile(tmp_path/'scan.iq.ci16',dtype='<i2').reshape(-1,2)
+            assert len(searched) == 14000*len(scans)
+            for index,row in enumerate(scans):
+                assert row['scan_iq_offset'] == index*14000 and row['scan_iq_samples'] == 14000
+                start = row['window_start']-1000000
+                np.testing.assert_array_equal(searched[index*14000:(index+1)*14000],iq[start:start+14000])
+                assert row['source']['first'] <= row['window_start']
+                assert row['window_start']+14000 <= row['source']['end']
+            if mode == 'selected_zero': assert len(scans) == 3 and out[0] == 0
     if mode == 'zero_long':
         assert out[1] == 16 and out[2] == 0
         assert len([r for r in rows if r['kind'] == 'scan']) == 16
-    if mode in ("signal", "publication_lag"):
+    if mode in ("signal", "selected_signal", "publication_lag"):
         assert list(out)[0] == 0, (list(out), rows[-3:])
         assert list(out)[2:] == [1,1500,1500]
         assert len(radio.writes("submit")) > 1 and len(radio.writes("pop")) == 1500

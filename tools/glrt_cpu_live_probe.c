@@ -23,13 +23,15 @@
 #define BLOCKS 1536U
 #define RING 5000000U
 #define ATTEMPTS 6U
-struct dwell_limits { unsigned blocks,attempts,alarm_seconds; uint64_t worker_ns; };
+struct dwell_limits { unsigned blocks,attempts,alarm_seconds; uint64_t worker_ns; int selected_iq; };
 static int dwell_limits(const char *blocks,struct dwell_limits *out)
 {
     if(!blocks || !strcmp(blocks,"1536"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000)};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),0};
     else if(!strcmp(blocks,"4096"))
-        *out=(struct dwell_limits){4096,16,45,UINT64_C(30000000000)};
+        *out=(struct dwell_limits){4096,16,45,UINT64_C(30000000000),0};
+    else if(!strcmp(blocks,"45000"))
+        *out=(struct dwell_limits){45000,200,325,UINT64_C(300000000000),1};
     else return -1;
     return 0;
 }
@@ -54,8 +56,9 @@ struct live {
     struct glrt_native_ports native;
     int16_t bank[12][11][11][2],refs[52800],scan_iq[28000];
     fftw_plan fft;
-    FILE *journal,*worker_iq,*grids;
-    uint64_t iq_samples,deadline_ns;
+    FILE *journal,*worker_iq,*grids,*scan_samples;
+    uint64_t iq_samples,deadline_ns,scan_iq_samples;
+    int selected_iq;
 };
 static int cancelled(void *pointer)
 {
@@ -83,6 +86,7 @@ static void view(FILE *f,const struct glrt_tracking_iq_view *v)
 static int retain(void *pointer,enum glrt_tracking_worker_record kind,const struct glrt_tracking_worker *w)
 {
     struct live *s=pointer;FILE *f=s->journal;
+    const uint64_t iq_limit=s->selected_iq ? 20000000 : 6000000;
     const int16_t *iq=NULL;size_t samples=0;
     fprintf(f,"{\"attempt\":%u,\"kind\":%d,\"recorded_ns\":%" PRIu64,s->attempts,kind,clock_ns(NULL));
     if(kind==GLRT_WORKER_SEED_IQ) {
@@ -121,10 +125,35 @@ static int retain(void *pointer,enum glrt_tracking_worker_record kind,const stru
         fputs("],\"checked_source\":",f);view(f,&w->checked_source);
     } else return -1;
     fprintf(f,",\"iq_offset\":%" PRIu64 ",\"iq_samples\":%zu}\n",s->iq_samples,samples);
-    if(s->iq_samples>6000000 || samples>6000000-s->iq_samples ||
+    if(s->iq_samples>iq_limit || samples>iq_limit-s->iq_samples ||
        (samples && (fwrite(iq,4,samples,s->worker_iq)!=samples || fflush(s->worker_iq))) ||
        ferror(f) || fflush(f)) return -1;
     s->iq_samples+=samples;return 0;
+}
+/* Retain only actually searched input in the explicitly selected-IQ profile.
+ * Every record associates its byte range with the same owned source view used
+ * for the search. This is not a full raw-IQ recording. */
+static int retain_scan(struct live *s)
+{
+    uint64_t limit=(uint64_t)s->attempt_limit*14000;
+    if(!s->selected_iq) return 0;
+    if(!s->scan_samples || s->scan_iq_samples>limit || limit-s->scan_iq_samples<14000 ||
+       fwrite(s->scan_iq,4,14000,s->scan_samples)!=14000 || fflush(s->scan_samples)) return -1;
+    s->scan_iq_samples+=14000;return 0;
+}
+static int capture_worker_done(struct live *s)
+{
+    int done;
+    if(!s->selected_iq || !s->started) return 0;
+    if(pthread_mutex_lock(&s->mutex)) return -1;
+    done=s->done;
+    return pthread_mutex_unlock(&s->mutex) ? -1 : done;
+}
+static int capture_early_final(const struct glrt_capture_snapshot *capture,unsigned returned,unsigned limit)
+{
+    const uint32_t *w=capture->words;
+    return !(w[19]&3) && wide(w+4)==wide(w+6) &&
+        wide(w+4)>=(uint64_t)returned*CHUNK && wide(w+4)<=(uint64_t)limit*CHUNK;
 }
 struct partition {
     struct live *live;
@@ -246,9 +275,11 @@ static void *worker_thread(void *pointer)
             { result=-1;break; }
         if(scan(s)) { result=cancelled(s) ? GLRT_WORKER_CANCELLED : -1;break; }
         scan_done=clock_ns(NULL);
+        if(retain_scan(s)) { result=GLRT_WORKER_RETENTION;break; }
         fprintf(s->journal,"{\"kind\":\"scan\",\"attempt\":%u,\"window_start\":%" PRIu64
             ",\"epoch\":%u,\"started_ns\":%" PRIu64 ",\"completed_ns\":%" PRIu64 ",\"source\":",
             s->attempts,candidate.window_start,s->epoch,started,scan_done);view(s->journal,&v);
+        if(s->selected_iq) fprintf(s->journal,",\"scan_iq_offset\":%" PRIu64 ",\"scan_iq_samples\":14000",s->scan_iq_samples-14000);
         fputs(",\"peaks\":[",s->journal);
         for(unsigned n=0;n<s->coarse.count;n++) fprintf(s->journal,"%s[%u,%u,%u]",n ? "," : "",
             s->coarse.peaks[n].epoch,s->coarse.peaks[n].frequency,s->coarse.peaks[n].score);
@@ -336,19 +367,20 @@ int main(int argc,char **argv)
     uint32_t rate=0,visit=9122201,w[24],block=0;
     uint64_t first=0,now=0,boundary=0,max_refill_ns=0,previous=0,published=0;
     char text[4096],label[80],path[PATH_MAX],resolved[PATH_MAX];
-    int n,rc=1,mutex=0,owned=0,rebased=0,joined=1;
+    int n,rc=1,mutex=0,owned=0,rebased=0,joined=1,worker_complete=0;
+    uint32_t completed_refills=0;
     const char *stage="arguments";
 #define NEED(x,name) do { stage=name; if(!(x)) goto done; } while(0)
     if((argc!=6 && argc!=7) || (strcmp(argv[1],"30000000") && strcmp(argv[1],"60000000")) ||
        dwell_limits(argc==7 ? argv[6] : NULL,&limits)) {
-        fprintf(stderr,"usage: %s 30000000|60000000 SERIAL BANK REFERENCES NEW_OUTPUT_DIRECTORY [1536|4096]\n",argv[0]);return 2;
+        fprintf(stderr,"usage: %s 30000000|60000000 SERIAL BANK REFERENCES NEW_OUTPUT_DIRECTORY [1536|4096|45000]\n",argv[0]);return 2;
     }
     rate=(uint32_t)strtoul(argv[1],NULL,10);
     action.sa_handler=signal_stop;sigemptyset(&action.sa_mask);
     NEED(!sigaction(SIGALRM,&action,NULL) && !sigaction(SIGINT,&action,NULL) && !sigaction(SIGTERM,&action,NULL),"signals");
     alarm(limits.alarm_seconds);
     NEED((s=calloc(1,sizeof(*s))) && (ring=malloc(RING*4U)),"storage");
-    s->rate=rate;s->attempt_limit=limits.attempts;
+    s->rate=rate;s->attempt_limit=limits.attempts;s->selected_iq=limits.selected_iq;
     NEED(!pthread_mutex_init(&s->mutex,NULL),"mutex");mutex=1;
     NEED(!load(argv[3],s->bank,sizeof(s->bank)) && !load(argv[4],s->refs,sizeof(s->refs)),"reference_files");
     NEED((fft_storage=fftw_malloc(GLRT_RESOLVER_FFT*sizeof(*fft_storage)))!=NULL,"fft_storage");
@@ -356,7 +388,9 @@ int main(int argc,char **argv)
     NEED(s->fft!=NULL,"fft_plan");
     /* Directory is created by the operator; every evidence file is new. */
 #define FILE_NEW(field,name,mode) do { NEED(snprintf(path,sizeof(path),"%s/%s",argv[5],name)>0,"path"); NEED((field=fopen(path,mode))!=NULL,"new_evidence"); } while(0)
-    FILE_NEW(journal,"capture.txt","wx");FILE_NEW(samples,"iq.ci16","wbx");
+    FILE_NEW(journal,"capture.txt","wx");
+    if(s->selected_iq) { FILE_NEW(s->scan_samples,"scan.iq.ci16","wbx"); }
+    else { FILE_NEW(samples,"iq.ci16","wbx"); }
     FILE_NEW(s->journal,"worker.jsonl","wx");FILE_NEW(s->worker_iq,"worker.iq.ci16","wbx");FILE_NEW(s->grids,"grids.u32","wbx");
     NEED((ctx=iio_create_local_context())!=NULL,"local_context");
     snprintf(label,sizeof(label),"glrt-iq-tracking-r%u-v1",rate);
@@ -403,7 +437,8 @@ int main(int argc,char **argv)
         n=attr(iq,"capture_snapshot",text,journal);
         NEED(n>0 && !glrt_iq_tracking_snapshot_parse(text,(size_t)n,&capture) &&
              !glrt_iq_tracking_source_take(&source,&capture,CHUNK,&first,&now),"contiguous_source");
-        NEED(fwrite(iio_buffer_start(buffer),1,(size_t)bytes,samples)==(size_t)bytes,"retain_iq");
+        completed_refills++;
+        NEED(!samples || fwrite(iio_buffer_start(buffer),1,(size_t)bytes,samples)==(size_t)bytes,"retain_iq");
         if(!rebased) {
             NEED(iio_device_attr_write_longlong(iq,"tracking_command",16)==0,"rebase");rebased=1;
             NEED(!snapshot(iq,w,journal) && !w[6] && w[20]==rate && w[2],"live_tracking_source");
@@ -421,8 +456,11 @@ int main(int argc,char **argv)
         if(!s->started && published>=14000) {
             NEED(!pthread_create(&s->thread,NULL,worker_thread,s),"worker_start");s->started=1;
         }
+        n=capture_worker_done(s);NEED(n>=0,"worker_state");
+        if(n) { worker_complete=1;block++;break; }
     }
-    NEED(wide(capture.words+4)==CHUNK*limits.blocks && wide(capture.words+6)==CHUNK*limits.blocks && !(capture.words[19]&3),"finite_source_complete");
+    if(worker_complete) { stage="worker_complete"; }
+    else { NEED(wide(capture.words+4)==CHUNK*limits.blocks && wide(capture.words+6)==CHUNK*limits.blocks && !(capture.words[19]&3),"finite_source_complete"); }
     rc=0;
 done:
     if(s && s->started) {
@@ -435,7 +473,11 @@ done:
     }
     if(buffer) { iio_buffer_destroy(buffer);buffer=NULL; }
     if(iq && journal) {
-        if(attr(iq,"capture_final_snapshot",text,journal)<0 || attr(iq,"capture_final_extension_snapshot",text,journal)<0) rc=1;
+        n=attr(iq,"capture_final_snapshot",text,journal);
+        if(n<0) rc=1;
+        else if(worker_complete && (glrt_iq_tracking_snapshot_parse(text,(size_t)n,&capture) ||
+                !capture_early_final(&capture,completed_refills,limits.blocks))) rc=1;
+        if(attr(iq,"capture_final_extension_snapshot",text,journal)<0) rc=1;
         if(rebased && joined) {
             /* Do not clear unread heads after a failed controller recovery. */
             if(snapshot(iq,w,journal) || !glrt_tracking_snapshot_drained(w)) rc=1;
@@ -453,12 +495,15 @@ done:
         if(s->journal && fclose(s->journal)) rc=1;
         if(s->worker_iq && fclose(s->worker_iq)) rc=1;
         if(s->grids && fclose(s->grids)) rc=1;
+        if(s->scan_samples && fclose(s->scan_samples)) rc=1;
         if(s->fft) fftw_destroy_plan(s->fft);
         if(mutex && pthread_mutex_destroy(&s->mutex)) rc=1;
     }
     fftw_free(fft_storage);free(ring);alarm(0);
     printf("{\"scope\":\"bounded_live_cpu_acquisition_native_feedback\",\"rate\":%u,\"status\":%d,"
-        "\"stage\":\"%s\",\"blocks\":%u,\"attempts\":%u,\"handoffs\":%u,\"native_results\":%u,\"max_refill_gap_ns\":%" PRIu64 "}\n",
-        rate,rc,stage,block,s ? s->attempts : 0,s ? s->handoffs : 0,s ? s->controller.sequence : 0,max_refill_ns);
+        "\"stage\":\"%s\",\"blocks\":%u,\"attempts\":%u,\"handoffs\":%u,\"native_results\":%u,\"max_refill_gap_ns\":%" PRIu64
+        ",\"retention_mode\":\"%s\",\"completed_refills\":%u,\"worker_complete\":%d,\"retained_scan_samples\":%" PRIu64 "}\n",
+        rate,rc,stage,block,s ? s->attempts : 0,s ? s->handoffs : 0,s ? s->controller.sequence : 0,max_refill_ns,
+        s && s->selected_iq ? "selected_windows" : "full",completed_refills,worker_complete,s ? s->scan_iq_samples : 0);
     free(s);return rc;
 }
