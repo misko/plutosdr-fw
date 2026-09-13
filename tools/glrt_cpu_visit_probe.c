@@ -51,10 +51,15 @@ static int visit_inspect(void *pointer,struct glrt_visit_state *state)
        !is_attr(phy,"ensm_mode","rx")) goto done;
     if(!iio_device_get_id(iq) || snprintf(path,sizeof(path),"/sys/bus/iio/devices/%s/buffer/enable",iio_device_get_id(iq))<=0 ||
        !(file=fopen(path,"r")) || fscanf(file,"%d",&enabled)!=1 || enabled) goto done;
-    if(snapshot(iq,w,NULL) || !glrt_tracking_snapshot_drained(w) || (w[5]&16) || w[6] || w[7] || w[18] || w[19] || w[20]!=v->rate)
-        goto done;
-    if(attr(iq,"tracking_snapshot",raw,NULL)<=0 ||
-       fprintf(v->journal,"snapshot %s\n",raw)<0 || fflush(v->journal)) goto done;
+    {
+        int length=attr(iq,"tracking_snapshot",raw,NULL);
+        if(length<=0 || glrt_tracking_snapshot_parse(raw,(size_t)length,w) ||
+           !glrt_tracking_snapshot_drained(w) || (w[5]&16) || w[6] || w[7] || w[18] || w[19] || w[20]!=v->rate)
+            goto done;
+        /* Retain the exact snapshot that passed validation. A second read
+         * advances the hardware counter and cannot prove this inspection. */
+        if(fprintf(v->journal,"snapshot %s\n",raw)<0 || fflush(v->journal)) goto done;
+    }
     *state=(struct glrt_visit_state){(uint64_t)hz,wide(w+3),v->rate,w[2],1,1};rc=0;
 done:
     if(file && fclose(file)) rc=-1;
