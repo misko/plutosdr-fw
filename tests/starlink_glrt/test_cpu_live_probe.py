@@ -674,11 +674,11 @@ def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
             episodes.append(reviewed)
             assert totals[3]==sum(len(r['heads']) for r in episodes)
             assert totals[4]==int(mode=='loss_then_supported' and episode==1)
-            if mode in ('full_profile','visit_full_profile'):
+            if mode in ('full_profile','visit_full_profile','visit_selected_profile'):
                 rows=[json.loads(line) for line in (tmp_path/'worker.jsonl').read_text().splitlines()]
                 observer_rows=[json.loads(line) for line in (tmp_path/'observer.jsonl').read_text().splitlines()]
                 disposition=dict(status=3,stage='worker_complete',worker_complete=1,
-                    retention_mode='full',reacquisitions=0,native_completed_runs=0,
+                    retention_mode='selected_windows' if mode=='visit_selected_profile' else 'full',reacquisitions=0,native_completed_runs=0,
                     handoffs=1,native_runs=1,completed_refills=count//16384,blocks=count//16384,
                     attempts=int(totals[0]),rate=rate,native_results=int(totals[3]))
                 result=review_clean_loss(rows,data,disposition,observer_rows)

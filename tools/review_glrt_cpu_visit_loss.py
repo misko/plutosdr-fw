@@ -8,7 +8,7 @@ from .starlink_glrt_tracking_journal import review as review_native
 
 def review_clean_loss(rows, journal, status, observer_rows):
     assert status['status']==3 and status['stage']=='worker_complete'
-    assert status['worker_complete']==1 and status['retention_mode']=='full'
+    assert status['worker_complete']==1 and status['retention_mode'] in ('full','selected_windows')
     assert status['reacquisitions']==status['native_completed_runs']==0
     assert status['handoffs']==status['native_runs']==1
     assert 0<status['completed_refills']==status['blocks']<=1536
