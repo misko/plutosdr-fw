@@ -11,13 +11,23 @@ epoch/frequency/score, and an epoch. All sample coordinates are 2.5-MS/s signal
 centers. A live caller must bind that epoch to the active GLT source epoch and
 retain its relationship to the independently attested GLI1 capture visit.
 
-The seed selects four pilots from retained IQ, beginning with the first of the
-latest 64 complete 750-Hz repeats. It checks the one-second proposal-age limit,
+The seed selects four pilots from retained IQ at the original measured
+candidate epoch. It checks the one-second proposal-age limit,
 retention boundaries, source identity, monotonic source/time/generation views,
 and exact integer/fractional positioning. Resolution evaluates all 17 timing
 hypotheses, with four 16384-point FFTs per hypothesis. Its result initializes
 an empty bootstrap history. Only subsequent supported past-pilot measurements
 can authorize a future proposal through the existing worker checks.
+
+Selecting a recent nominal repeat before measuring timing rate is unsafe for
+a moving signal: at 15 coarse samples/second, a 0.75-second jump shifts the
+true pilot by about eleven samples, outside the resolver's eight-sample guard.
+Original-epoch resolution leaves propagation to the causal bootstrap, which
+updates from supported past observations. This consumes more retained history
+and catch-up work, so the existing two-second ring/source deadline and
+200-observation budget remain explicit failure boundaries. Overwritten
+original IQ is rejected; it is never replaced with an unmeasured extrapolation.
+The prior September 12 checkpoints below used the earlier recent-repeat policy.
 
 The same worker now handles both inputs. Cancellation, wall/source deadlines,
 retention failures, overwritten IQ, support loss and a late handoff still

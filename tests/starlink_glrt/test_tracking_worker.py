@@ -108,7 +108,7 @@ def run(worker, mode):
         else: words[5] &= ~1
     iq = np.zeros((1_000_000, 2), dtype=np.int16)
     if mode != "zero":
-        for offset in range(230022, len(iq)-t.N+1, 30000):
+        for offset in range(22 if lib.software else 230022, len(iq)-t.N+1, 30000):
             iq[offset:offset+t.N] = refs[0, :, :2]
     owner = lib.seed_owner_new(1_000_000, 3, first)
     work = lib.worker_new()
@@ -207,7 +207,8 @@ def test_owned_seed_resolves_builds_real_history_and_retains_future_proposal(wor
     kinds = [kind for kind, _ in state['retained']]
     assert kinds[:2] == [1, 2] and kinds[-1] == 4
     assert all(kind == 3 for kind in kinds[2:-1]) and len(kinds)-3 == final[4]
-    assert final[4] == (18 if mode == "wait_resume" else 8)
+    assert final[4] == ((25 if mode == "wait_resume" else 15) if worker[0].software else
+                        (18 if mode == "wait_resume" else 8))
     assert final[5] == (1 if mode == "wait_resume" else 0)
     assert final[6] == final[4] and final[7:10] == [1, 0, 1] and final[12] == t.RATE
 

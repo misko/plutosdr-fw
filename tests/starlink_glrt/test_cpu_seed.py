@@ -77,18 +77,17 @@ def planned(cpu, candidate=None, view=None):
 def test_exact_source_coordinates_match_fraction_oracle(cpu, first, epoch_bin):
     candidate = proposal(first, epoch_bin)
     origin = first+epoch_bin+22
-    for repeat in (63, 64, 65, 66, 133, 134, 135, 744):
+    for repeat in (3, 4, 63, 64, 65, 66, 133, 134, 135, 744):
         for margin in (0, 1, 3325):
             end = origin+round(Fraction(repeat*t.RATE, 750))+t.N+8+margin
             view = source(candidate, end)
-            last = int(Fraction((end-origin-t.N-8)*750, t.RATE))
             seed = Seed()
             rc = cpu.glrt_cpu_seed_plan(c.byref(candidate), c.byref(view), t.RATE, c.byref(seed))
-            if last < 63:
+            if end < max(first+14000, origin+3*t.RATE//750+t.N+8):
                 assert rc == -2 and bytes(seed) == bytes(Seed())
                 continue
-            assert rc == 0 and seed.first_repeat == last-63
-            exact = Fraction(origin)+Fraction((last-63)*t.RATE, 750)
+            assert rc == 0 and seed.first_repeat == 0
+            exact = Fraction(origin)
             positions = [round(exact+Fraction(n*t.RATE, 750)) for n in range(4)]
             assert seed.first == min(positions)-8
             assert list(seed.starts) == [position-seed.first for position in positions]
@@ -117,7 +116,7 @@ def test_malformed_or_unavailable_proposals_cannot_select_iq(cpu, damage):
     elif damage == "future_proposal": candidate.window_start = view.source_now+1
     elif damage == "partial": view.end = candidate.window_start+13999
     elif damage == "expired": view.source_now = candidate.window_start+t.RATE+1
-    elif damage == "few": view.end = candidate.window_start+210000
+    elif damage == "few": view.end = candidate.window_start+candidate.peak.epoch+22+13307
     elif damage == "overwritten": view.first = planned(cpu).first+1
     elif damage == "age": age = 0
     elif damage == "large_age": age = t.RATE+1
@@ -143,7 +142,7 @@ def test_copy_uses_owned_ring_and_rejects_unusable_history(cpu, mode):
         seed = Seed()
         rc = cpu.glrt_cpu_seed_copy(owner, c.byref(candidate), 1 if mode == "expired" else t.RATE,
                                     out.ctypes.data, t.SAMPLES-int(mode == "short"), c.byref(seed))
-        if mode in ("normal", "wrapped"):
+        if mode == "normal":
             assert rc == 0
             np.testing.assert_array_equal(out, iq[seed.first-first:seed.first-first+t.SAMPLES])
             assert seed.copied.source_now == first+len(iq)+1000
@@ -179,7 +178,7 @@ def test_resolver_agrees_with_fft_oracle_and_initializes_no_supported_history(cp
     origin = candidate.window_start+candidate.peak.epoch+22
     view = source(candidate, origin+int(Fraction((repeat+63)*t.RATE, 750))+t.N+9)
     seed = planned(cpu, candidate, view)
-    assert seed.first_repeat == repeat
+    assert seed.first_repeat == 0
     rng = np.random.default_rng(13316)
     reference = rng.integers(-1200, 1201, (t.N, 2), dtype=np.int16)
     iq = rng.integers(-50, 51, (t.SAMPLES, 2), dtype=np.int16)

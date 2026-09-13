@@ -50,6 +50,10 @@ retains the capture visit, GLT epoch, native boundary and projected coarse
 boundary. Every candidate and past-IQ view uses that explicit binding.
 
 The worker resolves software candidates without synthesizing GLA1 events.
+It resolves the original measured epoch from retained IQ before extrapolating
+timing; nominally advancing an old proposal toward the newest IQ could move a
+drifting signal beyond the resolver guard. Subsequent causal measurements own
+that propagation, within the unchanged source, history and freshness budgets.
 Supported coarse history is converted to the native rate and passed through
 `glrt_tracking_controller_init_handoff`; the controller rereads source time
 after retaining a descriptor and before SUBMIT. `handoffs` counts runs with

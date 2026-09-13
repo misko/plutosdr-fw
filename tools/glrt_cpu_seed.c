@@ -6,7 +6,7 @@ int glrt_cpu_seed_plan(const struct glrt_cpu_candidate *c, const struct glrt_tra
     uint32_t maximum_age, struct glrt_cpu_seed *out)
 {
     struct glrt_cpu_seed p={0};
-    uint64_t origin,distance,last,advance,rounded;
+    uint64_t origin;
     unsigned n;
     if(!out) return -1;
     memset(out,0,sizeof(*out));
@@ -18,17 +18,14 @@ int glrt_cpu_seed_plan(const struct glrt_cpu_candidate *c, const struct glrt_tra
     if(v->source_now<c->window_start || v->source_now-c->window_start>maximum_age ||
        v->end<c->window_start+14000) return -2;
     origin=c->window_start+c->peak.epoch+22;
-    if(v->end<origin+3308) return -2;
-    distance=v->end-origin-3308;
-    last=(distance/10000)*3+(distance%10000)*3/10000;
-    if(last<63 || last-63>UINT32_MAX) return -2;
-    p.first_repeat=(uint32_t)(last-63);
-    advance=(uint64_t)p.first_repeat*10000;
-    rounded=(advance+1)/3;
-    p.first=origin+rounded-8;
+    /* Resolve the measured candidate before propagating it. A nominal jump
+     * toward source_now has no timing-rate evidence and can move the true
+     * pilot outside the resolver's eight-sample guard. Catch-up owns that
+     * propagation after supported observations exist. */
+    p.first=origin-8;
     if(p.first<v->first || p.first>v->end || GLRT_CPU_SEED_SAMPLES>v->end-p.first) return -2;
-    p.start=origin+advance/3;p.fraction=(uint32_t)(((advance%3)*65536+1)/3);
-    for(n=0;n<4;n++) p.starts[n]=(size_t)(8+(advance+(uint64_t)n*10000+1)/3-rounded);
+    p.start=origin;
+    for(n=0;n<4;n++) p.starts[n]=(size_t)(8+((uint64_t)n*10000+1)/3);
     p.candidate=*c;p.maximum_age=maximum_age;p.selected=*v;
     *out=p;
     return 0;

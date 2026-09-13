@@ -25,7 +25,8 @@ struct glrt_cpu_seed {
  * All coordinates are 2.5-MS/s signal centers. The upper-pilot origin is
  * window_start + epoch_bin + 22. Native conversion occurs after catch-up.
  *
- * Select the first four of the latest 64 complete 750-Hz repeats. Maximum
+ * Select four complete repeats at the measured candidate's original epoch;
+ * do not propagate unmeasured timing rate before resolution. Maximum
  * proposal age remains <= one second. Error clears the plan; copied IQ alone
  * never authorizes a handoff. 0 success, -1 invalid, -2 unavailable/stale. */
 int glrt_cpu_seed_plan(const struct glrt_cpu_candidate *, const struct glrt_tracking_iq_view *,

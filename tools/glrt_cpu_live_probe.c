@@ -270,12 +270,12 @@ static void *worker_thread(void *pointer)
         }
         if(candidate.window_start>UINT64_MAX-5000000) { result=-1;break; }
         cfg.source_deadline=candidate.window_start+5000000;
-        /* A fast scanner can finish before 64 repeats exist after its input.
+        /* A fast scanner can finish before four complete repeats exist.
          * Wait for real retained samples; never manufacture startup history. */
         while(!cancelled(s)) {
             if(glrt_tracking_iq_owner_copy(&s->owner,s->epoch,0,NULL,0,&v) || v.closed || !v.valid)
                 { result=GLRT_WORKER_SOURCE;break; }
-            if(v.end>=candidate.window_start+220000) break;
+            if(v.end>=candidate.window_start+17000) break;
             if(pause_worker(s)) { result=GLRT_WORKER_PORT;break; }
         }
         if(result || cancelled(s)) break;
