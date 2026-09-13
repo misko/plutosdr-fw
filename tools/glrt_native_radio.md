@@ -321,3 +321,26 @@ outcomes; source, deadline, I/O and retention failures fail the qualification
 after native recovery. Up to four episodes retain at most 10.56 MB of observer
 IQ, within the selected capture's existing 256-MiB evidence allowance. The
 operator requires both observer files even for a dwell without acquisition.
+
+### Bounded ARM-local frequency visits
+
+`glrt_tracking_visit.[ch]` and `glrt_cpu_visit_probe.c` add an explicit two-visit
+qualification path. The ARM parent accepts two distinct nominal upper-edge IF
+centers from channels 1–4 and retains the plan before tuning. It verifies the
+serial, native image/rate, ABI, disabled capture buffer, drained and cleared
+tracking engine, TX-disabled state and fixed receive settings before each tune.
+Only the RX LO changes; existing receive-clock calibration persists.
+
+Each forked child runs the existing 1536-block live probe, bounded to
+10.0663296 seconds of 2.5-MS/s IQ and six acquisition attempts. Child evidence
+is created exclusively in `visit-0` or `visit-1`. The parent joins the child,
+verifies and retains its idle state and source-counter/epoch advance, then
+permits the next tune. The total wall limit is 60 seconds, with at most two
+additional seconds to terminate and reap an unresponsive child. Total RF is
+at most 20.1326592 seconds. A failed child stops the visit loop even when its
+cleanup is verified; no generic failure is reclassified as clean tracking loss.
+
+This advances radio-local scanning across frequencies, while leaving sustained
+tracking, adaptive revisit order, continuation after qualified native loss and
+precision refinement as separate unqualified requirements. It does not select
+lower-edge frequencies with the upper-edge reference bank.
