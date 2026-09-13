@@ -137,6 +137,10 @@ only the next nine-frame step, within 250 Hz of the last accepted carrier and
 the existing Nyquist guard. Otherwise the previous hold-last behavior applies.
 This adds no per-pilot FFT or phase search, changes no support gate and uses no
 future measurement. Timing propagation and full-history handoff stay unchanged.
+After independently checking retained IQ and estimates,
+`tools/review_glrt_cpu_startup.py` verifies each initial carrier against only
+earlier accepted observations. Its tests compare actual C startup records and
+reject held, future, misordered and corrupted carrier evidence.
 
 Candidate ordering uses one original 3300-sample pilot per basin, at its
 unrefined timing. The journal retains all eight powers and the selected coarse
