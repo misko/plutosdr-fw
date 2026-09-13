@@ -28,17 +28,19 @@
 #define PAIR_SAMPLES 3333U
 #define RESTART_LIMIT 3U
 struct paired_head { uint32_t words[32]; };
-struct dwell_limits { unsigned blocks,attempts,alarm_seconds; uint64_t worker_ns; int selected_iq; };
+struct dwell_limits { unsigned blocks,attempts,alarm_seconds; uint64_t worker_ns; int selected_iq; unsigned observer_spacing; };
 static int dwell_limits(const char *blocks,struct dwell_limits *out)
 {
     if(!blocks || !strcmp(blocks,"1536"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),0};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),0,9};
     else if(!strcmp(blocks,"4096"))
-        *out=(struct dwell_limits){4096,16,45,UINT64_C(30000000000),0};
+        *out=(struct dwell_limits){4096,16,45,UINT64_C(30000000000),0,9};
     else if(!strcmp(blocks,"45000"))
-        *out=(struct dwell_limits){45000,200,325,UINT64_C(300000000000),1};
+        *out=(struct dwell_limits){45000,200,325,UINT64_C(300000000000),1,9};
     else if(!strcmp(blocks,"1536-selected"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,9};
+    else if(!strcmp(blocks,"1536-selected-observer3"))
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3};
     else return -1;
     return 0;
 }
@@ -70,6 +72,7 @@ struct live {
     struct paired_head paired[PAIR_LIMIT];
     uint32_t paired_queued,paired_copied,paired_episode_first;
     int selected_iq,visit_mode;
+    unsigned observer_spacing;
     pthread_t observer_thread;
     int observer_started,observer_stop,observer_result;
     struct glrt_tracking_observer observer;
@@ -155,18 +158,19 @@ static int start_observer(struct live *s)
     const struct glrt_tracking_trend *history=&s->worker.live.core.trend;
     struct glrt_tracking_batch batch;struct glrt_tracking_job job;double slope;
     uint64_t now=clock_ns(NULL);uint32_t first=history->history.last_seen;
-    if(s->observer_started || !s->observer_journal || !s->observer_iq || first>UINT32_MAX-9)
+    unsigned spacing=s->observer_spacing ? s->observer_spacing : 9;
+    if((spacing!=3 && spacing!=9) || s->observer_started || !s->observer_journal || !s->observer_iq || first>UINT32_MAX-spacing)
         return GLRT_NATIVE_RETENTION_ERROR;
-    first+=9;
+    first+=spacing;
     if(glrt_tracking_trend_batch(history,first,1,1,0,&batch,&slope) ||
        glrt_tracking_prediction(&batch,0,&job) || job.start>UINT64_MAX-7500000 ||
-       glrt_tracking_observer_init(&s->observer,history,first,200,job.start+7500000,now,UINT64_C(3000000000)))
+       glrt_tracking_observer_init_cadence(&s->observer,history,first,spacing,200,job.start+7500000,now,UINT64_C(3000000000)))
         return GLRT_NATIVE_PROTOCOL_ERROR;
     fprintf(s->observer_journal,"{\"kind\":\"start\",\"attempt\":%u,\"episode\":%u,\"epoch\":%u,"
         "\"rate\":2500000,\"native_rate\":%u,\"first_frame\":%u,\"maximum_measurements\":200,"
         "\"source_limit\":%" PRIu64 ",\"started_ns\":%" PRIu64 ",\"deadline_ns\":%" PRIu64
-        ",\"retained_total\":%u}\n",s->attempts,s->restarts,s->epoch,s->rate,first,
-        s->observer.source_limit,now,s->observer.deadline_ns,s->observer_retained);
+        ",\"retained_total\":%u,\"frame_spacing\":%u}\n",s->attempts,s->restarts,s->epoch,s->rate,first,
+        s->observer.source_limit,now,s->observer.deadline_ns,s->observer_retained,spacing);
     if(ferror(s->observer_journal) || fflush(s->observer_journal)) return GLRT_NATIVE_RETENTION_ERROR;
     s->observer_stop=0;s->observer_result=GLRT_OBSERVER_WAIT;
     if(pthread_create(&s->observer_thread,NULL,observer_thread,s)) return GLRT_NATIVE_IO_ERROR;
@@ -638,7 +642,7 @@ static int live_probe_run(int argc,char **argv,int visit_mode)
 #define NEED(x,name) do { stage=name; if(!(x)) goto done; } while(0)
     if((argc!=6 && argc!=7) || (strcmp(argv[1],"30000000") && strcmp(argv[1],"60000000")) ||
        dwell_limits(argc==7 ? argv[6] : NULL,&limits)) {
-        fprintf(stderr,"usage: %s 30000000|60000000 SERIAL BANK REFERENCES NEW_OUTPUT_DIRECTORY [1536|4096|45000|1536-selected]\n",argv[0]);return 2;
+        fprintf(stderr,"usage: %s 30000000|60000000 SERIAL BANK REFERENCES NEW_OUTPUT_DIRECTORY [1536|4096|45000|1536-selected|1536-selected-observer3]\n",argv[0]);return 2;
     }
     rate=(uint32_t)strtoul(argv[1],NULL,10);
     action.sa_handler=signal_stop;sigemptyset(&action.sa_mask);
@@ -646,6 +650,7 @@ static int live_probe_run(int argc,char **argv,int visit_mode)
     alarm(limits.alarm_seconds);
     NEED((s=calloc(1,sizeof(*s))) && (ring=malloc(RING*4U)),"storage");
     s->rate=rate;s->attempt_limit=limits.attempts;s->selected_iq=limits.selected_iq;s->visit_mode=visit_mode;
+    s->observer_spacing=limits.observer_spacing;
     NEED(!pthread_mutex_init(&s->mutex,NULL),"mutex");mutex=1;
     NEED(!load(argv[3],s->bank,sizeof(s->bank)) && !load(argv[4],s->refs,sizeof(s->refs)),"reference_files");
     NEED((fft_storage=fftw_malloc(GLRT_RESOLVER_FFT*sizeof(*fft_storage)))!=NULL,"fft_storage");

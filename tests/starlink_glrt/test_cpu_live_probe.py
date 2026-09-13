@@ -76,7 +76,8 @@ int live_set_dwell(struct test_live *t,const char *blocks,uint64_t out[4])
 {
     struct dwell_limits limits;
     if(dwell_limits(blocks,&limits)) return -1;
-    if(t) { t->live.attempt_limit=limits.attempts;t->live.selected_iq=limits.selected_iq; }
+    if(t) { t->live.attempt_limit=limits.attempts;t->live.selected_iq=limits.selected_iq;
+        t->live.observer_spacing=limits.observer_spacing; }
     out[0]=limits.blocks;out[1]=limits.attempts;
     out[2]=limits.alarm_seconds;out[3]=limits.worker_ns;
     return 0;
@@ -112,12 +113,15 @@ int live_observer_seed_start(struct test_live *t)
     struct live *s=&t->live;struct glrt_native_estimate e={0};
     e.coherence=e.linearized_coherence=.9;
     if(glrt_tracking_trend_reset(&s->worker.live.core.trend,3,2500000)) abort();
+    unsigned spacing=s->observer_spacing ? s->observer_spacing : 9;
+    uint64_t anchor=1000000-(63+spacing)*2500000U/750;
     for(unsigned k=0;k<8;k++)
-        if(glrt_tracking_trend_observe(&s->worker.live.core.trend,3,k*9,760000+k*30000,0,&e)!=1) abort();
+        if(glrt_tracking_trend_observe(&s->worker.live.core.trend,3,k*9,anchor+k*30000,0,&e)!=1) abort();
     s->deadline_ns=clock_ns(NULL)+UINT64_C(5000000000);
     return start_observer(s);
 }
 int live_observer_join(struct test_live *t) { return join_observer(&t->live); }
+void live_observer_spacing(struct test_live *t,unsigned spacing) { t->live.observer_spacing=spacing; }
 int live_pair_copy(struct test_live *t,unsigned *copied)
 {
     int result=paired_copy(&t->live);*copied=t->live.paired_copied;return result;
@@ -248,6 +252,7 @@ def live_api(tmp_path_factory):
     lib.live_observer_fail.argtypes = [c.c_void_p,c.c_int]
     lib.live_observer_seed_start.argtypes = [c.c_void_p]
     lib.live_observer_join.argtypes = [c.c_void_p]
+    lib.live_observer_spacing.argtypes = [c.c_void_p,c.c_uint]
     lib.live_rebase.argtypes = [c.c_void_p,c.c_void_p]
     lib.live_totals.argtypes = [c.c_void_p,c.c_void_p]
     lib.live_restart_fault.argtypes = [c.c_void_p,c.c_uint]
@@ -269,6 +274,7 @@ def live_api(tmp_path_factory):
     (b'4096', [4096,16,45,30000000000]),
     (b'45000', [45000,200,325,300000000000]),
     (b'1536-selected', [1536,6,25,12000000000]),
+    (b'1536-selected-observer3', [1536,6,25,12000000000]),
 ])
 def test_dwell_profiles_have_finite_capture_and_worker_limits(live_api, blocks, expected):
     lib, _ = live_api
@@ -376,7 +382,7 @@ def test_original_pilot_order_matches_independent_fft(live_api, tmp_path, mode):
     if mode == 'secondary_pilot': assert selected.value == 1
 
 
-def check_observer_evidence(directory,iq,origin,worker_rows,rate):
+def check_observer_evidence(directory,iq,origin,worker_rows,rate,spacing=9):
     rows=[json.loads(line) for line in (directory/'observer.jsonl').read_text().splitlines()]
     retained=np.fromfile(directory/'observer.iq.ci16',dtype='<i2').reshape(-1,2)
     offset=0;active=None;measurements=[]
@@ -386,7 +392,8 @@ def check_observer_evidence(directory,iq,origin,worker_rows,rate):
             assert active is None
             active=row;measurements=[]
             assert row['rate']==2500000 and row['native_rate']==rate
-            assert row['first_frame']==seeds[row['attempt']]['last_seen']+9
+            assert row['frame_spacing']==spacing
+            assert row['first_frame']==seeds[row['attempt']]['last_seen']+spacing
             assert row['epoch']==seeds[row['attempt']]['epoch']
             assert row['maximum_measurements']==200
             assert row['retained_total']*3300==offset
@@ -395,7 +402,7 @@ def check_observer_evidence(directory,iq,origin,worker_rows,rate):
             assert all(row[k]==active[k] for k in ('attempt','episode','epoch'))
             if row['kind']=='measurement':
                 assert row['sequence']==len(measurements)<200
-                assert row['frame']==active['first_frame']+9*row['sequence']
+                assert row['frame']==active['first_frame']+spacing*row['sequence']
                 assert row['iq_offset']==offset and row['iq_samples']==3300
                 start=row['first']-origin
                 np.testing.assert_array_equal(retained[offset:offset+3300],iq[start:start+3300])
@@ -421,10 +428,14 @@ def check_observer_evidence(directory,iq,origin,worker_rows,rate):
 
 
 @pytest.mark.parametrize('mode',['waiting_cancel','retained_cancel','closed','iq_failure','journal_failure'])
-def test_observer_thread_has_separate_retention_and_is_joined_before_owner_release(live_api,tmp_path,mode):
+@pytest.mark.parametrize('spacing',[9,3])
+def test_observer_thread_has_separate_retention_and_is_joined_before_owner_release(live_api,tmp_path,mode,spacing):
     lib,refs=live_api;coefficients=bank();ports=Ports()
     handle=lib.live_new(refs.ctypes.data,coefficients.ctypes.data,os.fsencode(tmp_path),c.byref(ports),60000000)
     try:
+        limits=(c.c_uint64*4)()
+        profile=b'1536-selected-observer3' if spacing==3 else b'1536-selected'
+        assert lib.live_set_dwell(handle,profile,limits)==0
         if mode in ('iq_failure','journal_failure'): lib.live_observer_fail(handle,int(mode=='journal_failure'))
         rc=lib.live_observer_seed_start(handle)
         assert rc==(-6 if mode=='journal_failure' else 0)
@@ -449,6 +460,7 @@ def test_observer_thread_has_separate_retention_and_is_joined_before_owner_relea
     assert (tmp_path/'native.coarse.ci16').read_bytes()==b''
     if mode!='journal_failure':
         rows=[json.loads(line) for line in (tmp_path/'observer.jsonl').read_text().splitlines()]
+        assert rows[0]['frame_spacing']==spacing and rows[0]['first_frame']==63+spacing
         assert rows[-1]['kind']=='terminal'
         assert rows[-1]['status']=={'closed':-2,'iq_failure':-4}.get(mode,-6)
         if mode=='retained_cancel':
@@ -463,7 +475,8 @@ def test_observer_thread_has_separate_retention_and_is_joined_before_owner_relea
     (60000000,"selected_zero"),(60000000,"selected_retention"),
     (30000000,"native_rejection"),(30000000,"native_retention"),(30000000,"late_handoff"),
     (30000000,"observer_retention"),(60000000,"observer_retention")])
-def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilot_moments, tmp_path, rate, mode):
+@pytest.mark.parametrize('observer_spacing',[9,3])
+def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilot_moments, tmp_path, rate, mode,observer_spacing):
     lib, refs = live_api
     radio = Radio(controller, pilot_moments, tracking_rate=rate)
     if mode == "native_rejection": radio.reject = True
@@ -483,6 +496,7 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
     ports = Ports(None, Read(read), Write(radio.write), Retain(radio.retain), Clock(lambda _: radio.time))
     coefficients = bank()
     handle = lib.live_new(refs.ctypes.data, coefficients.ctypes.data, os.fsencode(tmp_path), c.byref(ports), rate)
+    lib.live_observer_spacing(handle,observer_spacing)
     if mode=='observer_retention': lib.live_observer_fail(handle,0)
     if mode == 'zero_long':
         assert lib.live_set_dwell(handle, b'4096', (c.c_uint64*4)()) == 0
@@ -518,7 +532,7 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
         out = (c.c_uint64*5)();lib.live_finish(handle, out)
     assert not radio.errors, radio.errors
     rows = [json.loads(s) for s in (tmp_path/"worker.jsonl").read_text().splitlines()]
-    observer_rows=check_observer_evidence(tmp_path,iq,1000000,rows,rate)
+    observer_rows=check_observer_evidence(tmp_path,iq,1000000,rows,rate,observer_spacing)
     pairs = [r for r in rows if r['kind']=='native_coarse_iq']
     paired_iq = np.fromfile(tmp_path/'native.coarse.ci16',dtype='<i2').reshape(-1,2)
     assert len(paired_iq)==len(pairs)*3333 and len(pairs)<=64
