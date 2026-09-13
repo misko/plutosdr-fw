@@ -2,6 +2,7 @@
 #include "glrt_cpu_coarse.h"
 #include <math.h>
 #include <string.h>
+#include <stdlib.h>
 #ifdef __ARM_NEON
 #include <arm_neon.h>
 #endif
@@ -127,37 +128,64 @@ int glrt_cpu_coarse_grid(uint32_t grid[11][GLRT_CPU_COARSE_EPOCHS], const int16_
     return 0;
 }
 
+static void sift(struct glrt_cpu_coarse_peak *heap,unsigned length,unsigned parent)
+{
+    struct glrt_cpu_coarse_peak value=heap[parent];
+    while(2*parent+1<length) {
+        unsigned child=2*parent+1;
+        if(child+1<length && better(&heap[child+1],&heap[child])) child++;
+        if(!better(&heap[child],&value)) break;
+        heap[parent]=heap[child];parent=child;
+    }
+    heap[parent]=value;
+}
+
 int glrt_cpu_coarse_select_bounded(const struct glrt_cpu_coarse_workspace *w,
     struct glrt_cpu_coarse_peak *peaks, unsigned budget, uint32_t *count,
     int (*poll)(void *), void *context)
 {
-    unsigned k,f,e,r;
+    unsigned k=0,f,e,r,length=0;
+    struct glrt_cpu_coarse_peak *heap=NULL;
     if(count) *count=0;
     if(!peaks || !budget || budget>64) return -1;
     memset(peaks,0,budget*sizeof(*peaks));
     if(!w || !count || !poll || w->completed_epochs!=GLRT_CPU_COARSE_EPOCHS) return -1;
-    for(k=0;k<budget;k++) {
-        struct glrt_cpu_coarse_peak best={0,0,0};
-        if(poll(context)) goto failed;
-        for(f=0;f<11;f++) for(e=0;e<GLRT_CPU_COARSE_EPOCHS;e++) {
+    if(poll(context)) goto failed;
+    /* Bounded 429.7-KiB temporary storage, not the capture-thread stack.
+     * Heap order is the exact existing score/tie order. Suppressed maxima
+     * are discarded only after all preceding selected maxima are known. */
+    heap=malloc(11*GLRT_CPU_COARSE_EPOCHS*sizeof(*heap));
+    if(!heap) goto failed;
+    for(f=0;f<11;f++) for(e=0;e<GLRT_CPU_COARSE_EPOCHS;e++) {
             struct glrt_cpu_coarse_peak p={e,f,w->grid[f][e]};
             uint32_t left=e ? w->grid[f][e-1] : 0;
             uint32_t right=e+1<GLRT_CPU_COARSE_EPOCHS ? w->grid[f][e+1] : 0;
+            if(!(e%256) && poll(context)) goto failed;
             if(!p.score || p.score<left || p.score<right || (p.score==left && p.score==right)) continue;
+            heap[length++]=p;
+    }
+    for(r=length/2;r;r--) {
+        if(!(r%256) && poll(context)) goto failed;
+        sift(heap,length,r-1);
+    }
+    while(length && k<budget) {
+            struct glrt_cpu_coarse_peak p=heap[0];
+            if(poll(context)) goto failed;
+            heap[0]=heap[--length];
+            if(length) sift(heap,length,0);
             for(r=0;r<k;r++) {
-                unsigned d=distance(e,peaks[r].epoch);
+                unsigned d=distance(p.epoch,peaks[r].epoch);
                 if(d>GLRT_CPU_COARSE_EPOCHS/2) d=GLRT_CPU_COARSE_EPOCHS-d;
-                if(d<20 && distance(f,peaks[r].frequency)<=1) break;
+                if(d<20 && distance(p.frequency,peaks[r].frequency)<=1) break;
             }
-            if(r==k && better(&p,&best)) best=p;
-        }
-        if(!best.score) break;
-        peaks[k]=best;
+            if(r==k) peaks[k++]=p;
     }
     if(poll(context)) goto failed;
     *count=k;
+    free(heap);
     return 0;
 failed:
+    free(heap);
     memset(peaks,0,budget*sizeof(*peaks));
     return -1;
 }

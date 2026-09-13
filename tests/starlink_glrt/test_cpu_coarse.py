@@ -216,3 +216,32 @@ def test_bounded_selection_rejects_invalid_admission(api,budget,completed):
     w=Workspace();w.completed_epochs=completed;peaks=(Peak*64)();count=C.c_uint32(999)
     assert api.glrt_cpu_coarse_select_bounded(C.byref(w),peaks,budget,C.byref(count),POLL(lambda _:0),None)==-1
     assert count.value==0
+
+
+def test_heap_failure_at_publication_clears_completed_selection(api):
+    w=Workspace();w.completed_epochs=3333
+    np.ctypeslib.as_array(w.grid)[:]=np.random.default_rng(91).integers(0,65537,(11,3333))
+    peaks=(Peak*64)();count=C.c_uint32();calls=0;stop=0
+    def poll(_):
+        nonlocal calls
+        calls+=1
+        return calls==stop
+    callback=POLL(poll)
+    assert api.glrt_cpu_coarse_select_bounded(C.byref(w),peaks,64,C.byref(count),callback,None)==0
+    assert count.value==64
+    stop=calls;calls=0
+    assert api.glrt_cpu_coarse_select_bounded(C.byref(w),peaks,64,C.byref(count),callback,None)==-1
+    assert calls==stop and count.value==0 and bytes(peaks)==bytes(C.sizeof(peaks))
+
+
+def test_heap_allocation_failure_cannot_publish_peaks(tmp_path):
+    source=tmp_path/'allocation.c';binary=tmp_path/'allocation.so'
+    source.write_text('#include <stdlib.h>\nstatic void *fail_alloc(size_t n) { (void)n; return NULL; }\n'
+                      '#define malloc fail_alloc\n#include "glrt_cpu_coarse.c"\n')
+    subprocess.run(['cc','-O2','-std=c99','-Wall','-Wextra','-Werror','-shared','-fPIC',
+                    '-I',str(ROOT/'tools'),str(source),'-lm','-o',str(binary)],check=True)
+    lib=C.CDLL(str(binary));w=Workspace();w.completed_epochs=3333
+    w.count=8
+    for p in w.peaks:p.score=99
+    assert lib.glrt_cpu_coarse_select(C.byref(w),POLL(lambda _:0),None)==-1
+    assert w.count==0 and bytes(w.peaks)==bytes(C.sizeof(w.peaks))
