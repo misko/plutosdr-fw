@@ -197,6 +197,7 @@ def test_native_preflight_precedes_every_rf_mutation(tmp_path, monkeypatch, case
 def test_selected_capture_budget_and_artifacts_are_explicit(storage_operator):
     selected = storage_operator.capture_artifacts(45000)
     assert 'scan.iq.ci16' in selected and 'iq.ci16' not in selected
+    assert selected[-3:] == ('native-1.journal','native-2.journal','native-3.journal')
     assert storage_operator.retention_budget_kib(45000) == 256*1024
     for blocks in (1536,4096):
         assert storage_operator.capture_artifacts(blocks) == storage_operator.ARTIFACTS

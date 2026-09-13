@@ -57,10 +57,34 @@ counter evidence, but cannot support arbitrary re-analysis of unretained IQ.
 The selected profile uses the same private 320-MiB filesystem, with a 256-MiB
 evidence allowance, 80 MiB of memory headroom and 40 MiB of filesystem headroom.
 Its worker deadline is 300 seconds, cancellation alarm 325 seconds and operator
-timeout 340 seconds. Capture stops when the worker terminates, including after
-a native run, instead of continuing until the sample limit. The output records
+timeout 340 seconds. After a clean native acquisition loss, it can restart at
+most three times (four native episodes total). The capture thread joins the
+finished worker, verifies that GLT1 is drained, cleared and loss-free, and
+destroys the old IQ owner. After a fresh refill, REBASE establishes the next
+epoch; samples preceding its boundary are excluded from the new owner.
+Source/retention errors, unread results, cancellation and exhausted budgets
+never authorize a restart. The 200 attempts, 300-second worker deadline, sample
+limit and retained-IQ budgets apply across all epochs and are not replenished.
+
+Each epoch has a separate, exclusively created GLRJ1 file: `native.journal`,
+then at most `native-1.journal` through `native-3.journal`. A previous native
+`final` is never followed by a new controller lifecycle in the same file.
+Unopened episode files are recorded as absent by the operator. `reacquisition`
+records retain the old epoch and remaining global budget; each new source
+binding is in `capture.txt`. Independent review must account for all epochs.
+`tools/review_glrt_cpu_live_epochs.py` checks these bindings, clean-loss
+preflights, independent native journals, cumulative counts and paired-head
+identity. It supplements the acquisition arithmetic review and does not
+recompute native estimates or establish RF accuracy.
+
+Capture stops on a native completion or a terminal worker result that cannot
+restart, instead of continuing until the sample limit. The output records
 `retention_mode`, `completed_refills`, `worker_complete` and searched-sample
-count. Source counters may include a final exported tail beyond the last
+count, plus `reacquisitions`, `native_runs` and `native_completed_runs`.
+`native_results` and `handoffs` count all episodes. A successful bounded scan
+exit does not imply a successful tracking run; every native failure remains
+in its episode journal and worker terminal record.
+Source counters may include a final exported tail beyond the last
 returned refill; all duration/loss review must use those actual final counters.
 The two shorter full-IQ profiles continue to capture their entire fixed length.
 
@@ -68,7 +92,9 @@ For the first 64 retained native heads, `native.coarse.ci16` records 3333 coarse
 samples beginning 16 samples before `floor(native_start / decimation_ratio)`.
 These owner coordinates already account for DDC group delay. Each
 `native_coarse_iq` journal record binds the window to native sequence, start,
-phase seed/step, reference phase, count and fault, plus the copied source view.
+phase seed/step, reference phase, count and fault, plus native episode and the
+copied source view. The 64-head cap spans all episodes; native sequence numbers
+restart at zero in each new epoch while payload offsets remain cumulative.
 The additional payload is capped at 853248 bytes. It is diagnostic evidence;
 these copies do not update feedback or change the support gate.
 
@@ -126,7 +152,12 @@ worker with an advancing owned sample stream and explicitly simulated GLT1
 ports. Synthetic pilots acquire and retire 1500 native measurements at both
 rates. Zero signal, cancellation and source loss submit no jobs. Native
 rejection, retention failure and stale admission exercise stop/drain and
-unread-head preservation. Those generated port results are not RF evidence.
+unread-head preservation. The selected-mode lifecycle tests also run clean
+native loss followed by reacquisition and 1500 supported synthetic heads,
+four consecutive losses, global budget exhaustion and restart refusal after
+source, epoch, retention, cancellation and rebase faults at both rates.
+Exclusive per-episode journal tests prevent overwrite and a fifth file.
+Those generated port results are not RF evidence.
 
 The first physical 30-MS/s run is
 `/srv/bulk/leo/glrt-deployment-20260909/radio20-iq-tracking-20260912/cpu-live30-v2/`.
@@ -148,9 +179,10 @@ The new 60-MS/s deployment receipt is in `deploy60-live-v1/`.
 These establish loaded ingestion and rejection behavior at both rates.
 A supported physical acquisition-to-native-feedback loop is still required.
 The operator accepts `--lo-hz` for separately bounded frequency revisits and
-checks RF state again after capture. Autonomous revisit selection,
-reacquisition after a native run and longer refinement remain beyond this
-single-loop qualification executable.
+checks RF state again after capture. Bounded same-frequency reacquisition is
+implemented in the selected profile; physical restart verification remains
+required. Autonomous frequency revisits and longer refinement remain beyond
+this qualification executable.
 The final RF-state comparison also runs when the executable exits nonzero;
 that exit remains a failure even when the radio has returned to its expected
 receive configuration and TX-safe idle state.

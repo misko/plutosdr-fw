@@ -3,11 +3,13 @@
 This exercises the actual pthread/FFTW composition, not FPGA or RF accuracy.
 """
 import ctypes as c
+import copy
 import json
 import os
 from pathlib import Path
 import subprocess
 import time
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -19,6 +21,7 @@ from .test_native_controller import Radio, Ports, Read, Write, Retain, Clock
 from .test_tracking_controller import controller, models, pilot_moments
 from .test_native_journal import journal as native_journal
 from tools.starlink_glrt_tracking_journal import review as review_native_journal
+from tools.review_glrt_cpu_live_epochs import review_epochs
 
 pytestmark = pytest.mark.fftw
 
@@ -26,10 +29,19 @@ WRAPPER = r'''
 #define main unused_probe_main
 #include "glrt_cpu_live_probe.c"
 #undef main
-struct test_live { struct live live; int16_t *ring; fftw_complex *fft; uint64_t end; };
+struct test_live { struct live live; int16_t *ring; fftw_complex *fft; uint64_t end; FILE *capture; };
 const char *iio_device_get_id(const struct iio_device *d) { (void)d;return "iio:device0"; }
 int iio_channel_attr_read_longlong(const struct iio_channel *c,const char *name,long long *out)
 { char text[128];if(iio_channel_attr_read(c,name,text,sizeof(text))<=0) return -1;*out=strtoll(text,NULL,10);return 0; }
+int live_journal_file(const char *directory,unsigned episode,const char *kind,const char *raw)
+{
+    struct live *s=calloc(1,sizeof(*s));struct glrt_native_posix p={.device=-1,.journal=-1};int rc;
+    if(!s) abort();
+    s->restarts=episode;rc=open_native_episode(s,&p,directory,directory);
+    if(!rc) rc=s->native.retain(s->native.context,kind,raw,strlen(raw));
+    if(glrt_native_posix_close(&p)) rc=-1;
+    free(s);return rc;
+}
 void *live_new(const int16_t *refs,const int16_t *bank,const char *directory,
               const struct glrt_native_ports *ports,unsigned rate)
 {
@@ -45,12 +57,14 @@ void *live_new(const int16_t *refs,const int16_t *bank,const char *directory,
     snprintf(path,sizeof(path),"%s/worker.iq",directory);s->worker_iq=fopen(path,"wbx");
     snprintf(path,sizeof(path),"%s/grids",directory);s->grids=fopen(path,"wbx");
     snprintf(path,sizeof(path),"%s/native.coarse.ci16",directory);s->native_coarse_iq=fopen(path,"wbx");
-    if(!s->journal || !s->worker_iq || !s->grids || !s->native_coarse_iq) abort();
+    snprintf(path,sizeof(path),"%s/capture.txt",directory);t->capture=fopen(path,"wx");
+    if(!s->journal || !s->worker_iq || !s->grids || !s->native_coarse_iq || !t->capture) abort();
+    fprintf(t->capture,"epoch_binding 9122201 3 %" PRIu64 " %" PRIu64 "\n",t->end*(rate/2500000)-1,t->end);
     return t;
 }
 int live_publish(struct test_live *t,const int16_t *iq,size_t count)
 {
-    int rc=glrt_tracking_iq_owner_publish(&t->live.owner,3,t->end,iq,count,t->end+count,clock_ns(NULL));
+    int rc=glrt_tracking_iq_owner_publish(&t->live.owner,t->live.epoch,t->end,iq,count,t->end+count,clock_ns(NULL));
     if(!rc) t->end+=count;
     return rc;
 }
@@ -90,9 +104,41 @@ int live_pair_copy(struct test_live *t,unsigned *copied)
 }
 void live_start(struct test_live *t)
 {
-    t->live.deadline_ns=clock_ns(NULL)+UINT64_C(5000000000);
+    if(!t->live.deadline_ns) t->live.deadline_ns=clock_ns(NULL)+UINT64_C(5000000000);
     if(pthread_create(&t->live.thread,NULL,worker_thread,&t->live)) abort();
     t->live.started=1;
+}
+void live_join(struct test_live *t)
+{
+    void *result=NULL;
+    if(pthread_join(t->live.thread,&result) || result) abort();
+    t->live.started=0;
+}
+int live_restart(struct test_live *t) { return restart_owner(&t->live,t->capture); }
+int live_rebase(struct test_live *t,uint64_t *first)
+{
+    int rc=rebase_source(&t->live,t->capture,9122201,first);
+    if(rc) return rc;
+    t->end=*first;
+    return glrt_tracking_iq_owner_init(&t->live.owner,t->ring,RING,t->live.epoch,t->end);
+}
+void live_totals(struct test_live *t,uint64_t out[8])
+{
+    struct live *s=&t->live;
+    out[0]=s->attempts;out[1]=s->restarts;out[2]=s->native_runs;out[3]=s->native_results;
+    out[4]=s->native_completed_runs;out[5]=s->iq_samples;out[6]=s->scan_iq_samples;out[7]=s->deadline_ns;
+}
+/* Admission faults are injected only after the actual worker has joined. */
+void live_restart_fault(struct test_live *t,unsigned mode)
+{
+    struct live *s=&t->live;
+    if(mode==1) s->selected_iq=0;
+    if(mode==2) s->native_clean_loss=0;
+    if(mode==3) s->result=GLRT_NATIVE_RETENTION_ERROR;
+    if(mode==4) s->restarts=RESTART_LIMIT;
+    if(mode==5) s->attempt_limit=s->attempts;
+    if(mode==6) s->stop=1;
+    if(mode==7) s->deadline_ns=1;
 }
 int live_done(struct test_live *t)
 {
@@ -119,9 +165,9 @@ int live_rank(struct test_live *t,const int16_t *iq,const unsigned *epochs,unsig
 void live_free_unstarted(struct test_live *t)
 {
     struct live *s=&t->live;
-    if(glrt_tracking_iq_owner_close(&s->owner,0) || glrt_tracking_iq_owner_destroy(&s->owner)) abort();
+    if(s->owner.initialized && (glrt_tracking_iq_owner_close(&s->owner,0) || glrt_tracking_iq_owner_destroy(&s->owner))) abort();
     fclose(s->journal);fclose(s->worker_iq);fclose(s->grids);
-    fclose(s->native_coarse_iq);
+    fclose(s->native_coarse_iq);fclose(t->capture);
     if(s->scan_samples) fclose(s->scan_samples);
     fftw_destroy_plan(s->fft);fftw_free(t->fft);free(t->ring);
     if(pthread_mutex_destroy(&s->mutex)) abort();
@@ -130,12 +176,12 @@ void live_free_unstarted(struct test_live *t)
 void live_finish(struct test_live *t,uint64_t out[5])
 {
     void *result=NULL;struct live *s=&t->live;
-    if(pthread_join(s->thread,&result) || result) abort();
+    if(s->started && (pthread_join(s->thread,&result) || result)) abort();
     out[0]=(uint64_t)(int64_t)s->result;out[1]=s->attempts;out[2]=s->handoffs;
     out[3]=s->controller.configured;out[4]=s->controller.sequence;
-    if(glrt_tracking_iq_owner_close(&s->owner,0) || glrt_tracking_iq_owner_destroy(&s->owner)) abort();
+    if(s->owner.initialized && (glrt_tracking_iq_owner_close(&s->owner,0) || glrt_tracking_iq_owner_destroy(&s->owner))) abort();
     fclose(s->journal);fclose(s->worker_iq);fclose(s->grids);
-    fclose(s->native_coarse_iq);
+    fclose(s->native_coarse_iq);fclose(t->capture);
     if(s->scan_samples) fclose(s->scan_samples);
     fftw_destroy_plan(s->fft);fftw_free(t->fft);free(t->ring);
     if(pthread_mutex_destroy(&s->mutex)) abort();
@@ -165,6 +211,7 @@ def live_api(tmp_path_factory):
     lib = c.CDLL(str(out/"live.so"))
     lib.live_new.argtypes = [c.c_void_p, c.c_void_p, c.c_char_p, c.POINTER(Ports), c.c_uint]
     lib.live_new.restype = c.c_void_p
+    lib.live_journal_file.argtypes = [c.c_char_p,c.c_uint,c.c_char_p,c.c_char_p]
     lib.live_publish.argtypes = [c.c_void_p, c.c_void_p, c.c_size_t]
     lib.live_set_dwell.argtypes = [c.c_void_p, c.c_char_p, c.c_void_p]
     lib.live_select_windows.argtypes = [c.c_void_p,c.c_char_p,c.c_uint,c.c_int]
@@ -172,10 +219,13 @@ def live_api(tmp_path_factory):
     lib.live_final.argtypes = [c.c_uint]*5
     lib.live_pair_stage.argtypes = [c.c_void_p,c.c_uint64,c.c_int]
     lib.live_pair_copy.argtypes = [c.c_void_p,c.c_void_p]
+    lib.live_rebase.argtypes = [c.c_void_p,c.c_void_p]
+    lib.live_totals.argtypes = [c.c_void_p,c.c_void_p]
+    lib.live_restart_fault.argtypes = [c.c_void_p,c.c_uint]
     lib.unused_probe_main.argtypes = [c.c_int, c.POINTER(c.c_char_p)]
     lib.live_rank.argtypes = [c.c_void_p,c.c_void_p,c.c_void_p,c.c_uint,c.c_void_p,c.c_void_p]
     lib.live_free_unstarted.argtypes = [c.c_void_p]
-    for name in ("live_start", "live_done", "live_stop", "live_close_source"):
+    for name in ("live_start", "live_done", "live_stop", "live_close_source", "live_join", "live_restart"):
         getattr(lib, name).argtypes = [c.c_void_p]
     lib.live_finish.argtypes = [c.c_void_p, c.c_void_p]
     rom = root/"hdl/library/starlink_glrt"
@@ -215,6 +265,19 @@ def test_invalid_dwell_rejected_before_opening_evidence_or_radio(live_api, tmp_p
 def test_early_stop_requires_idle_complete_counters_with_bounded_tail(live_api, admitted, delivered, flags, expected):
     lib,_=live_api
     assert lib.live_final(admitted,delivered,flags,2,4)==expected
+
+
+def test_native_episodes_use_separate_exclusive_bounded_journals(live_api,tmp_path):
+    lib,_=live_api
+    saved={}
+    for episode in range(4):
+        payload=f'preserved episode {episode}\n'.encode()
+        assert lib.live_journal_file(os.fsencode(tmp_path),episode,b'final',payload)==0
+        name='native.journal' if not episode else f'native-{episode}.journal'
+        saved[name]=b'GLRJ1\nfinal '+str(len(payload)).encode()+b'\n'+payload
+        assert lib.live_journal_file(os.fsencode(tmp_path),episode,b'final',b'replacement')==-1
+    assert lib.live_journal_file(os.fsencode(tmp_path),4,b'final',b'unbounded')==-1
+    assert {p.name:p.read_bytes() for p in tmp_path.iterdir()}==saved
 
 
 @pytest.mark.parametrize('rate', [30000000,60000000])
@@ -405,3 +468,164 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
         if mode == "late_handoff": assert out[2] == 0 and not radio.writes("submit")
     else:
         assert list(out)[2:] == [0,0,0] and not radio.events
+
+
+@pytest.mark.parametrize('rate', [30000000,60000000])
+@pytest.mark.parametrize('mode', [
+    'loss_then_supported','four_losses','attempt_budget','full_profile','worker_error',
+    'retention_error','restart_budget','cancel','deadline','uncleared','source_gap',
+    'wrong_epoch','wrong_rate','unread_head','read_failure','rebase_same_epoch',
+    'rebase_short_write',
+])
+def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
+        live_api, controller, pilot_moments, tmp_path, rate, mode):
+    lib,refs=live_api
+    radio=Radio(controller,pilot_moments,tracking_rate=rate)
+    ratio=rate//2500000
+    radio.origin=radio.latest=1000000*ratio
+    radio.reject=True
+    initial=time.monotonic()
+    read_failed=False
+
+    def read(context,name,output,size):
+        if read_failed: return -1
+        radio.advance(max(0,radio.origin+int((time.monotonic()-initial)*rate)-radio.latest))
+        return radio.read(context,name,output,size)
+
+    def write(context,name,data,size):
+        raw=c.string_at(data,size)
+        if name==b'tracking_command' and raw==b'16\n':
+            assert not radio.valid and not radio.pending and not radio.queue
+            assert radio.configured==radio.popped==radio.admitted==0
+            radio.events.append(('write','tracking_command',raw))
+            if mode=='rebase_short_write': return 2
+            if mode!='rebase_same_epoch': radio.epoch+=1
+            radio.valid=True
+            return size
+        return radio.write(context,name,data,size)
+
+    ports=Ports(None,Read(read),Write(write),Retain(radio.retain),Clock(lambda _:radio.time))
+    coefficients=bank()
+    handle=lib.live_new(refs.ctypes.data,coefficients.ctypes.data,os.fsencode(tmp_path),c.byref(ports),rate)
+    lib.live_select_windows(handle,os.fsencode(tmp_path),1 if mode=='attempt_budget' else 8,0)
+    iq=np.zeros((10_000_000,2),dtype=np.int16)
+    for frame in range(3000):
+        start=22+(frame*10000+1)//3
+        if start+3300<=len(iq): iq[start:start+3300]=refs[0,:,:2]
+    count=16384
+    assert lib.live_publish(handle,iq.ctypes.data,count)==0
+    initial=time.monotonic()-count/2500000
+    lib.live_start(handle)
+    episodes=[];before=None;initial_deadline=None
+    try:
+        for episode in range(4):
+            while not lib.live_done(handle):
+                elapsed=time.monotonic()-initial
+                assert elapsed<6
+                if (count+16384)/2500000<=elapsed:
+                    block=np.ascontiguousarray(iq[count:count+16384])
+                    assert len(block)==16384 and lib.live_publish(handle,block.ctypes.data,len(block))==0
+                    count+=len(block)
+                else: time.sleep(.001)
+            # This is the same capture-thread ordering as the executable:
+            # finished worker -> join -> retained/drained source check -> release owner.
+            lib.live_join(handle)
+            totals=(c.c_uint64*8)();lib.live_totals(handle,totals)
+            if initial_deadline is None: initial_deadline=totals[7]
+            assert totals[7]==initial_deadline
+            if before is not None:
+                assert totals[0]>before[0] and totals[5]>before[5] and totals[6]>before[6]
+            assert totals[0]<=8 and totals[1]==episode and totals[2]==episode+1
+            data=native_journal(radio)
+            path=tmp_path/('native.journal' if not episode else f'native-{episode}.journal')
+            path.write_bytes(data)
+            reviewed=review_native_journal(data,epoch=3+episode,rate=rate)
+            assert reviewed['heads'] and not radio.queue and not radio.pending and not radio.valid
+            assert reviewed['supported']==(1500 if mode=='loss_then_supported' and episode else 0)
+            episodes.append(reviewed)
+            assert totals[3]==sum(len(r['heads']) for r in episodes)
+            assert totals[4]==int(mode=='loss_then_supported' and episode==1)
+            if mode=='loss_then_supported' and episode==1:
+                assert lib.live_restart(handle)==0
+                break
+            fault={'full_profile':1,'worker_error':2,'retention_error':3,'restart_budget':4,
+                   'cancel':6,'deadline':7}.get(mode)
+            if fault: lib.live_restart_fault(handle,fault)
+            if mode=='uncleared': radio.valid=True
+            if mode=='source_gap': radio.gap=True
+            if mode=='wrong_epoch': radio.epoch+=1
+            if mode=='wrong_rate': radio.rate=30000000 if rate==60000000 else 60000000
+            if mode=='unread_head': radio.queue.append([0]*32)
+            if mode=='read_failure': read_failed=True
+            prior_writes=len(radio.writes('command'))
+            admitted=lib.live_restart(handle)
+            assert len(radio.writes('command'))==prior_writes
+            if fault or mode=='attempt_budget' or episode==3:
+                assert admitted==0
+                break
+            if mode in ('uncleared','source_gap','wrong_epoch','wrong_rate','unread_head','read_failure'):
+                assert admitted==(-1 if mode=='read_failure' else -3)
+                break
+            assert admitted==1
+            before=list(totals)
+            lib.live_totals(handle,totals)
+            assert totals[0]==before[0] and list(totals)[5:]==before[5:]
+            assert totals[1]==episode+1
+            # A different GLRJ1 stream starts here. Old final records remain
+            # immutable and independently reviewable; no cross-epoch append.
+            radio.events=[]
+            first=c.c_uint64()
+            result=lib.live_rebase(handle,c.byref(first))
+            if mode.startswith('rebase_'):
+                assert result==-1 and not radio.writes('submit')
+                break
+            assert result==0 and first.value>1000000+count
+            count=first.value-1000000
+            radio.reject=mode!='loss_then_supported'
+            while (count+16384)/2500000>time.monotonic()-initial: time.sleep(.001)
+            block=np.ascontiguousarray(iq[count:count+16384])
+            assert lib.live_publish(handle,block.ctypes.data,len(block))==0
+            count+=len(block)
+            lib.live_start(handle)
+    finally:
+        lib.live_stop(handle)
+        out=(c.c_uint64*5)();lib.live_finish(handle,out)
+    assert not radio.errors,radio.errors
+    rows=[json.loads(line) for line in (tmp_path/'worker.jsonl').read_text().splitlines()]
+    if mode in ('loss_then_supported','four_losses'):
+        assert len(episodes)==(2 if mode=='loss_then_supported' else 4)
+        scans=[r for r in rows if r['kind']=='scan']
+        assert [r['attempt'] for r in scans]==list(range(1,len(scans)+1))
+        assert sorted({r['epoch'] for r in scans})==list(range(3,3+len(episodes)))
+        assert len([r for r in rows if r['kind']=='reacquisition'])==len(episodes)-1
+        pairs=[r for r in rows if r['kind']=='native_coarse_iq']
+        paired=np.fromfile(tmp_path/'native.coarse.ci16',dtype='<i2').reshape(-1,2)
+        assert len(paired)==len(pairs)*3333<=64*3333
+        for index,row in enumerate(pairs):
+            head=episodes[row['native_episode']]['heads'][row['native_sequence']]
+            assert row['native_start']==head.start
+            assert row['source']['epoch']==3+row['native_episode']
+            assert row['iq_offset']==index*3333
+            start=row['first']-1000000
+            np.testing.assert_array_equal(paired[index*3333:(index+1)*3333],iq[start:start+3333])
+        if mode=='loss_then_supported': assert len(pairs)==64
+        capture_text=(tmp_path/'capture.txt').read_text()
+        journals={p.name:p.read_bytes() for p in tmp_path.glob('native*.journal')}
+        status=dict(rate=rate,reacquisitions=totals[1],attempts=totals[0],native_runs=totals[2],
+                    native_results=totals[3],native_completed_runs=totals[4],handoffs=out[2])
+        result=review_epochs(capture_text,rows,journals,status)
+        assert result['reacquisitions']==len(episodes)-1
+        for mutation in ('missing_episode','wrong_epoch','reset_budget','wrong_total','wrong_pair','uncleared_loss'):
+            altered_rows=copy.deepcopy(rows);altered_status=dict(status);altered_journals=dict(journals)
+            if mutation=='missing_episode': altered_journals.pop('native-1.journal')
+            if mutation=='wrong_epoch':
+                next(r for r in altered_rows if r['kind']=='native_terminal')['epoch']+=1
+            if mutation=='reset_budget':
+                next(r for r in altered_rows if r['kind']=='reacquisition')['attempts_used']=0
+            if mutation=='wrong_total': altered_status['native_results']-=1
+            if mutation=='wrong_pair':
+                next(r for r in altered_rows if r['kind']=='native_coarse_iq')['native_episode']+=1
+            if mutation=='uncleared_loss':
+                next(r for r in altered_rows if r['kind']=='native_terminal')['result']=-6
+            with pytest.raises((AssertionError,ValueError)):
+                review_epochs(capture_text,altered_rows,altered_journals,altered_status)

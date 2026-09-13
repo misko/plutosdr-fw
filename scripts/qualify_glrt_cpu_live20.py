@@ -36,8 +36,11 @@ def retention_budget_kib(blocks):
 
 def capture_artifacts(blocks):
     retention_budget_kib(blocks)
-    return tuple('scan.iq.ci16' if blocks == 45000 and name == 'iq.ci16' else name
-                 for name in ARTIFACTS)
+    names = tuple('scan.iq.ci16' if blocks == 45000 and name == 'iq.ci16' else name
+                  for name in ARTIFACTS)
+    # At most three clean-loss restarts. Unopened episode files are recorded
+    # as absent; every actual journal stays independently reviewable as GLRJ1.
+    return names + tuple(f'native-{n}.journal' for n in range(1,4)) if blocks == 45000 else names
 
 
 def preflight_memory(memory_info, blocks, evidence):
