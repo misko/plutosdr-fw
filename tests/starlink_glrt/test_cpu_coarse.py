@@ -68,7 +68,8 @@ def integer_grid(iq, coefficients):
                 im = np.sum(values[:,:,1]*c[:,0]-values[:,:,0]*c[:,1],axis=1)
                 # Python isqrt is independent of the C floating seed/correction.
                 numerator = [math.isqrt(int(a)**2+int(b)**2) for a,b in zip(re,im)]
-                denominator = [math.isqrt(int(e)*int(np.sum(c*c))) for e in energy]
+                reference_energy = int(np.sum(c*c))
+                denominator = [math.isqrt(int(e)*reference_energy) for e in energy]
                 totals[frequency,:count] += np.asarray([
                     min(65536,(a<<16)//b) if b else 0 for a,b in zip(numerator,denominator)],dtype=np.uint64)
     return (totals//support).astype(np.uint32)
