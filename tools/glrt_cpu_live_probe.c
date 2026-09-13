@@ -200,7 +200,7 @@ static int run_feedback(struct live *s)
     if(glrt_tracking_trend_from_coarse(&s->worker.live.core.trend,s->rate,frame,1500,&native)) return -1;
     n=s->native.read(s->native.context,"tracking_snapshot",raw,sizeof(raw));
     if(n<=0 || (size_t)n>sizeof(raw)) return GLRT_NATIVE_IO_ERROR;
-    if(s->native.retain(s->native.context,"handoff_source",raw,(size_t)n)) return GLRT_NATIVE_RETENTION_ERROR;
+    if(s->native.retain(s->native.context,"snapshot",raw,(size_t)n)) return GLRT_NATIVE_RETENTION_ERROR;
     if(glrt_tracking_snapshot_parse(raw,(size_t)n,words) || words[20]!=s->rate ||
        words[2]!=s->epoch || (words[5]&48)!=48 || words[6] || words[7] ||
        words[18] || words[19] || !glrt_tracking_snapshot_drained(words)) return GLRT_NATIVE_SOURCE_LOST;

@@ -17,6 +17,8 @@ from .test_cpu_coarse import bank
 from .test_tracking_seed import SOURCES
 from .test_native_controller import Radio, Ports, Read, Write, Retain, Clock
 from .test_tracking_controller import controller, models, pilot_moments
+from .test_native_journal import journal as native_journal
+from tools.starlink_glrt_tracking_journal import review as review_native_journal
 
 pytestmark = pytest.mark.fftw
 
@@ -263,6 +265,9 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
         assert list(out)[0] == 0, (list(out), rows[-3:])
         assert list(out)[2:] == [1,1500,1500]
         assert len(radio.writes("submit")) > 1 and len(radio.writes("pop")) == 1500
+        reviewed = review_native_journal(native_journal(radio), epoch=3, rate=rate)
+        assert len(reviewed['heads']) == reviewed['supported'] == 1500
+        assert reviewed['handoff'].rate == rate
         assert not radio.pending and not radio.queue and not radio.valid
         first = next(row for row in rows if row["kind"] == "scan")
         terminal = next(row for row in rows if row["kind"] == "worker_terminal")
