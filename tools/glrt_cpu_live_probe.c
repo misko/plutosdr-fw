@@ -23,6 +23,16 @@
 #define BLOCKS 1536U
 #define RING 5000000U
 #define ATTEMPTS 6U
+struct dwell_limits { unsigned blocks,attempts,alarm_seconds; uint64_t worker_ns; };
+static int dwell_limits(const char *blocks,struct dwell_limits *out)
+{
+    if(!blocks || !strcmp(blocks,"1536"))
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000)};
+    else if(!strcmp(blocks,"4096"))
+        *out=(struct dwell_limits){4096,16,45,UINT64_C(30000000000)};
+    else return -1;
+    return 0;
+}
 static volatile sig_atomic_t interrupted;
 static void signal_stop(int n) { (void)n;interrupted=1; }
 static uint64_t wide(const uint32_t *w) { return w[0]|((uint64_t)w[1]<<32); }
@@ -36,7 +46,7 @@ struct live {
     pthread_mutex_t mutex;
     pthread_t thread;
     int stop,done,result,started;
-    uint32_t epoch,rate,attempts,handoffs;
+    uint32_t epoch,rate,attempts,handoffs,attempt_limit;
     struct glrt_tracking_iq_owner owner;
     struct glrt_tracking_worker worker;
     struct glrt_cpu_coarse_workspace coarse;
@@ -221,7 +231,7 @@ static int run_feedback(struct live *s)
 static void *worker_thread(void *pointer)
 {
     struct live *s=pointer;int result=0;
-    for(s->attempts=1;s->attempts<=ATTEMPTS;s->attempts++) {
+    for(s->attempts=1;s->attempts<=s->attempt_limit;s->attempts++) {
         struct glrt_tracking_iq_view v;
         struct glrt_cpu_candidate candidate;
         struct glrt_tracking_worker_config cfg={.owner=&s->owner,.references=s->refs,.fft=fft,.fft_context=s,
@@ -279,7 +289,7 @@ static void *worker_thread(void *pointer)
         if(rc==GLRT_WORKER_RETENTION || rc==GLRT_WORKER_PORT || rc==GLRT_WORKER_INVALID || rc==GLRT_WORKER_SOURCE)
             { result=rc;break; }
     }
-    if(s->attempts>ATTEMPTS) s->attempts=ATTEMPTS;
+    if(s->attempts>s->attempt_limit) s->attempts=s->attempt_limit;
     if(pthread_mutex_lock(&s->mutex)) return (void *)(uintptr_t)1;
     s->result=result;s->done=1;
     return (void *)(uintptr_t)(pthread_mutex_unlock(&s->mutex)!=0);
@@ -320,6 +330,7 @@ int main(int argc,char **argv)
     struct glrt_capture_snapshot capture;
     struct glrt_iq_tracking_source source;
     struct sigaction action={0};
+    struct dwell_limits limits;
     fftw_complex *fft_storage=NULL;int16_t *ring=NULL;
     FILE *journal=NULL,*samples=NULL;
     uint32_t rate=0,visit=9122201,w[24],block=0;
@@ -328,15 +339,16 @@ int main(int argc,char **argv)
     int n,rc=1,mutex=0,owned=0,rebased=0,joined=1;
     const char *stage="arguments";
 #define NEED(x,name) do { stage=name; if(!(x)) goto done; } while(0)
-    if(argc!=6 || (strcmp(argv[1],"30000000") && strcmp(argv[1],"60000000"))) {
-        fprintf(stderr,"usage: %s 30000000|60000000 SERIAL BANK REFERENCES NEW_OUTPUT_DIRECTORY\n",argv[0]);return 2;
+    if((argc!=6 && argc!=7) || (strcmp(argv[1],"30000000") && strcmp(argv[1],"60000000")) ||
+       dwell_limits(argc==7 ? argv[6] : NULL,&limits)) {
+        fprintf(stderr,"usage: %s 30000000|60000000 SERIAL BANK REFERENCES NEW_OUTPUT_DIRECTORY [1536|4096]\n",argv[0]);return 2;
     }
     rate=(uint32_t)strtoul(argv[1],NULL,10);
     action.sa_handler=signal_stop;sigemptyset(&action.sa_mask);
     NEED(!sigaction(SIGALRM,&action,NULL) && !sigaction(SIGINT,&action,NULL) && !sigaction(SIGTERM,&action,NULL),"signals");
-    alarm(25);
+    alarm(limits.alarm_seconds);
     NEED((s=calloc(1,sizeof(*s))) && (ring=malloc(RING*4U)),"storage");
-    s->rate=rate;
+    s->rate=rate;s->attempt_limit=limits.attempts;
     NEED(!pthread_mutex_init(&s->mutex,NULL),"mutex");mutex=1;
     NEED(!load(argv[3],s->bank,sizeof(s->bank)) && !load(argv[4],s->refs,sizeof(s->refs)),"reference_files");
     NEED((fft_storage=fftw_malloc(GLRT_RESOLVER_FFT*sizeof(*fft_storage)))!=NULL,"fft_storage");
@@ -374,14 +386,14 @@ int main(int argc,char **argv)
         iio_channel_enable(ch);
     }
     NEED(iio_device_attr_write_longlong(iq,"capture_visit_id",visit)==0 &&
-         iio_device_attr_write_longlong(iq,"capture_sample_limit",CHUNK*BLOCKS)==0 &&
+         iio_device_attr_write_longlong(iq,"capture_sample_limit",CHUNK*limits.blocks)==0 &&
          iio_device_set_kernel_buffers_count(iq,4)==0,"capture_setup");
     NEED((buffer=iio_device_create_buffer(iq,CHUNK,false))!=NULL,"start");
     n=attr(iq,"capture_baseline_snapshot",text,journal);
     NEED(n>0 && !glrt_iq_tracking_snapshot_parse(text,(size_t)n,&capture) &&
-         !glrt_iq_tracking_source_begin(&source,visit,CHUNK*BLOCKS,&capture),"baseline");
-    s->deadline_ns=clock_ns(NULL)+UINT64_C(12000000000);previous=clock_ns(NULL);
-    for(block=0;block<BLOCKS;block++) {
+         !glrt_iq_tracking_source_begin(&source,visit,CHUNK*limits.blocks,&capture),"baseline");
+    s->deadline_ns=clock_ns(NULL)+limits.worker_ns;previous=clock_ns(NULL);
+    for(block=0;block<limits.blocks;block++) {
         ssize_t bytes;uint64_t stamped,elapsed;size_t skip=0;
         NEED(!interrupted,"wall_deadline");
         bytes=iio_buffer_refill(buffer);stamped=clock_ns(NULL);elapsed=stamped-previous;previous=stamped;
@@ -410,7 +422,7 @@ int main(int argc,char **argv)
             NEED(!pthread_create(&s->thread,NULL,worker_thread,s),"worker_start");s->started=1;
         }
     }
-    NEED(wide(capture.words+4)==CHUNK*BLOCKS && wide(capture.words+6)==CHUNK*BLOCKS && !(capture.words[19]&3),"finite_source_complete");
+    NEED(wide(capture.words+4)==CHUNK*limits.blocks && wide(capture.words+6)==CHUNK*limits.blocks && !(capture.words[19]&3),"finite_source_complete");
     rc=0;
 done:
     if(s && s->started) {

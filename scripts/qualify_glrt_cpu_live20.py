@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""One 10.067-second .20 live CPU acquisition/native-feedback qualification."""
+"""One bounded .20 live CPU acquisition/native-feedback qualification."""
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 import shlex
 import subprocess
@@ -24,7 +25,18 @@ from deploy_glrt_iq_tracking20 import EVIDENCE, PASSWORD
 ARTIFACTS = ('capture.txt', 'iq.ci16', 'worker.jsonl', 'worker.iq.ci16', 'grids.u32', 'native.journal')
 
 
-def configure_idle_rx(context, *, rate, lo_hz, evidence):
+def configure_idle_rx(context, *, rate, lo_hz, evidence, memory_info, blocks):
+    if blocks not in (1536, 4096):
+        raise ValueError('unsupported capture length')
+    required_kib = 16384*blocks*4//1024 + 80*1024
+    matches = re.findall(r'^MemAvailable:\s+(\d+) kB$', memory_info, re.MULTILINE)
+    if len(matches) != 1:
+        raise ValueError('missing or malformed MemAvailable')
+    available_kib = int(matches[0])
+    evidence['memory_preflight'] = {'available_kib': available_kib, 'required_kib': required_kib,
+                                  'headroom_kib': 80*1024}
+    if available_kib < required_kib:
+        raise ValueError('insufficient RAM for retained capture and worker headroom')
     device = context.find_device('starlink-glrt-iq')
     if device is None:
         raise ValueError('missing GLI1 capture device')
@@ -44,6 +56,8 @@ def main():
     parser.add_argument('--deployment', type=Path, required=True)
     parser.add_argument('--rate', type=int, choices=(30000000, 60000000), required=True)
     parser.add_argument('--binary', type=Path, required=True)
+    parser.add_argument('--blocks', type=int, choices=(1536, 4096), default=1536,
+                        help='16384-sample refills: 10.066 or 26.844 seconds at 2.5 MS/s')
     parser.add_argument('--lo-hz', type=int, default=1690312496,
                         help='Receive LO for this one bounded dwell; default is the historical .20 upper edge')
     parser.add_argument('--output', type=Path, required=True)
@@ -60,8 +74,9 @@ def main():
        hashes['references'] != '78b50e1aea5c350889b0798fc691491299925932e496a918cd5fbd3b9bc4faf2':
         raise ValueError('reference bank differs from reviewed image')
     args.output.mkdir(parents=True, exist_ok=False)
-    evidence = {'rate': args.rate, 'requested_lo_hz': args.lo_hz, 'rf_sample_limit': 16384*1536,
-                'rf_duration_limit_s': 16384*1536/2500000, 'payload_sha256': hashes,
+    evidence = {'rate': args.rate, 'requested_lo_hz': args.lo_hz, 'blocks': args.blocks,
+                'rf_sample_limit': 16384*args.blocks,
+                'rf_duration_limit_s': 16384*args.blocks/2500000, 'payload_sha256': hashes,
                 'status': 'started', 'live_tracking_qualified': False}
     remote = '/tmp/gli-live20-'+uuid.uuid4().hex
     evidence['remote_directory'] = remote
@@ -92,6 +107,8 @@ def main():
         try:
             evidence['before'] = g.attest_tx_safe_idle(transport, plan, serial=ENDPOINT[0],
                 host=ENDPOINT[1], layout=profile.return_iio_layout)
+            memory = run('cat /proc/meminfo');memory.check_returncode()
+            evidence['memory_before'] = memory.stdout.decode()
             import iio
             context = iio.Context('ip:'+ENDPOINT[1])
             try:
@@ -99,7 +116,8 @@ def main():
                 if context.attrs['hw_serial'] != ENDPOINT[0] or context.attrs['fw_version'] != plan['expected_firmware']:
                     raise ValueError('configuration identity differs')
                 evidence['configured'] = configure_idle_rx(context, rate=args.rate,
-                    lo_hz=args.lo_hz, evidence=evidence)
+                    lo_hz=args.lo_hz, evidence=evidence, blocks=args.blocks,
+                    memory_info=evidence['memory_before'])
                 evidence['calibration'] = {}
                 save()
                 g.calibrate_rx(context.find_device('ad9361-phy'), source_rate=args.rate,
@@ -116,8 +134,11 @@ def main():
                     raise ValueError('staged payload differs')
             run('chmod 700 '+shlex.quote(remote+'/probe')).check_returncode()
             print(json.dumps({'phase': 'starting_bounded_live_capture', 'rate': args.rate}), flush=True)
-            result = run(shlex.join([remote+'/probe', str(args.rate), ENDPOINT[0],
-                                    remote+'/bank', remote+'/references', remote]))
+            command = [remote+'/probe', str(args.rate), ENDPOINT[0],
+                       remote+'/bank', remote+'/references', remote]
+            if args.blocks != 1536:
+                command.append(str(args.blocks))
+            result = run(shlex.join(command), timeout=60 if args.blocks == 4096 else 45)
             terminal = True
             evidence['probe_exit_code'] = result.returncode
             (args.output/'stdout.json').write_bytes(result.stdout)

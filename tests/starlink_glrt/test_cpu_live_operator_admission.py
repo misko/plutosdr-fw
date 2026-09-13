@@ -74,8 +74,10 @@ def test_refusal_precedes_radio_contact_and_records_busy_receipt(tmp_path, monke
 @pytest.mark.parametrize('case', [
     'ready', 'boot_drops', 'unread', 'active', 'unaccounted', 'fault',
     'epoch_valid', 'uncleared', 'wrong_rate', 'malformed', 'missing',
+    'memory_short', 'memory_missing', 'memory_unit', 'memory_duplicate',
 ])
-def test_native_preflight_precedes_every_rf_mutation(tmp_path, monkeypatch, case):
+@pytest.mark.parametrize('blocks', [1536,4096])
+def test_native_preflight_precedes_every_rf_mutation(tmp_path, monkeypatch, case, blocks):
     """A prior failed controller's retained results survive a later invocation."""
     def module(name, **values):
         result = ModuleType(name)
@@ -115,11 +117,21 @@ def test_native_preflight_precedes_every_rf_mutation(tmp_path, monkeypatch, case
         'tracking_snapshot': SimpleNamespace(value=wire)})
     context = SimpleNamespace(find_device=lambda name: device)
     evidence = {}
+    required_kib = 16384*blocks*4//1024 + 80*1024
+    memory_info = f'MemAvailable:    {required_kib} kB\n'
+    if case == 'memory_short': memory_info = f'MemAvailable: {required_kib-1} kB\n'
+    if case == 'memory_missing': memory_info = 'MemFree: 500000 kB\n'
+    if case == 'memory_unit': memory_info = f'MemAvailable: {required_kib} MB\n'
+    if case == 'memory_duplicate': memory_info *= 2
     if case in ('ready', 'boot_drops'):
-        operator.configure_idle_rx(context, rate=30000000, lo_hz=1690312496, evidence=evidence)
+        operator.configure_idle_rx(context, rate=30000000, lo_hz=1690312496, evidence=evidence,
+                                   memory_info=memory_info, blocks=blocks)
         assert len(mutations) == 1 and mutations[0]['source_rate'] == 30000000
+        assert evidence['memory_preflight']['required_kib'] == required_kib
     else:
         with pytest.raises(ValueError):
-            operator.configure_idle_rx(context, rate=30000000, lo_hz=1690312496, evidence=evidence)
+            operator.configure_idle_rx(context, rate=30000000, lo_hz=1690312496, evidence=evidence,
+                                       memory_info=memory_info, blocks=blocks)
         assert mutations == []
-    if case != 'missing': assert evidence['tracking_before_configuration'] == wire
+    if case != 'missing' and not case.startswith('memory_'):
+        assert evidence['tracking_before_configuration'] == wire

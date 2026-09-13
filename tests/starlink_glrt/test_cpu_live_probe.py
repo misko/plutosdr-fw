@@ -36,7 +36,7 @@ void *live_new(const int16_t *refs,const int16_t *bank,const char *directory,
     t->ring=malloc(RING*4U);t->fft=fftw_malloc(GLRT_RESOLVER_FFT*sizeof(*t->fft));
     if(!t->ring || !t->fft || pthread_mutex_init(&s->mutex,NULL)) abort();
     memcpy(s->refs,refs,sizeof(s->refs));memcpy(s->bank,bank,sizeof(s->bank));
-    s->native=*ports;s->epoch=3;s->rate=rate;t->end=1000000;
+    s->native=*ports;s->epoch=3;s->rate=rate;s->attempt_limit=ATTEMPTS;t->end=1000000;
     s->fft=fftw_plan_dft_1d(GLRT_RESOLVER_FFT,t->fft,t->fft,FFTW_FORWARD,FFTW_ESTIMATE|FFTW_UNALIGNED);
     if(!s->fft || glrt_tracking_iq_owner_init(&s->owner,t->ring,RING,s->epoch,t->end)) abort();
     snprintf(path,sizeof(path),"%s/worker.jsonl",directory);s->journal=fopen(path,"wx");
@@ -50,6 +50,15 @@ int live_publish(struct test_live *t,const int16_t *iq,size_t count)
     int rc=glrt_tracking_iq_owner_publish(&t->live.owner,3,t->end,iq,count,t->end+count,clock_ns(NULL));
     if(!rc) t->end+=count;
     return rc;
+}
+int live_set_dwell(struct test_live *t,const char *blocks,uint64_t out[4])
+{
+    struct dwell_limits limits;
+    if(dwell_limits(blocks,&limits)) return -1;
+    if(t) t->live.attempt_limit=limits.attempts;
+    out[0]=limits.blocks;out[1]=limits.attempts;
+    out[2]=limits.alarm_seconds;out[3]=limits.worker_ns;
+    return 0;
 }
 void live_start(struct test_live *t)
 {
@@ -124,6 +133,8 @@ def live_api(tmp_path_factory):
     lib.live_new.argtypes = [c.c_void_p, c.c_void_p, c.c_char_p, c.POINTER(Ports), c.c_uint]
     lib.live_new.restype = c.c_void_p
     lib.live_publish.argtypes = [c.c_void_p, c.c_void_p, c.c_size_t]
+    lib.live_set_dwell.argtypes = [c.c_void_p, c.c_char_p, c.c_void_p]
+    lib.unused_probe_main.argtypes = [c.c_int, c.POINTER(c.c_char_p)]
     lib.live_rank.argtypes = [c.c_void_p,c.c_void_p,c.c_void_p,c.c_uint,c.c_void_p,c.c_void_p]
     lib.live_free_unstarted.argtypes = [c.c_void_p]
     for name in ("live_start", "live_done", "live_stop", "live_close_source"):
@@ -134,6 +145,26 @@ def live_api(tmp_path_factory):
         (rom/"native_direct_2500000_phase4_upper_interleaved.mem").read_bytes(), 2500000, p)
         for p in range(4)], dtype=np.int16)
     return lib, refs
+
+
+@pytest.mark.parametrize('blocks,expected', [
+    (None, [1536,6,25,12000000000]), (b'1536', [1536,6,25,12000000000]),
+    (b'4096', [4096,16,45,30000000000]),
+])
+def test_dwell_profiles_have_finite_capture_and_worker_limits(live_api, blocks, expected):
+    lib, _ = live_api
+    out = (c.c_uint64*4)()
+    assert lib.live_set_dwell(None, blocks, out) == 0
+    assert list(out) == expected
+    assert out[0]*16384/2500000 < 30
+
+
+@pytest.mark.parametrize('blocks', [b'0', b'4097', b'-1', b'4096garbage', b'4294967296'])
+def test_invalid_dwell_rejected_before_opening_evidence_or_radio(live_api, tmp_path, blocks):
+    lib, _ = live_api
+    args = [b'probe', b'30000000', b'serial', b'missing-bank', b'missing-refs', os.fsencode(tmp_path), blocks]
+    assert lib.unused_probe_main(len(args), (c.c_char_p*len(args))(*args)) == 2
+    assert not list(tmp_path.iterdir())
 
 
 @pytest.mark.parametrize('mode', ['secondary_pilot', 'noise', 'zero', 'cancel', 'invalid_epoch'])
@@ -173,7 +204,7 @@ def test_original_pilot_order_matches_independent_fft(live_api, tmp_path, mode):
 
 @pytest.mark.parametrize("rate,mode", [(30000000,"signal"),(60000000,"signal"),
     (60000000,"publication_lag"),(60000000,"handoff_horizon_expired"),
-    (30000000,"zero"),(30000000,"cancel"),(30000000,"source_loss"),
+    (30000000,"zero"),(30000000,"zero_long"),(30000000,"cancel"),(30000000,"source_loss"),
     (30000000,"native_rejection"),(30000000,"native_retention"),(30000000,"late_handoff")])
 def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilot_moments, tmp_path, rate, mode):
     lib, refs = live_api
@@ -195,6 +226,8 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
     ports = Ports(None, Read(read), Write(radio.write), Retain(radio.retain), Clock(lambda _: radio.time))
     coefficients = bank()
     handle = lib.live_new(refs.ctypes.data, coefficients.ctypes.data, os.fsencode(tmp_path), c.byref(ports), rate)
+    if mode == 'zero_long':
+        assert lib.live_set_dwell(handle, b'4096', (c.c_uint64*4)()) == 0
     iq = np.zeros((10_000_000, 2), dtype=np.int16)
     if mode in ("signal", "publication_lag", "handoff_horizon_expired", "native_rejection", "native_retention", "late_handoff"):
         for frame in range(3000):
@@ -223,6 +256,9 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
         out = (c.c_uint64*5)();lib.live_finish(handle, out)
     assert not radio.errors, radio.errors
     rows = [json.loads(s) for s in (tmp_path/"worker.jsonl").read_text().splitlines()]
+    if mode == 'zero_long':
+        assert out[1] == 16 and out[2] == 0
+        assert len([r for r in rows if r['kind'] == 'scan']) == 16
     if mode in ("signal", "publication_lag"):
         assert list(out)[0] == 0, (list(out), rows[-3:])
         assert list(out)[2:] == [1,1500,1500]

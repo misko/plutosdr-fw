@@ -25,6 +25,17 @@ controller cleanup also have finite timeouts. Shutdown joins workers before
 destroying their IQ/FFT storage. A failed native recovery leaves unread heads
 uncleared for retained recovery.
 
+The optional `--blocks 4096` operator argument selects a 26.8435456-second
+dwell (67108864 complex samples), at most sixteen coarse attempts, a
+30-second worker deadline and a 45-second cancellation alarm. The C executable
+accepts the corresponding final positional argument `4096`; only `1536` and
+`4096` are admitted. Resolver and native-controller budgets are unchanged.
+Before RF configuration, both profiles require `/proc/meminfo` to report enough
+`MemAvailable` for the full retained CI16 capture plus 80 MiB of worker and
+system headroom: 176 MiB for the default or 336 MiB for the longer dwell.
+The operator retains this preflight and waits at most 60 seconds for the
+longer executable. There is no retry after an uncertain remote execution.
+
 REBASE occurs only after capture starts. Its returned native counter defines
 a conservative new-epoch boundary. Samples whose signal centers precede that
 boundary are recorded but excluded from the worker's IQ owner. The journal
