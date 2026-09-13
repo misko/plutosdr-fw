@@ -77,7 +77,11 @@ int live_set_dwell(struct test_live *t,const char *blocks,uint64_t out[4])
     struct dwell_limits limits;
     if(dwell_limits(blocks,&limits)) return -1;
     if(t) { t->live.attempt_limit=limits.attempts;t->live.selected_iq=limits.selected_iq;
-        t->live.observer_spacing=limits.observer_spacing; }
+        t->live.observer_spacing=limits.observer_spacing;t->live.rank_budget=limits.rank_budget;
+        if(limits.rank_budget==64 && !t->live.ranking_fft) {
+            t->live.ranking_fft=fftw_plan_dft_1d(4096,t->fft,t->fft,FFTW_FORWARD,FFTW_ESTIMATE|FFTW_UNALIGNED);
+            if(!t->live.ranking_fft) abort();
+        } }
     out[0]=limits.blocks;out[1]=limits.attempts;
     out[2]=limits.alarm_seconds;out[3]=limits.worker_ns;
     return 0;
@@ -185,6 +189,8 @@ int live_rank(struct test_live *t,const int16_t *iq,const unsigned *epochs,unsig
     struct live *s=&t->live;
     memcpy(s->scan_iq,iq,sizeof(s->scan_iq));s->coarse.count=count;
     for(unsigned k=0;k<count && k<8;k++) s->coarse.peaks[k].epoch=epochs[k];
+    s->wide_count=count;
+    for(unsigned k=0;k<count && k<64;k++) s->wide_peaks[k].epoch=epochs[k];
     s->deadline_ns=clock_ns(NULL)+UINT64_C(3000000000);
     return rank_candidates(s,scores,selected);
 }
@@ -197,7 +203,7 @@ void live_free_unstarted(struct test_live *t)
     fclose(s->native_coarse_iq);fclose(t->capture);
     fclose(s->observer_journal);fclose(s->observer_iq);
     if(s->scan_samples) fclose(s->scan_samples);
-    fftw_destroy_plan(s->fft);fftw_free(t->fft);free(t->ring);
+    fftw_destroy_plan(s->fft);if(s->ranking_fft) fftw_destroy_plan(s->ranking_fft);fftw_free(t->fft);free(t->ring);
     if(pthread_mutex_destroy(&s->mutex)) abort();
     free(t);
 }
@@ -213,7 +219,7 @@ void live_finish(struct test_live *t,uint64_t out[5])
     fclose(s->native_coarse_iq);fclose(t->capture);
     fclose(s->observer_journal);fclose(s->observer_iq);
     if(s->scan_samples) fclose(s->scan_samples);
-    fftw_destroy_plan(s->fft);fftw_free(t->fft);free(t->ring);
+    fftw_destroy_plan(s->fft);if(s->ranking_fft) fftw_destroy_plan(s->ranking_fft);fftw_free(t->fft);free(t->ring);
     if(pthread_mutex_destroy(&s->mutex)) abort();
     free(t);
 }
@@ -275,6 +281,7 @@ def live_api(tmp_path_factory):
     (b'45000', [45000,200,325,300000000000]),
     (b'1536-selected', [1536,6,25,12000000000]),
     (b'1536-selected-observer3', [1536,6,25,12000000000]),
+    (b'1536-selected-observer3-scan64', [1536,6,25,12000000000]),
 ])
 def test_dwell_profiles_have_finite_capture_and_worker_limits(live_api, blocks, expected):
     lib, _ = live_api
@@ -348,13 +355,17 @@ def test_paired_iq_waits_for_real_publication_and_rejects_lost_inputs(live_api, 
 
 
 @pytest.mark.parametrize('mode', ['secondary_pilot', 'noise', 'zero', 'cancel', 'invalid_epoch'])
-def test_original_pilot_order_matches_independent_fft(live_api, tmp_path, mode):
+@pytest.mark.parametrize('wide',[False,True])
+def test_original_pilot_order_matches_independent_fft(live_api, tmp_path, mode,wide):
     lib, refs = live_api
     coefficients = bank()
     ports = Ports()
     handle = lib.live_new(refs.ctypes.data, coefficients.ctypes.data, os.fsencode(tmp_path), c.byref(ports), 60000000)
     iq = np.random.default_rng(982).integers(-100,101,(14000,2),dtype=np.int16)
     epochs = np.array([500,1023,1800,2200,2600,3000,50,3250],dtype=np.uint32)
+    if wide:
+        assert lib.live_set_dwell(handle,b'1536-selected-observer3-scan64',(c.c_uint64*4)())==0
+        epochs=np.concatenate([epochs,np.arange(56,dtype=np.uint32)*53])
     if mode == 'secondary_pilot':
         ref = refs[0,:,0].astype(float)+1j*refs[0,:,1]
         pilot = ref*np.exp(2j*np.pi*464356*np.arange(3300)/2500000)
@@ -362,9 +373,9 @@ def test_original_pilot_order_matches_independent_fft(live_api, tmp_path, mode):
     if mode == 'zero': iq[:]=0
     if mode == 'cancel': lib.live_stop(handle)
     if mode == 'invalid_epoch': epochs[7]=3333
-    scores = np.full(8,999.,dtype=np.float64);selected=c.c_uint(999)
+    scores = np.full(len(epochs),999.,dtype=np.float64);selected=c.c_uint(999)
     try:
-        rc = lib.live_rank(handle,iq.ctypes.data,epochs.ctypes.data,8,scores.ctypes.data,c.byref(selected))
+        rc = lib.live_rank(handle,iq.ctypes.data,epochs.ctypes.data,len(epochs),scores.ctypes.data,c.byref(selected))
     finally:
         lib.live_free_unstarted(handle)
     if mode in ('cancel','invalid_epoch'):
@@ -375,7 +386,7 @@ def test_original_pilot_order_matches_independent_fft(live_api, tmp_path, mode):
     for epoch in epochs:
         cut=iq[int(epoch)+22:int(epoch)+3322].astype(float)
         z=cut[:,0]+1j*cut[:,1]
-        expected.append(max(abs(np.fft.fft(z*np.conj(ref),16384))**2)/
+        expected.append(max(abs(np.fft.fft(z*np.conj(ref),4096 if wide else 16384))**2)/
                         max(float(np.vdot(z,z).real*np.vdot(ref,ref).real),1))
     assert rc == 0 and selected.value == np.argmax(expected)
     np.testing.assert_allclose(scores,expected,rtol=2e-12,atol=2e-15)
@@ -607,7 +618,7 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
 
 @pytest.mark.parametrize('rate', [30000000,60000000])
 @pytest.mark.parametrize('mode', [
-    'loss_then_supported','four_losses','attempt_budget','full_profile','visit_full_profile','visit_selected_profile','short_observer3','worker_error',
+    'loss_then_supported','four_losses','attempt_budget','full_profile','visit_full_profile','visit_selected_profile','short_observer3','short_scan64','worker_error',
     'retention_error','restart_budget','cancel','deadline','uncleared','source_gap',
     'wrong_epoch','wrong_rate','unread_head','read_failure','rebase_same_epoch',
     'rebase_short_write',
@@ -651,6 +662,8 @@ def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
         lib.live_visit_mode(handle)
     if mode=='short_observer3':
         assert lib.live_set_dwell(handle,b'1536-selected-observer3',(c.c_uint64*4)())==0
+    if mode=='short_scan64':
+        assert lib.live_set_dwell(handle,b'1536-selected-observer3-scan64',(c.c_uint64*4)())==0
     iq=np.zeros((10_000_000,2),dtype=np.int16)
     for frame in range(3000):
         start=22+(frame*10000+1)//3
@@ -735,7 +748,7 @@ def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
             if fault or mode=='attempt_budget' or episode==3:
                 assert admitted==0
                 break
-            if mode in ('visit_selected_profile','short_observer3'):
+            if mode in ('visit_selected_profile','short_observer3','short_scan64'):
                 assert admitted==0  # Return clean loss to the LO owner, without same-LO REBASE.
                 break
             if mode in ('uncleared','source_gap','wrong_epoch','wrong_rate','unread_head','read_failure'):
@@ -767,7 +780,14 @@ def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
         out=(c.c_uint64*5)();lib.live_finish(handle,out)
     assert not radio.errors,radio.errors
     rows=[json.loads(line) for line in (tmp_path/'worker.jsonl').read_text().splitlines()]
-    check_observer_evidence(tmp_path,iq,1000000,rows,rate,3 if mode=='short_observer3' else 9)
+    check_observer_evidence(tmp_path,iq,1000000,rows,rate,3 if mode in ('short_observer3','short_scan64') else 9)
+    if mode=='short_scan64':
+        scans=[r for r in rows if r['kind']=='scan']
+        ranks=[r for r in rows if r['kind']=='candidate_order']
+        assert scans and ranks and len(scans)==len(ranks)
+        assert all(len(r['peaks'])==64 for r in scans)
+        assert all(r['ranking_fft']==4096 and r['candidate_budget']==64 and len(r['single_pilot_power'])==64 for r in ranks)
+        assert any(r['kind']==4 for r in rows)
     if mode in ('loss_then_supported','four_losses'):
         assert len(episodes)==(2 if mode=='loss_then_supported' else 4)
         scans=[r for r in rows if r['kind']=='scan']

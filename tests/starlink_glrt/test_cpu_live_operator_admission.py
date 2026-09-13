@@ -222,6 +222,19 @@ def test_selected_capture_budget_and_artifacts_are_explicit(storage_operator):
         with pytest.raises(ValueError): storage_operator.capture_artifacts(blocks)
 
 
+@pytest.mark.parametrize('blocks,spacing,budget,valid',[
+    (1536,3,64,True),(1536,9,64,False),(4096,3,64,False),(45000,9,64,False),
+    (1536,3,65,False),(1536,3,0,False)])
+def test_expanded_scan_is_admitted_only_in_short_selected_profile(storage_operator,blocks,spacing,budget,valid):
+    if valid:
+        assert storage_operator.observer_profile(blocks,spacing,budget)=='1536-selected-observer3-scan64'
+        artifacts=storage_operator.capture_artifacts(blocks,spacing)
+        assert 'scan.iq.ci16' in artifacts and 'iq.ci16' not in artifacts
+        assert not any(n.startswith('native-') for n in artifacts)
+    else:
+        with pytest.raises(ValueError):storage_operator.observer_profile(blocks,spacing,budget)
+
+
 @pytest.mark.parametrize('missing',[None,'observer.jsonl','observer.iq.ci16'])
 def test_observer_artifacts_are_required_even_without_handoff(storage_operator,missing):
     evidence={'artifacts':{name:{'bytes':0} for name in ('observer.jsonl','observer.iq.ci16')}}

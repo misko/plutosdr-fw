@@ -37,10 +37,13 @@ def retention_budget_kib(blocks):
     return 256*1024 if blocks == 45000 else 16384*blocks*4//1024
 
 
-def observer_profile(blocks, spacing):
+def observer_profile(blocks, spacing, candidate_budget=8):
     retention_budget_kib(blocks)
     if spacing not in (3,9) or (spacing==3 and blocks!=1536):
         raise ValueError('three-frame observer requires the bounded 1536-block profile')
+    if candidate_budget not in (8,64) or (candidate_budget==64 and (blocks!=1536 or spacing!=3)):
+        raise ValueError('64 candidates require the bounded three-frame observer profile')
+    if candidate_budget==64: return '1536-selected-observer3-scan64'
     return '1536-selected-observer3' if spacing==3 else str(blocks)
 
 
@@ -131,6 +134,7 @@ def main():
     parser.add_argument('--rate', type=int, choices=(30000000, 60000000), required=True)
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--observer-spacing',type=int,choices=(3,9),default=9)
+    parser.add_argument('--candidate-budget',type=int,choices=(8,64),default=8)
     parser.add_argument('--blocks', type=int, choices=(1536, 4096, 45000), default=1536,
                         help='1536/4096 retain full IQ for 10.066/26.844 s; '
                              '45000 retains searched windows for at most 294.912 s or 200 attempts')
@@ -138,7 +142,7 @@ def main():
                         help='Receive LO for this one bounded dwell; default is the historical .20 upper edge')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
-    selected_profile=observer_profile(args.blocks,args.observer_spacing)
+    selected_profile=observer_profile(args.blocks,args.observer_spacing,args.candidate_budget)
     artifacts = capture_artifacts(args.blocks,args.observer_spacing)
     if not 70000000 <= args.lo_hz <= 6000000000:
         raise ValueError('receive LO is outside the AD9361 range')
@@ -156,6 +160,8 @@ def main():
                 'rf_sample_limit': 16384*args.blocks,
                 'rf_duration_limit_s': 16384*args.blocks/2500000, 'payload_sha256': hashes,
                 'profile': selected_profile,
+                'candidate_budget': args.candidate_budget,
+                'ranking_fft': 4096 if args.candidate_budget==64 else 16384,
                 'retention_mode': 'selected_windows' if args.blocks == 45000 or args.observer_spacing==3 else 'full',
                 'passive_observer': {'rate': 2500000, 'feedback_authority': False,
                                      'frame_spacing': args.observer_spacing,

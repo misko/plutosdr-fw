@@ -28,19 +28,21 @@
 #define PAIR_SAMPLES 3333U
 #define RESTART_LIMIT 3U
 struct paired_head { uint32_t words[32]; };
-struct dwell_limits { unsigned blocks,attempts,alarm_seconds; uint64_t worker_ns; int selected_iq; unsigned observer_spacing; };
+struct dwell_limits { unsigned blocks,attempts,alarm_seconds; uint64_t worker_ns; int selected_iq; unsigned observer_spacing,rank_budget; };
 static int dwell_limits(const char *blocks,struct dwell_limits *out)
 {
     if(!blocks || !strcmp(blocks,"1536"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),0,9};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),0,9,8};
     else if(!strcmp(blocks,"4096"))
-        *out=(struct dwell_limits){4096,16,45,UINT64_C(30000000000),0,9};
+        *out=(struct dwell_limits){4096,16,45,UINT64_C(30000000000),0,9,8};
     else if(!strcmp(blocks,"45000"))
-        *out=(struct dwell_limits){45000,200,325,UINT64_C(300000000000),1,9};
+        *out=(struct dwell_limits){45000,200,325,UINT64_C(300000000000),1,9,8};
     else if(!strcmp(blocks,"1536-selected"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,9};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,9,8};
     else if(!strcmp(blocks,"1536-selected-observer3"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,8};
+    else if(!strcmp(blocks,"1536-selected-observer3-scan64"))
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,64};
     else return -1;
     return 0;
 }
@@ -67,6 +69,10 @@ struct live {
     struct glrt_native_ports native;
     int16_t bank[12][11][11][2],refs[52800],scan_iq[28000];
     fftw_plan fft;
+    fftw_plan ranking_fft;
+    unsigned rank_budget;
+    uint32_t wide_count;
+    struct glrt_cpu_coarse_peak wide_peaks[64];
     FILE *journal,*worker_iq,*grids,*scan_samples,*native_coarse_iq;
     uint64_t iq_samples,deadline_ns,scan_iq_samples;
     struct paired_head paired[PAIR_LIMIT];
@@ -293,35 +299,45 @@ static int scan(struct live *s)
     if(pthread_join(child,NULL)) _exit(2);
     if(p[0].result || p[1].result) return -1;
     s->coarse.completed_epochs=p[0].completed+p[1].completed;
+    if(s->rank_budget==64)
+        return glrt_cpu_coarse_select_bounded(&s->coarse,s->wide_peaks,64,&s->wide_count,cancelled,s);
     return glrt_cpu_coarse_select(&s->coarse,cancelled,s);
 }
+static unsigned proposal_count(const struct live *s)
+{ return s->rank_budget==64 ? s->wide_count : s->coarse.count; }
+static const struct glrt_cpu_coarse_peak *proposal_peaks(const struct live *s)
+{ return s->rank_budget==64 ? s->wide_peaks : s->coarse.peaks; }
 /* Cheap ordering only: one original full pilot per coarse basin, with CFO
  * searched by FFT. The selected proposal must still pass the unchanged
  * four-pilot resolver, retained-history gates and live source deadlines. */
-static int rank_candidates(struct live *s,double scores[8],unsigned *selected)
+static int rank_candidates(struct live *s,double *scores,unsigned *selected)
 {
-    double pending[8]={0},energy=0;
+    double pending[64]={0},energy=0;
     double (*bins)[2]=s->worker.fft_workspace.bins;
-    unsigned best=0,n,k;
-    memset(scores,0,8*sizeof(*scores));*selected=0;
-    if(!s->coarse.count || s->coarse.count>8 || cancelled(s)) return -1;
+    unsigned best=0,n,k,count=proposal_count(s),budget=s->rank_budget==64 ? 64 : 8;
+    unsigned fft_count=budget==64 ? 4096 : GLRT_RESOLVER_FFT;
+    const struct glrt_cpu_coarse_peak *peaks=proposal_peaks(s);
+    memset(scores,0,budget*sizeof(*scores));*selected=0;
+    if(!count || count>budget || cancelled(s) || (budget==64 && !s->ranking_fft)) return -1;
     for(n=0;n<3300;n++) {
         double i=s->refs[4*n],q=s->refs[4*n+1];energy+=i*i+q*q;
     }
     if(!energy) return -1;
-    for(k=0;k<s->coarse.count;k++) {
-        unsigned start=s->coarse.peaks[k].epoch+22;
+    for(k=0;k<count;k++) {
+        unsigned start=peaks[k].epoch+22;
         double observed=0,peak=0,denominator;
-        if(s->coarse.peaks[k].epoch>=3333 || cancelled(s)) return -1;
+        if(peaks[k].epoch>=3333 || cancelled(s)) return -1;
         memset(bins,0,sizeof(s->worker.fft_workspace.bins));
         for(n=0;n<3300;n++) {
             double i=s->scan_iq[2*(start+n)],q=s->scan_iq[2*(start+n)+1];
             double ri=s->refs[4*n],rq=s->refs[4*n+1];
             bins[n][0]=i*ri+q*rq;bins[n][1]=q*ri-i*rq;observed+=i*i+q*q;
         }
-        if(fft(s,bins,GLRT_RESOLVER_FFT) || cancelled(s)) return -1;
+        if(budget==64) fftw_execute_dft(s->ranking_fft,bins,bins);
+        else if(fft(s,bins,GLRT_RESOLVER_FFT)) return -1;
+        if(cancelled(s)) return -1;
         denominator=fmax(observed*energy,1);
-        for(n=0;n<GLRT_RESOLVER_FFT;n++) {
+        for(n=0;n<fft_count;n++) {
             double power=(bins[n][0]*bins[n][0]+bins[n][1]*bins[n][1])/denominator;
             if(!isfinite(power)) return -1;
             if(power>peak) peak=power;
@@ -330,7 +346,7 @@ static int rank_candidates(struct live *s,double scores[8],unsigned *selected)
         if(peak>pending[best]) best=k;
     }
     if(cancelled(s)) return -1;
-    memcpy(scores,pending,sizeof(pending));*selected=best;return 0;
+    memcpy(scores,pending,budget*sizeof(*scores));*selected=best;return 0;
 }
 /* Observe the first 64 retained native heads without changing their authority.
  * Forward exact evidence before remembering metadata; the controller still
@@ -489,23 +505,25 @@ static void *worker_thread(void *pointer)
             s->attempts,candidate.window_start,s->epoch,started,scan_done);view(s->journal,&v);
         if(s->selected_iq) fprintf(s->journal,",\"scan_iq_offset\":%" PRIu64 ",\"scan_iq_samples\":14000",s->scan_iq_samples-14000);
         fputs(",\"peaks\":[",s->journal);
-        for(unsigned n=0;n<s->coarse.count;n++) fprintf(s->journal,"%s[%u,%u,%u]",n ? "," : "",
-            s->coarse.peaks[n].epoch,s->coarse.peaks[n].frequency,s->coarse.peaks[n].score);
+        for(unsigned n=0;n<proposal_count(s);n++) fprintf(s->journal,"%s[%u,%u,%u]",n ? "," : "",
+            proposal_peaks(s)[n].epoch,proposal_peaks(s)[n].frequency,proposal_peaks(s)[n].score);
         fputs("]}\n",s->journal);
         if(ferror(s->journal) || fflush(s->journal) ||
            fwrite(s->coarse.grid,sizeof(s->coarse.grid),1,s->grids)!=1 || fflush(s->grids)) { result=-1;break; }
-        if(!s->coarse.count) continue;
+        if(!proposal_count(s)) continue;
         {
-            double scores[8];unsigned selected;
+            double scores[64];unsigned selected;
             uint64_t rank_started=clock_ns(NULL);
             if(rank_candidates(s,scores,&selected)) { result=cancelled(s) ? GLRT_WORKER_CANCELLED : -1;break; }
             fprintf(s->journal,"{\"kind\":\"candidate_order\",\"attempt\":%u,\"selected_rank\":%u,"
                 "\"started_ns\":%" PRIu64 ",\"completed_ns\":%" PRIu64 ",\"single_pilot_power\":[",
                 s->attempts,selected,rank_started,clock_ns(NULL));
-            for(unsigned n=0;n<s->coarse.count;n++) fprintf(s->journal,"%s%.17g",n ? "," : "",scores[n]);
-            fputs("]}\n",s->journal);
+            for(unsigned n=0;n<proposal_count(s);n++) fprintf(s->journal,"%s%.17g",n ? "," : "",scores[n]);
+            fputs("]",s->journal);
+            if(s->rank_budget==64) fputs(",\"ranking_fft\":4096,\"candidate_budget\":64",s->journal);
+            fputs("}\n",s->journal);
             if(ferror(s->journal) || fflush(s->journal)) { result=-1;break; }
-            candidate.peak=s->coarse.peaks[selected];
+            candidate.peak=proposal_peaks(s)[selected];
         }
         if(candidate.window_start>UINT64_MAX-5000000) { result=-1;break; }
         cfg.source_deadline=candidate.window_start+5000000;
@@ -642,7 +660,7 @@ static int live_probe_run(int argc,char **argv,int visit_mode)
 #define NEED(x,name) do { stage=name; if(!(x)) goto done; } while(0)
     if((argc!=6 && argc!=7) || (strcmp(argv[1],"30000000") && strcmp(argv[1],"60000000")) ||
        dwell_limits(argc==7 ? argv[6] : NULL,&limits)) {
-        fprintf(stderr,"usage: %s 30000000|60000000 SERIAL BANK REFERENCES NEW_OUTPUT_DIRECTORY [1536|4096|45000|1536-selected|1536-selected-observer3]\n",argv[0]);return 2;
+        fprintf(stderr,"usage: %s 30000000|60000000 SERIAL BANK REFERENCES NEW_OUTPUT_DIRECTORY [1536|4096|45000|1536-selected|1536-selected-observer3|1536-selected-observer3-scan64]\n",argv[0]);return 2;
     }
     rate=(uint32_t)strtoul(argv[1],NULL,10);
     action.sa_handler=signal_stop;sigemptyset(&action.sa_mask);
@@ -650,12 +668,16 @@ static int live_probe_run(int argc,char **argv,int visit_mode)
     alarm(limits.alarm_seconds);
     NEED((s=calloc(1,sizeof(*s))) && (ring=malloc(RING*4U)),"storage");
     s->rate=rate;s->attempt_limit=limits.attempts;s->selected_iq=limits.selected_iq;s->visit_mode=visit_mode;
-    s->observer_spacing=limits.observer_spacing;
+    s->observer_spacing=limits.observer_spacing;s->rank_budget=limits.rank_budget;
     NEED(!pthread_mutex_init(&s->mutex,NULL),"mutex");mutex=1;
     NEED(!load(argv[3],s->bank,sizeof(s->bank)) && !load(argv[4],s->refs,sizeof(s->refs)),"reference_files");
     NEED((fft_storage=fftw_malloc(GLRT_RESOLVER_FFT*sizeof(*fft_storage)))!=NULL,"fft_storage");
     s->fft=fftw_plan_dft_1d(GLRT_RESOLVER_FFT,fft_storage,fft_storage,FFTW_FORWARD,FFTW_ESTIMATE|FFTW_UNALIGNED);
     NEED(s->fft!=NULL,"fft_plan");
+    if(s->rank_budget==64) {
+        s->ranking_fft=fftw_plan_dft_1d(4096,fft_storage,fft_storage,FFTW_FORWARD,FFTW_ESTIMATE|FFTW_UNALIGNED);
+        NEED(s->ranking_fft!=NULL,"ranking_fft_plan");
+    }
     /* Directory is created by the operator; every evidence file is new. */
 #define FILE_NEW(field,name,mode) do { NEED(snprintf(path,sizeof(path),"%s/%s",argv[5],name)>0,"path"); NEED((field=fopen(path,mode))!=NULL,"new_evidence"); } while(0)
     FILE_NEW(journal,"capture.txt","wx");
@@ -782,6 +804,7 @@ done:
         if(s->observer_journal && fclose(s->observer_journal)) rc=1;
         if(s->observer_iq && fclose(s->observer_iq)) rc=1;
         if(s->fft) fftw_destroy_plan(s->fft);
+        if(s->ranking_fft) fftw_destroy_plan(s->ranking_fft);
         if(mutex && pthread_mutex_destroy(&s->mutex)) rc=1;
     }
     fftw_free(fft_storage);free(ring);alarm(0);
