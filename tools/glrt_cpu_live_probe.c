@@ -539,7 +539,7 @@ static void *worker_thread(void *pointer)
 static int restart_owner(struct live *s,FILE *capture_journal)
 {
     char raw[4096];uint32_t w[24];int n;
-    if(s->visit_mode || s->started || s->observer_started || !s->done || !s->selected_iq || !s->native_clean_loss ||
+    if(s->observer_spacing==3 || s->visit_mode || s->started || s->observer_started || !s->done || !s->selected_iq || !s->native_clean_loss ||
        s->result!=GLRT_NATIVE_ACQUISITION_LOST || s->restarts>=RESTART_LIMIT ||
        s->attempts>=s->attempt_limit || cancelled(s)) return 0;
     n=s->native.read(s->native.context,"tracking_snapshot",raw,sizeof(raw));

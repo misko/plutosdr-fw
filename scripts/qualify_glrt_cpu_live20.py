@@ -37,9 +37,17 @@ def retention_budget_kib(blocks):
     return 256*1024 if blocks == 45000 else 16384*blocks*4//1024
 
 
-def capture_artifacts(blocks):
+def observer_profile(blocks, spacing):
     retention_budget_kib(blocks)
-    names = tuple('scan.iq.ci16' if blocks == 45000 and name == 'iq.ci16' else name
+    if spacing not in (3,9) or (spacing==3 and blocks!=1536):
+        raise ValueError('three-frame observer requires the bounded 1536-block profile')
+    return '1536-selected-observer3' if spacing==3 else str(blocks)
+
+
+def capture_artifacts(blocks, observer_spacing=9):
+    retention_budget_kib(blocks)
+    observer_profile(blocks,observer_spacing)
+    names = tuple('scan.iq.ci16' if (blocks == 45000 or observer_spacing==3) and name == 'iq.ci16' else name
                   for name in ARTIFACTS)
     # At most three clean-loss restarts. Unopened episode files are recorded
     # as absent; every actual journal stays independently reviewable as GLRJ1.
@@ -122,6 +130,7 @@ def main():
     parser.add_argument('--deployment', type=Path, required=True)
     parser.add_argument('--rate', type=int, choices=(30000000, 60000000), required=True)
     parser.add_argument('--binary', type=Path, required=True)
+    parser.add_argument('--observer-spacing',type=int,choices=(3,9),default=9)
     parser.add_argument('--blocks', type=int, choices=(1536, 4096, 45000), default=1536,
                         help='1536/4096 retain full IQ for 10.066/26.844 s; '
                              '45000 retains searched windows for at most 294.912 s or 200 attempts')
@@ -129,7 +138,8 @@ def main():
                         help='Receive LO for this one bounded dwell; default is the historical .20 upper edge')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
-    artifacts = capture_artifacts(args.blocks)
+    selected_profile=observer_profile(args.blocks,args.observer_spacing)
+    artifacts = capture_artifacts(args.blocks,args.observer_spacing)
     if not 70000000 <= args.lo_hz <= 6000000000:
         raise ValueError('receive LO is outside the AD9361 range')
     plan, profile = g.deployment_identity(args.deployment, serial=ENDPOINT[0], host=ENDPOINT[1])
@@ -145,8 +155,10 @@ def main():
     evidence = {'rate': args.rate, 'requested_lo_hz': args.lo_hz, 'blocks': args.blocks,
                 'rf_sample_limit': 16384*args.blocks,
                 'rf_duration_limit_s': 16384*args.blocks/2500000, 'payload_sha256': hashes,
-                'retention_mode': 'selected_windows' if args.blocks == 45000 else 'full',
+                'profile': selected_profile,
+                'retention_mode': 'selected_windows' if args.blocks == 45000 or args.observer_spacing==3 else 'full',
                 'passive_observer': {'rate': 2500000, 'feedback_authority': False,
+                                     'frame_spacing': args.observer_spacing,
                                      'maximum_measurements_per_episode': 200, 'maximum_episodes': 4 if args.blocks == 45000 else 1},
                 'status': 'started', 'live_tracking_qualified': False}
     remote = '/tmp/gli-live20-'+uuid.uuid4().hex
@@ -214,8 +226,8 @@ def main():
             print(json.dumps({'phase': 'starting_bounded_live_capture', 'rate': args.rate}), flush=True)
             command = [remote+'/probe', str(args.rate), ENDPOINT[0],
                        remote+'/bank', remote+'/references', remote]
-            if args.blocks != 1536:
-                command.append(str(args.blocks))
+            if args.blocks != 1536 or args.observer_spacing==3:
+                command.append(selected_profile)
             execution_attempted = True
             result = run(shlex.join(command), timeout=340 if args.blocks == 45000 else 60 if args.blocks == 4096 else 45)
             terminal = True

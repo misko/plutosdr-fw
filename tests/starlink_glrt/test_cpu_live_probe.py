@@ -607,7 +607,7 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
 
 @pytest.mark.parametrize('rate', [30000000,60000000])
 @pytest.mark.parametrize('mode', [
-    'loss_then_supported','four_losses','attempt_budget','full_profile','visit_full_profile','visit_selected_profile','worker_error',
+    'loss_then_supported','four_losses','attempt_budget','full_profile','visit_full_profile','visit_selected_profile','short_observer3','worker_error',
     'retention_error','restart_budget','cancel','deadline','uncleared','source_gap',
     'wrong_epoch','wrong_rate','unread_head','read_failure','rebase_same_epoch',
     'rebase_short_write',
@@ -649,6 +649,8 @@ def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
     if mode=='visit_selected_profile':
         assert lib.live_set_dwell(handle,b'1536-selected',(c.c_uint64*4)())==0
         lib.live_visit_mode(handle)
+    if mode=='short_observer3':
+        assert lib.live_set_dwell(handle,b'1536-selected-observer3',(c.c_uint64*4)())==0
     iq=np.zeros((10_000_000,2),dtype=np.int16)
     for frame in range(3000):
         start=22+(frame*10000+1)//3
@@ -733,7 +735,7 @@ def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
             if fault or mode=='attempt_budget' or episode==3:
                 assert admitted==0
                 break
-            if mode=='visit_selected_profile':
+            if mode in ('visit_selected_profile','short_observer3'):
                 assert admitted==0  # Return clean loss to the LO owner, without same-LO REBASE.
                 break
             if mode in ('uncleared','source_gap','wrong_epoch','wrong_rate','unread_head','read_failure'):
@@ -765,7 +767,7 @@ def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
         out=(c.c_uint64*5)();lib.live_finish(handle,out)
     assert not radio.errors,radio.errors
     rows=[json.loads(line) for line in (tmp_path/'worker.jsonl').read_text().splitlines()]
-    check_observer_evidence(tmp_path,iq,1000000,rows,rate)
+    check_observer_evidence(tmp_path,iq,1000000,rows,rate,3 if mode=='short_observer3' else 9)
     if mode in ('loss_then_supported','four_losses'):
         assert len(episodes)==(2 if mode=='loss_then_supported' else 4)
         scans=[r for r in rows if r['kind']=='scan']

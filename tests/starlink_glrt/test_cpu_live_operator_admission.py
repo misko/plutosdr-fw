@@ -52,6 +52,20 @@ def test_filesystem_capacity_is_separate_from_available_memory(storage_operator,
             storage_operator.preflight_filesystem(output, remote, blocks, evidence)
 
 
+@pytest.mark.parametrize('blocks,spacing',[(4096,3),(45000,3),(1536,0),(1536,6)])
+def test_observer_cadence_rejects_unbounded_or_unknown_profile(storage_operator,blocks,spacing):
+    with pytest.raises(ValueError): storage_operator.observer_profile(blocks,spacing)
+    with pytest.raises(ValueError): storage_operator.capture_artifacts(blocks,spacing)
+
+
+def test_three_frame_profile_retains_selected_iq_and_one_episode(storage_operator):
+    assert storage_operator.observer_profile(1536,3)=='1536-selected-observer3'
+    names=storage_operator.capture_artifacts(1536,3)
+    assert 'scan.iq.ci16' in names and 'iq.ci16' not in names
+    assert 'observer.jsonl' in names and 'observer.iq.ci16' in names
+    assert not any(name.startswith('native-') for name in names)
+
+
 @pytest.mark.parametrize('mounted', [False,True])
 @pytest.mark.parametrize('attempted,terminal,retrieved,expected', [
     (False,False,False,True), (True,False,False,False),
