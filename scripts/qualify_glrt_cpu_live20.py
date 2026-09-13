@@ -25,7 +25,7 @@ from deploy_glrt_iq_tracking20 import EVIDENCE, PASSWORD
 ARTIFACTS = ('capture.txt', 'iq.ci16', 'worker.jsonl', 'worker.iq.ci16', 'grids.u32', 'native.journal')
 
 
-def configure_idle_rx(context, *, rate, lo_hz, evidence, memory_info, blocks):
+def preflight_memory(memory_info, blocks, evidence):
     if blocks not in (1536, 4096):
         raise ValueError('unsupported capture length')
     required_kib = 16384*blocks*4//1024 + 80*1024
@@ -37,6 +37,34 @@ def configure_idle_rx(context, *, rate, lo_hz, evidence, memory_info, blocks):
                                   'headroom_kib': 80*1024}
     if available_kib < required_kib:
         raise ValueError('insufficient RAM for retained capture and worker headroom')
+
+
+def preflight_filesystem(output, remote, blocks, evidence):
+    # BusyBox df -Pk produces one header and one row for this exact path.
+    lines = output.splitlines()
+    fields = lines[1].split() if len(lines) == 2 else []
+    if len(fields) != 6 or fields[0] != 'tmpfs' or not fields[3].isdigit() or \
+       fields[5] != (remote if blocks == 4096 else '/tmp'):
+        raise ValueError('unexpected evidence filesystem')
+    required_kib = 16384*blocks*4//1024 + 40*1024
+    evidence['filesystem_preflight'] = {'available_kib': int(fields[3]),
+        'required_kib': required_kib, 'mountpoint': fields[5], 'df': output}
+    if int(fields[3]) < required_kib:
+        raise ValueError('insufficient evidence filesystem space')
+
+
+def cleanup_evidence(run, remote, names, *, mounted, execution_attempted, terminal, retrieved):
+    if execution_attempted and not (terminal and retrieved):
+        return False
+    run('rm -f '+shlex.join([remote+'/'+name for name in names])).check_returncode()
+    if mounted:
+        run('umount '+shlex.quote(remote)).check_returncode()
+    run('rmdir '+shlex.quote(remote)).check_returncode()
+    return True
+
+
+def configure_idle_rx(context, *, rate, lo_hz, evidence, memory_info, blocks):
+    preflight_memory(memory_info, blocks, evidence)
     device = context.find_device('starlink-glrt-iq')
     if device is None:
         raise ValueError('missing GLI1 capture device')
@@ -103,12 +131,21 @@ def main():
     with lease, acquire_radio_lock(ENDPOINT[0]):
         transport = b.BoundSshBootstrapTransport(interface=None, host=ENDPOINT[1],
             password=PASSWORD.read_text().strip(), known_hosts_file=EVIDENCE/'radio20.known_hosts')
-        staged = terminal = retrieved = False
+        staged = mounted = execution_attempted = terminal = retrieved = False
         try:
             evidence['before'] = g.attest_tx_safe_idle(transport, plan, serial=ENDPOINT[0],
                 host=ENDPOINT[1], layout=profile.return_iio_layout)
             memory = run('cat /proc/meminfo');memory.check_returncode()
             evidence['memory_before'] = memory.stdout.decode()
+            preflight_memory(evidence['memory_before'], args.blocks, evidence)
+            run('mkdir '+shlex.quote(remote)).check_returncode()
+            staged = True
+            if args.blocks == 4096:
+                run('mount -t tmpfs -o size=320m,nosuid,nodev tmpfs '+shlex.quote(remote)).check_returncode()
+                mounted = True
+                evidence['private_tmpfs_kib'] = 320*1024
+            filesystem = run('df -Pk '+shlex.quote(remote));filesystem.check_returncode()
+            preflight_filesystem(filesystem.stdout.decode(), remote, args.blocks, evidence)
             import iio
             context = iio.Context('ip:'+ENDPOINT[1])
             try:
@@ -125,8 +162,6 @@ def main():
             finally:
                 _close_iio_context(iio, context)
                 save()
-            run('mkdir '+shlex.quote(remote)).check_returncode()
-            staged = True
             for name, data in payload.items():
                 run('cat > '+shlex.quote(remote+'/'+name), data).check_returncode()
                 check = run('sha256sum '+shlex.quote(remote+'/'+name));check.check_returncode()
@@ -138,6 +173,7 @@ def main():
                        remote+'/bank', remote+'/references', remote]
             if args.blocks != 1536:
                 command.append(str(args.blocks))
+            execution_attempted = True
             result = run(shlex.join(command), timeout=60 if args.blocks == 4096 else 45)
             terminal = True
             evidence['probe_exit_code'] = result.returncode
@@ -173,11 +209,11 @@ def main():
             try:
                 evidence['after'] = g.attest_tx_safe_idle(transport, plan, serial=ENDPOINT[0],
                     host=ENDPOINT[1], layout=profile.return_iio_layout)
-                if staged and terminal and retrieved:
+                if staged:
                     names = (*payload, *ARTIFACTS)
-                    run('rm -f '+shlex.join([remote+'/'+name for name in names])+
-                        ' && rmdir '+shlex.quote(remote)).check_returncode()
-                    evidence['temporary_files_removed'] = True
+                    evidence['temporary_files_removed'] = cleanup_evidence(run, remote, names,
+                        mounted=mounted, execution_attempted=execution_attempted,
+                        terminal=terminal, retrieved=retrieved)
             finally:
                 save()
     print(json.dumps({'status': evidence['status'], 'rate': args.rate, 'output': str(args.output)}), flush=True)

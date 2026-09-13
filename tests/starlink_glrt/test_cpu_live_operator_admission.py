@@ -12,6 +12,63 @@ from tools.generate_glrt_tracking_gram import reference_rows
 from .test_cpu_coarse import bank
 
 
+@pytest.fixture
+def storage_operator(tmp_path, monkeypatch):
+    """No radio or production lease objects are available to these storage tests."""
+    def module(name, **values):
+        result = ModuleType(name);result.__dict__.update(values)
+        monkeypatch.setitem(sys.modules, name, result)
+    module('leo');module('leo.acquisition')
+    module('leo.acquisition.authority', LocalCaptureAuthority=None, RadioResource=None, CaptureTaskKind=None)
+    module('pluto_plus', bootstrap_firmware=None, glrt_canary=None)
+    module('pluto_plus.glrt_iq_tracking_profiles', ENDPOINT=('serial20','192.168.1.20'))
+    module('pluto_plus.radio_lock', acquire_radio_lock=None)
+    module('pluto_plus.release_candidate_rx_only_linux', _close_iio_context=None)
+    module('deploy_glrt_iq_tracking20', EVIDENCE=tmp_path, PASSWORD=tmp_path/'unused')
+    root = Path(__file__).resolve().parents[2]
+    spec = importlib.util.spec_from_file_location('live_operator_storage', root/'scripts/qualify_glrt_cpu_live20.py')
+    operator = importlib.util.module_from_spec(spec);spec.loader.exec_module(operator)
+    return operator
+
+
+@pytest.mark.parametrize('blocks', [1536,4096])
+@pytest.mark.parametrize('case', ['ready','short','wrong_mount','wrong_fs','malformed'])
+def test_filesystem_capacity_is_separate_from_available_memory(storage_operator, blocks, case):
+    remote = '/tmp/gli-live20-test'
+    mount = remote if blocks == 4096 else '/tmp'
+    required = blocks*64 + 40*1024
+    free = required-1 if case == 'short' else required
+    if case == 'wrong_mount': mount = '/mnt/jffs2'
+    filesystem = 'mtd2' if case == 'wrong_fs' else 'tmpfs'
+    output = f'Filesystem 1024-blocks Used Available Capacity Mounted on\n{filesystem} 327680 0 {free} 0% {mount}\n'
+    if case == 'malformed': output = output.splitlines()[0]
+    evidence = {}
+    storage_operator.preflight_memory('MemAvailable: 440000 kB\n', blocks, evidence)
+    if case == 'ready':
+        storage_operator.preflight_filesystem(output, remote, blocks, evidence)
+        assert evidence['filesystem_preflight']['required_kib'] == required
+    else:
+        with pytest.raises(ValueError):
+            storage_operator.preflight_filesystem(output, remote, blocks, evidence)
+
+
+@pytest.mark.parametrize('mounted', [False,True])
+@pytest.mark.parametrize('attempted,terminal,retrieved,expected', [
+    (False,False,False,True), (True,False,False,False),
+    (True,True,False,False), (True,True,True,True),
+])
+def test_storage_cleanup_preserves_uncertain_execution_and_unretrieved_evidence(
+        storage_operator, mounted, attempted, terminal, retrieved, expected):
+    commands = []
+    def run(command):
+        commands.append(command)
+        return SimpleNamespace(check_returncode=lambda: None)
+    assert storage_operator.cleanup_evidence(run, '/tmp/gli-test', ['probe','iq.ci16'],
+        mounted=mounted, execution_attempted=attempted, terminal=terminal, retrieved=retrieved) == expected
+    assert commands == (['rm -f /tmp/gli-test/probe /tmp/gli-test/iq.ci16'] +
+        (['umount /tmp/gli-test'] if mounted else []) + ['rmdir /tmp/gli-test'] if expected else [])
+
+
 @pytest.mark.parametrize("failure", ["busy", "bank", "references", "lo", "rate"])
 def test_refusal_precedes_radio_contact_and_records_busy_receipt(tmp_path, monkeypatch, failure):
     root = Path(__file__).resolve().parents[2]

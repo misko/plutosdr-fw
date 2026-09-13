@@ -35,6 +35,13 @@ Before RF configuration, both profiles require `/proc/meminfo` to report enough
 system headroom: 176 MiB for the default or 336 MiB for the longer dwell.
 The operator retains this preflight and waits at most 60 seconds for the
 longer executable. There is no retry after an uncertain remote execution.
+The longer profile uses a private 320-MiB tmpfs mounted at its unique evidence
+directory, because the radio's existing `/tmp` limit cannot hold the 256-MiB
+IQ file. A separate filesystem preflight requires the IQ bytes plus 40 MiB
+for worker IQ, journals, grids and payloads before any RF reconfiguration.
+After verified process exit, artifact retrieval and radio idle attestation,
+cleanup removes only this invocation's files and unmounts its private tmpfs.
+An uncertain process or incomplete retrieval preserves the directory and mount.
 
 REBASE occurs only after capture starts. Its returned native counter defines
 a conservative new-epoch boundary. Samples whose signal centers precede that
