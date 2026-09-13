@@ -15,6 +15,13 @@ int glrt_tracking_observer_init(struct glrt_tracking_observer *s,
     const struct glrt_tracking_trend *history, uint32_t first, uint32_t maximum,
     uint64_t source_limit, uint64_t now, uint64_t budget)
 {
+    return glrt_tracking_observer_init_cadence(s,history,first,9,maximum,source_limit,now,budget);
+}
+
+int glrt_tracking_observer_init_cadence(struct glrt_tracking_observer *s,
+    const struct glrt_tracking_trend *history, uint32_t first, uint32_t spacing,
+    uint32_t maximum, uint64_t source_limit, uint64_t now, uint64_t budget)
+{
     struct glrt_tracking_trend retained;
     struct glrt_tracking_batch batch;
     struct glrt_tracking_job job;
@@ -22,13 +29,14 @@ int glrt_tracking_observer_init(struct glrt_tracking_observer *s,
     if(!s) return -1;
     if(history) retained=*history;
     memset(s,0,sizeof(*s));s->status=GLRT_OBSERVER_INVALID;
-    if(!history || retained.rate!=2500000 || !maximum || maximum>200 ||
+    if(!history || retained.rate!=2500000 || (spacing!=3 && spacing!=9) || !maximum || maximum>200 ||
        !now || !budget || budget>UINT64_C(5000000000) || now>UINT64_MAX-budget ||
-       !glrt_tracking_trend_handoff_valid(&retained,first,maximum*9) ||
+       !glrt_tracking_trend_handoff_valid(&retained,first,maximum*spacing) ||
        glrt_tracking_trend_batch(&retained,first,1,1,0,&batch,&slope) ||
        glrt_tracking_prediction(&batch,0,&job) || job.start>UINT64_MAX-3300 ||
        source_limit<job.start+3300 || source_limit-job.start>12500000) return -1;
     s->trend=retained;s->next_frame=first;s->maximum_measurements=maximum;
+    s->frame_spacing=spacing;
     s->deadline_ns=now+budget;s->last_ns=now;s->source_limit=source_limit;
     s->status=GLRT_OBSERVER_WAIT;
     return 0;
@@ -70,7 +78,8 @@ int glrt_tracking_observer_step(struct glrt_tracking_observer *s,
     if(!s || !trace || !refs || !scratch || !ports || !ports->clock_ns ||
        !ports->cancelled || !ports->retain) return finish(s,trace,GLRT_OBSERVER_INVALID);
     if(s->status!=GLRT_OBSERVER_WAIT) return s->status;
-    if(s->trend.rate!=2500000 || !s->maximum_measurements || s->maximum_measurements>200)
+    if(s->trend.rate!=2500000 || !s->maximum_measurements || s->maximum_measurements>200 ||
+       (s->frame_spacing!=3 && s->frame_spacing!=9))
         return finish(s,trace,GLRT_OBSERVER_INVALID);
     if(s->measurements>=s->maximum_measurements) return finish(s,trace,GLRT_OBSERVER_DONE);
     rc=guard(s,owner,ports,&checked);
@@ -98,7 +107,7 @@ int glrt_tracking_observer_step(struct glrt_tracking_observer *s,
     if(ports->retain(ports->context,&next,scratch)) return finish(s,trace,GLRT_OBSERVER_RETENTION);
     rc=guard(s,owner,ports,&checked);
     if(rc!=GLRT_OBSERVER_WAIT) return finish(s,trace,rc);
-    s->trend=pending;s->measurements++;s->next_frame+=9;
+    s->trend=pending;s->measurements++;s->next_frame+=s->frame_spacing;
     *trace=next;
     return GLRT_OBSERVER_MEASURED;
 }

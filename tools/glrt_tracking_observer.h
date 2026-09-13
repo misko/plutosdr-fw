@@ -21,7 +21,7 @@ struct glrt_tracking_observer_trace {
 struct glrt_tracking_observer {
     struct glrt_tracking_trend trend;
     uint64_t deadline_ns, last_ns, source_limit, last_source;
-    uint32_t next_frame, measurements, maximum_measurements;
+    uint32_t next_frame, measurements, maximum_measurements, frame_spacing;
     int status;
 };
 struct glrt_tracking_observer_ports {
@@ -47,6 +47,14 @@ struct glrt_tracking_observer_ports {
 int glrt_tracking_observer_init(struct glrt_tracking_observer *,
     const struct glrt_tracking_trend *, uint32_t first_frame, uint32_t maximum_measurements,
     uint64_t source_limit, uint64_t now_ns, uint64_t wall_budget_ns);
+
+/* Explicit internal cadence: three or nine frames. The legacy initializer
+ * selects nine. All ownership, evidence, history and budget limits above
+ * still apply; a denser cadence does not authorize native measurements. */
+int glrt_tracking_observer_init_cadence(struct glrt_tracking_observer *,
+    const struct glrt_tracking_trend *, uint32_t first_frame, uint32_t frame_spacing,
+    uint32_t maximum_measurements, uint64_t source_limit, uint64_t now_ns,
+    uint64_t wall_budget_ns);
 
 /* One bounded copied-IQ calculation, or WAIT without a fabricated measurement.
  * refs is four pinned 3300x4 phase banks; scratch is 3300 CI16 pairs. Neither

@@ -96,6 +96,12 @@ int main(int argc,char **argv)
     if(!strcmp(mode,"init_source")) limit=first+3299;
     if(!strcmp(mode,"init_long_source")) limit=first+12500001;
     if(!strncmp(mode,"init_",5)) {
+        if(!strncmp(mode,"init_spacing",12)) {
+            assert(glrt_tracking_observer_init_cadence(&observer,&original,frame,
+                (unsigned)atoi(mode+12),maximum,limit,now,budget)==-1);
+            assert(observer.status==GLRT_OBSERVER_INVALID);
+            free(iq);free(storage);puts("PASS");return 0;
+        }
         assert(glrt_tracking_observer_init(&observer,&original,frame,maximum,limit,now,budget)==-1);
         assert(observer.status==GLRT_OBSERVER_INVALID);
         free(iq);free(storage);puts("PASS");return 0;
@@ -182,11 +188,19 @@ int main(int argc,char **argv)
 '''
 
 
-@pytest.fixture(scope="module")
-def observer_binary(tmp_path_factory):
+@pytest.fixture(scope="module", params=[9, 3])
+def observer_binary(tmp_path_factory, request):
     root = Path(__file__).resolve().parents[2]
     out = tmp_path_factory.mktemp("passive-observer")
-    (out/"test.c").write_text(BENCH)
+    source = BENCH
+    if request.param == 3:
+        source = source.replace('glrt_tracking_observer_init(', 'glrt_tracking_observer_init_cadence(')
+        source = source.replace('frame,maximum,limit,now,budget)', 'frame,3,maximum,limit,now,budget)')
+        source = source.replace('k*30000+n', 'k*10000+n')
+        source = source.replace('trace.frame==72+n*9', 'trace.frame==72+n*3')
+        source = source.replace('trace.job.start==first+n*30000', 'trace.job.start==first+n*10000')
+        source = source.replace('jobs==3 && c.retained==3', 'jobs==8 && c.retained==8')
+    (out/"test.c").write_text(source)
     sources = ["glrt_tracking_observer.c", "glrt_tracking_iq_owner.c", "glrt_tracking_recent_iq.c",
                "glrt_tracking_iq.c", "glrt_native_trend.c", "glrt_native_schedule.c",
                "glrt_tracking_schedule.c", "glrt_native_solver.c"]
@@ -208,6 +222,7 @@ def observer_binary(tmp_path_factory):
     "clock_during_retention", "init_rate", "init_history", "init_frame", "init_far_frame",
     "init_count", "init_zero_count", "init_budget", "init_zero_budget", "init_overflow",
     "init_source", "init_long_source",
+    "init_spacing0", "init_spacing1", "init_spacing2", "init_spacing6", "init_spacing10",
 ])
 def test_passive_owner_measurements_and_fences(observer_binary, mode):
     binary, references = observer_binary
