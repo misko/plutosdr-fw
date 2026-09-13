@@ -67,7 +67,7 @@ struct live {
     uint64_t iq_samples,deadline_ns,scan_iq_samples;
     struct paired_head paired[PAIR_LIMIT];
     uint32_t paired_queued,paired_copied,paired_episode_first;
-    int selected_iq;
+    int selected_iq,visit_mode;
     pthread_t observer_thread;
     int observer_started,observer_stop,observer_result;
     struct glrt_tracking_observer observer;
@@ -252,7 +252,7 @@ static int retain_scan(struct live *s)
 static int capture_worker_done(struct live *s)
 {
     int done;
-    if(!s->selected_iq || !s->started) return 0;
+    if((!s->selected_iq && !s->visit_mode) || !s->started) return 0;
     if(pthread_mutex_lock(&s->mutex)) return -1;
     done=s->done;
     return pthread_mutex_unlock(&s->mutex) ? -1 : done;
@@ -643,7 +643,7 @@ static int live_probe_run(int argc,char **argv,int visit_mode)
     NEED(!sigaction(SIGALRM,&action,NULL) && !sigaction(SIGINT,&action,NULL) && !sigaction(SIGTERM,&action,NULL),"signals");
     alarm(limits.alarm_seconds);
     NEED((s=calloc(1,sizeof(*s))) && (ring=malloc(RING*4U)),"storage");
-    s->rate=rate;s->attempt_limit=limits.attempts;s->selected_iq=limits.selected_iq;
+    s->rate=rate;s->attempt_limit=limits.attempts;s->selected_iq=limits.selected_iq;s->visit_mode=visit_mode;
     NEED(!pthread_mutex_init(&s->mutex,NULL),"mutex");mutex=1;
     NEED(!load(argv[3],s->bank,sizeof(s->bank)) && !load(argv[4],s->refs,sizeof(s->refs)),"reference_files");
     NEED((fft_storage=fftw_malloc(GLRT_RESOLVER_FFT*sizeof(*fft_storage)))!=NULL,"fft_storage");

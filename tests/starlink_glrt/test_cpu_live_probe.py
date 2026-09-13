@@ -22,6 +22,7 @@ from .test_tracking_controller import controller, models, pilot_moments
 from .test_native_journal import journal as native_journal
 from tools.starlink_glrt_tracking_journal import review as review_native_journal
 from tools.review_glrt_cpu_live_epochs import review_epochs
+from tools.review_glrt_cpu_visit_loss import review_clean_loss
 
 pytestmark = pytest.mark.fftw
 
@@ -135,6 +136,7 @@ void live_join(struct test_live *t)
 }
 int live_restart(struct test_live *t) { return restart_owner(&t->live,t->capture); }
 int live_visit_loss(struct test_live *t) { return live_visit_clean_loss(&t->live,1); }
+void live_visit_mode(struct test_live *t) { t->live.visit_mode=1; }
 int live_rebase(struct test_live *t,uint64_t *first)
 {
     int rc=rebase_source(&t->live,t->capture,9122201,first);
@@ -252,7 +254,7 @@ def live_api(tmp_path_factory):
     lib.unused_probe_main.argtypes = [c.c_int, c.POINTER(c.c_char_p)]
     lib.live_rank.argtypes = [c.c_void_p,c.c_void_p,c.c_void_p,c.c_uint,c.c_void_p,c.c_void_p]
     lib.live_free_unstarted.argtypes = [c.c_void_p]
-    for name in ("live_start", "live_done", "live_stop", "live_close_source", "live_join", "live_restart", "live_visit_loss"):
+    for name in ("live_start", "live_done", "live_stop", "live_close_source", "live_join", "live_restart", "live_visit_loss", "live_visit_mode"):
         getattr(lib, name).argtypes = [c.c_void_p]
     lib.live_finish.argtypes = [c.c_void_p, c.c_void_p]
     rom = root/"hdl/library/starlink_glrt"
@@ -590,7 +592,7 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
 
 @pytest.mark.parametrize('rate', [30000000,60000000])
 @pytest.mark.parametrize('mode', [
-    'loss_then_supported','four_losses','attempt_budget','full_profile','worker_error',
+    'loss_then_supported','four_losses','attempt_budget','full_profile','visit_full_profile','worker_error',
     'retention_error','restart_budget','cancel','deadline','uncleared','source_gap',
     'wrong_epoch','wrong_rate','unread_head','read_failure','rebase_same_epoch',
     'rebase_short_write',
@@ -626,6 +628,9 @@ def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
     coefficients=bank()
     handle=lib.live_new(refs.ctypes.data,coefficients.ctypes.data,os.fsencode(tmp_path),c.byref(ports),rate)
     lib.live_select_windows(handle,os.fsencode(tmp_path),1 if mode=='attempt_budget' else 8,0)
+    if mode=='visit_full_profile':
+        lib.live_restart_fault(handle,1)  # Full IQ, not the selected-window profile.
+        lib.live_visit_mode(handle)
     iq=np.zeros((10_000_000,2),dtype=np.int16)
     for frame in range(3000):
         start=22+(frame*10000+1)//3
@@ -647,6 +652,7 @@ def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
                 else: time.sleep(.001)
             # This is the same capture-thread ordering as the executable:
             # finished worker -> join -> retained/drained source check -> release owner.
+            if mode=='visit_full_profile': assert lib.live_capture_done(handle)==1
             lib.live_join(handle)
             assert lib.live_visit_loss(handle)==int(not (mode=='loss_then_supported' and episode==1))
             totals=(c.c_uint64*8)();lib.live_totals(handle,totals)
@@ -664,10 +670,35 @@ def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
             episodes.append(reviewed)
             assert totals[3]==sum(len(r['heads']) for r in episodes)
             assert totals[4]==int(mode=='loss_then_supported' and episode==1)
+            if mode in ('full_profile','visit_full_profile'):
+                rows=[json.loads(line) for line in (tmp_path/'worker.jsonl').read_text().splitlines()]
+                observer_rows=[json.loads(line) for line in (tmp_path/'observer.jsonl').read_text().splitlines()]
+                disposition=dict(status=3,stage='worker_complete',worker_complete=1,
+                    retention_mode='full',reacquisitions=0,native_completed_runs=0,
+                    handoffs=1,native_runs=1,completed_refills=count//16384,blocks=count//16384,
+                    attempts=int(totals[0]),rate=rate,native_results=int(totals[3]))
+                result=review_clean_loss(rows,data,disposition,observer_rows)
+                assert result['status']=='pass' and result['final_frame']==result['last_supported_frame']+32
+                for kind,field,value in [
+                    ('native_terminal','result',0),('native_terminal','retained_popped',0),
+                    ('native_terminal','paired_copied',0),('observer_join','observer_joined',0),
+                    ('observer_join','observer_result',-1),('observer_join','epoch',99),
+                    ('observer_join','native_result',0),('worker_terminal','status',0),
+                ]:
+                    altered=copy.deepcopy(rows)
+                    next(r for r in altered if r['kind']==kind)[field]=value
+                    with pytest.raises((AssertionError,ValueError)):
+                        review_clean_loss(altered,data,disposition,observer_rows)
+                for field,value in [('status',1),('worker_complete',0),('reacquisitions',1),
+                                    ('native_results',0),('blocks',1537),('rate',2500000)]:
+                    with pytest.raises((AssertionError,ValueError)):
+                        review_clean_loss(rows,data,{**disposition,field:value},observer_rows)
+                with pytest.raises((AssertionError,ValueError)):
+                    review_clean_loss(rows,data,disposition,observer_rows[:-1])
             if mode=='loss_then_supported' and episode==1:
                 assert lib.live_restart(handle)==0
                 break
-            fault={'full_profile':1,'worker_error':2,'retention_error':3,'restart_budget':4,
+            fault={'full_profile':1,'visit_full_profile':1,'worker_error':2,'retention_error':3,'restart_budget':4,
                    'cancel':6,'deadline':7}.get(mode)
             if fault: lib.live_restart_fault(handle,fault)
             if mode in ('worker_error','retention_error','cancel'):

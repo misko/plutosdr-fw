@@ -368,3 +368,11 @@ successful capture before tuning again. Unknown exits and signals stop the
 sequence. This permits scanning after a qualified loss; it neither changes
 native support gates nor establishes sustained lock. Physical qualification
 must separately exercise a handoff, clean loss and subsequent frequency visit.
+
+Visit mode explicitly observes worker completion in the full-IQ profile;
+standalone full-IQ capture continues to its original finite limit. The first
+clean-loss implementation omitted this dispatch and could not emit exit 3 in
+the real visit profile. The corrected path has a full-IQ worker-completion
+test at both rates. `review_glrt_cpu_visit_loss.py` independently checks the
+retained drain/clear, exhausted support horizon and observer join. It must be
+combined with final source/IQ, numerical and parent-transition reviews.
