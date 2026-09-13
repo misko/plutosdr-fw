@@ -38,6 +38,8 @@ mkdir -p ${TARGET_DIR}/etc/wpa_supplicant/
 mkdir -p ${TARGET_DIR}/mnt/msd
 
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/../pluto/update.sh ${TARGET_DIR}/sbin/
+${INSTALL} -D -m 0755 ${BOARD_DIR}/../pluto/pluto-fw-update ${TARGET_DIR}/usr/sbin/
+${INSTALL} -D -m 0755 ${BOARD_DIR}/../pluto/pluto-flash-range ${TARGET_DIR}/usr/sbin/
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/../pluto/udc_handle_suspend.sh ${TARGET_DIR}/sbin/
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/../pluto/S10mdev ${TARGET_DIR}/etc/init.d/
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/../pluto/S15watchdog ${TARGET_DIR}/etc/init.d/

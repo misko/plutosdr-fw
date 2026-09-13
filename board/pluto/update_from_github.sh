@@ -53,6 +53,6 @@ if [ ! -f ${FILE} ] ; then
 fi
 
 # write to flash
-update_frm.sh /root/${FILE}
+update_frm.sh "/root/${FILE}" || exit 1
 
 echo "Reboot your system to run the new firmware"

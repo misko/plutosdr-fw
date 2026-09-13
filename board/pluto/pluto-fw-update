@@ -1,0 +1,136 @@
+#!/bin/sh
+# One persistent firmware transaction for SSH and mass-storage callers.
+set -eu
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+umask 077
+. /etc/device_config
+fail() { echo "Failed: $*" >&2; exit 1; }
+[ "$#" = 1 ] || fail 'one firmware FRM path required'
+[ -f "$1" ] && [ -s "$1" ] || fail 'firmware file missing or empty'
+mkdir /run/pluto-fw-update.lock 2>/dev/null || fail 'another update is active'
+work=$(mktemp -d /tmp/pluto-fw-update.XXXXXX) || { rmdir /run/pluto-fw-update.lock; exit 1; }
+mutation_started=0
+success=0
+cleanup() {
+    if [ "$mutation_started" = 1 ] && [ "$success" = 0 ]; then
+        echo "Recovery evidence retained in $work" >&2
+    else
+        rm -rf "$work"
+    fi
+    rmdir /run/pluto-fw-update.lock
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+cp "$1" "$work/input.frm" || fail 'cannot stage firmware'
+frm_bytes=$(stat -c %s "$work/input.frm")
+[ "$frm_bytes" -gt 33 ] || fail 'truncated FRM'
+fit_bytes=$((frm_bytes - 33))
+head -c "$fit_bytes" "$work/input.frm" > "$work/firmware.itb"
+tail -c 33 "$work/input.frm" > "$work/trailer"
+md5sum "$work/firmware.itb" | cut -d ' ' -f 1 > "$work/expected-trailer"
+cmp -s "$work/trailer" "$work/expected-trailer" || fail 'FRM checksum/trailer mismatch'
+# Check actual FIT structure and target property, not arbitrary matching bytes.
+dumpimage -l "$work/firmware.itb" > "$work/fit-list" || fail 'invalid FIT'
+[ "$(fdtget -t s "$work/firmware.itb" / magic)" = "$FRM_MAGIC" ] || fail 'wrong FIT target'
+# Embedded-data FIT only. Ensure the FDT bounds equal the bytes to be flashed.
+total=$(od -An -tu1 -j4 -N4 "$work/firmware.itb" | awk '{print (($1*256+$2)*256+$3)*256+$4}')
+[ "$total" = "$fit_bytes" ] || fail 'FIT length does not match its header'
+configs=$(fdtget -l "$work/firmware.itb" /configurations) || fail 'missing FIT configurations'
+[ -n "$configs" ] || fail 'empty FIT configurations'
+for config in $configs; do
+    case "$config" in *[!a-zA-Z0-9_@.,+-]*) fail 'invalid configuration name';; esac
+    for role in kernel ramdisk fdt fpga; do
+        image=$(fdtget -t s "$work/firmware.itb" "/configurations/$config" "$role") || fail "missing $role"
+        case "$image" in ''|*[!a-zA-Z0-9_@.,+-]*) fail 'invalid image reference';; esac
+        fdtget -p "$work/firmware.itb" "/images/$image" | grep -qx data || fail 'external/missing image data'
+        expected_type=$role
+        [ "$role" != fdt ] || expected_type=flat_dt
+        [ "$(fdtget -t s "$work/firmware.itb" "/images/$image" type)" = "$expected_type" ] || fail 'wrong FIT component type'
+        [ "$(fdtget -t s "$work/firmware.itb" "/images/$image" arch)" = arm ] || fail 'wrong FIT architecture'
+    done
+done
+images=$(fdtget -l "$work/firmware.itb" /images) || fail 'missing FIT images'
+index=0
+for image in $images; do
+    dumpimage -T flat_dt -p "$index" -o "$work/component" "$work/firmware.itb" > "$work/component.log" 2>&1 || fail 'invalid embedded component'
+    [ -s "$work/component" ] || fail 'empty FIT component'
+    index=$((index + 1))
+done
+rm -f "$work/component"
+# Kernel-exported offsets are authoritative; do not infer them from /proc/mtd.
+partition() {
+    found=''
+    for node in /sys/class/mtd/mtd[0-9]*; do
+        [ -f "$node/name" ] || continue
+        [ "$(cat "$node/name")" = "$1" ] || continue
+        [ -z "$found" ] || fail "ambiguous partition $1"
+        found=$node
+    done
+    [ -n "$found" ] || fail "missing partition $1"
+    printf '%s\n' "$found"
+}
+firmware=$(partition qspi-linux)
+boot=$(partition qspi-fsbl-uboot)
+environment=$(partition qspi-uboot-env)
+nvm=$(partition qspi-nvmfs)
+# Require direct sibling partitions of one SPI flash; reject nested MTD layouts.
+parent=$(dirname "$(readlink -f "$firmware")")
+[ "$parent" = "$(dirname "$(readlink -f "$boot")")" ] &&
+[ "$parent" = "$(dirname "$(readlink -f "$environment")")" ] &&
+[ "$parent" = "$(dirname "$(readlink -f "$nvm")")" ] || fail 'partitions belong to different flash devices'
+case "$parent" in */mtd) ;; *) fail 'unsupported nested partition layout';; esac
+capacity=$(cat "$parent/../spi-nor/size") || fail 'missing physical flash capacity'
+case "$capacity" in ''|*[!0-9]*|0?*) fail 'invalid flash capacity';; esac
+[ "${#capacity}" -le 10 ] && [ "$capacity" -gt 0 ] && [ "$capacity" -le 4294967295 ] || fail 'invalid flash capacity' 
+for node in "$firmware" "$boot" "$environment" "$nvm"; do
+    [ "$(cat "$node/type")" = nor ] || fail 'target is not NOR flash'
+    for attribute in offset size erasesize; do
+        value=$(cat "$node/$attribute") || fail "missing $attribute"
+        case "$value" in ''|*[!0-9]*|0?*) fail "invalid $attribute";; esac
+        [ "${#value}" -le 10 ] && [ "$value" -le 4294967295 ] || fail "oversized $attribute"
+    done
+    [ -c "/dev/$(basename "$node")" ] || fail 'missing MTD character device'
+done
+start=$(cat "$firmware/offset")
+size=$(cat "$firmware/size")
+erase=$(cat "$firmware/erasesize")
+[ "$((start + size))" -le "$capacity" ] || fail 'partition exceeds physical capacity'
+# No extended grants ship until write AND installed boot paths are qualified.
+pluto-flash-range "$start" "$size" "$erase" "$fit_bytes" 16777216 > "$work/range" || fail 'image exceeds qualified flash range; use a smaller bootstrap or qualified SD/RAM recovery'
+boot_start=$(cat "$boot/offset")
+boot_size=$(cat "$boot/size")
+env_start=$(cat "$environment/offset")
+env_size=$(cat "$environment/size")
+env_erase=$(cat "$environment/erasesize")
+nvm_start=$(cat "$nvm/offset")
+nvm_size=$(cat "$nvm/size")
+[ "$boot_start" = 0 ] && [ "$boot_size" -gt 0 ] && [ "$nvm_size" -gt 0 ] &&
+[ "$((boot_start + boot_size))" = "$env_start" ] &&
+[ "$((env_start + env_size))" = "$nvm_start" ] &&
+[ "$((nvm_start + nvm_size))" = "$start" ] || fail 'overlapping or incomplete protected partitions'
+[ "$env_size" = 131072 ] || fail 'unsupported U-Boot environment format'
+pluto-flash-range "$env_start" "$env_size" "$env_erase" "$env_size" 16777216 > /dev/null || fail 'unsafe environment geometry'
+fw_device=/dev/$(basename "$firmware")
+boot_device=/dev/$(basename "$boot")
+nvm_device=/dev/$(basename "$nvm")
+env_device=/dev/$(basename "$environment")
+printf '%s 0x0 0x%x 0x%x %s\n' "$env_device" "$env_size" "$env_erase" "$((env_size / env_erase))" > "$work/fw_env.config"
+fw_printenv -c "$work/fw_env.config" > "$work/env.before" 2> "$work/env.errors" || fail 'invalid existing environment'
+[ ! -s "$work/env.errors" ] || fail 'environment reader reported a warning' 
+sha256sum "$boot_device" "$nvm_device" > "$work/boot.before" || fail 'cannot read protected boot/NVM partitions'
+# flashcp erases only the rounded payload span and verifies its completed write.
+mutation_started=1
+flashcp "$work/firmware.itb" "$fw_device" || fail 'flash write/verification failed; do not reboot'
+sha256sum -c "$work/boot.before" || fail 'protected boot changed; do not reboot'
+fit_hex=$(printf '%X' "$fit_bytes")
+fw_setenv -c "$work/fw_env.config" fit_size "$fit_hex" || fail 'environment write failed; do not reboot'
+[ "$(fw_printenv -c "$work/fw_env.config" -n fit_size)" = "$fit_hex" ] || fail 'fit_size verification failed'
+fw_printenv -c "$work/fw_env.config" > "$work/env.after" || fail 'cannot verify environment'
+sed '/^fit_size=/d' "$work/env.before" | LC_ALL=C sort > "$work/env.before.keys"
+sed '/^fit_size=/d' "$work/env.after" | LC_ALL=C sort > "$work/env.after.keys"
+cmp -s "$work/env.before.keys" "$work/env.after.keys" || fail 'unexpected environment change; do not reboot'
+sha256sum -c "$work/boot.before" || fail 'protected boot changed after environment update; do not reboot'
+cat "$work/range"
+success=1
+echo Done

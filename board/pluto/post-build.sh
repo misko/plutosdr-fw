@@ -56,6 +56,8 @@ mkdir -p ${TARGET_DIR}/etc/dropbear
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/update.sh ${TARGET_DIR}/sbin/
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/update_from_github.sh ${TARGET_DIR}/sbin/
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/update_frm.sh ${TARGET_DIR}/sbin/
+${INSTALL} -D -m 0755 ${BOARD_DIR}/pluto-fw-update ${TARGET_DIR}/usr/sbin/
+${INSTALL} -D -m 0755 ${BOARD_DIR}/pluto-flash-range ${TARGET_DIR}/usr/sbin/
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/udc_handle_suspend.sh ${TARGET_DIR}/sbin/
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/sdr_usb_gadget_supervisor.sh ${TARGET_DIR}/usr/sbin/
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/pluto-read-identity ${TARGET_DIR}/usr/sbin/

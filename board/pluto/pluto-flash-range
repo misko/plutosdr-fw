@@ -1,0 +1,22 @@
+#!/bin/sh
+# Shared pure range validator. All inputs are canonical decimal byte counts.
+# Usage: pluto-flash-range START PARTITION_SIZE ERASE_SIZE FIT_BYTES LIMIT
+set -eu
+[ "$#" = 5 ] || { echo 'flash range: five byte counts required' >&2; exit 1; }
+for number do
+    case "$number" in ''|*[!0-9]*|0?*) echo 'flash range: invalid byte count' >&2; exit 1;; esac
+    [ "${#number}" -le 10 ] && [ "$number" -le 4294967295 ] || exit 1
+done
+start=$1 size=$2 erase=$3 bytes=$4 limit=$5
+[ "$size" -gt 0 ] && [ "$erase" -gt 0 ] && [ "$bytes" -gt 0 ] || exit 1
+[ "$((start % erase))" = 0 ] && [ "$((size % erase))" = 0 ] || {
+    echo 'flash range: unaligned partition geometry' >&2; exit 1;
+}
+end=$((start + bytes))
+erase_end=$(((end + erase - 1) / erase * erase))
+[ "$end" -le "$((start + size))" ] && [ "$erase_end" -le "$((start + size))" ] &&
+[ "$end" -le "$limit" ] && [ "$erase_end" -le "$limit" ] || {
+    echo "flash range refused: FIT=$bytes start=$start end=$end erase_end=$erase_end limit=$limit partition_size=$size" >&2
+    exit 1
+}
+printf 'payload_start=%s\npayload_end=%s\nerase_end=%s\naddress_limit=%s\n' "$start" "$end" "$erase_end" "$limit"

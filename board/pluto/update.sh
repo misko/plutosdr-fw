@@ -180,26 +180,21 @@ handle_boot_frm () {
 
 
 handle_frimware_frm () {
-	FILE="$1"
-	MAGIC="$2"
-	rm -f /mnt/msd/SUCCESS /mnt/msd/FAILED /mnt/msd/FAILED_FIRMWARE_CHSUM_ERROR
-	md5=`tail -c 33 ${FILE}`
-	head -c -33 ${FILE} > /opt/firmware.frm
-	FRM_SIZE=`cat /opt/firmware.frm | wc -c | xargs printf "%X\n"`
-	frm=`md5sum /opt/firmware.frm | cut -d ' ' -f 1`
-	if [ "$frm" = "$md5" ]
-	then
-		flash_indication_on
-		grep -q "${MAGIC}"  /opt/firmware.frm && dd if=/opt/firmware.frm of=/dev/mtdblock3 bs=64k && fw_setenv fit_size ${FRM_SIZE} && do_reset=1 && touch /mnt/msd/SUCCESS || touch /mnt/msd/FAILED
+	rm -f /mnt/msd/SUCCESS /mnt/msd/FAILED
+	flash_indication_on
+	if /usr/sbin/pluto-fw-update "$1" > /mnt/msd/UPDATE_RESULT 2>&1; then
 		flash_indication_off
-	else
-		echo $frm $md5 > /mnt/msd/FAILED_FIRMWARE_CHSUM_ERROR
-		do_reset=0
+		touch /mnt/msd/SUCCESS
+		do_reset=1
+		rm -f "$1"
+		return 0
 	fi
-
-	rm -f ${FILE} /opt/firmware.frm
-	sync
+	flash_indication_off
+	touch /mnt/msd/FAILED
+	do_reset=0
+	return 1
 }
+
 
 while [ 1 ]
 do
@@ -222,7 +217,20 @@ do
 
 	if [[ -s ${FIRMWARE} ]]
 	then
-		handle_frimware_frm "${FIRMWARE}" "${FRM_MAGIC}"
+		if [[ -s ${bootimage} ]]; then
+			rm -f /mnt/msd/SUCCESS
+			echo 'Failed: firmware and boot.frm require separate verified transactions' > /mnt/msd/UPDATE_RESULT
+			touch /mnt/msd/FAILED
+			umount /mnt/msd
+			echo $img > $file
+			continue
+		fi
+		if ! handle_frimware_frm "${FIRMWARE}" "${FRM_MAGIC}"; then
+			# Terminal failure for this eject: no boot/config/env writes or reset.
+			umount /mnt/msd
+			echo $img > $file
+			continue
+		fi
 	fi
 
 	if [[ -s ${bootimage} ]]
