@@ -174,7 +174,8 @@ def run(worker, mode):
             if kind == 2: assert s[6:10] == [0, 1, 0, 0]
             if kind == 4:
                 assert s[6] >= 8 and s[7:10] == [1, 0, 1] and s[12] == t.RATE
-                if mode == "handoff_late": publish(20000)
+                if mode == "handoff_late" or (mode == "handoff_late_once" and
+                        not any(k == 4 for k, _ in state['retained'])): publish(20000)
                 if mode == "handoff_closed": assert lib.glrt_tracking_iq_owner_close(owner, 0) == 0
                 if mode == "handoff_cancel": state['cancelled'] = True
             state['retained'].append((kind, s))
@@ -213,6 +214,17 @@ def test_owned_seed_resolves_builds_real_history_and_retains_future_proposal(wor
     assert final[6] == final[4] and final[7:10] == [1, 0, 1] and final[12] == t.RATE
 
 
+def test_one_stale_retained_proposal_refreshes_from_the_same_causal_history(worker):
+    rc, final, state = run(worker, 'handoff_late_once')
+    proposals = [s for kind,s in state['retained'] if kind == 4]
+    assert rc == 1 and len(proposals) == 2
+    assert proposals[1][10] > proposals[0][10]  # Later frame, without ordinal reset.
+    assert proposals[1][11] >= 1_000_000+state['end']+2500
+    assert proposals[1][6] >= proposals[0][6] >= 8
+    assert final[3] == state['calls'] == 68
+    assert final[7:10] == [1,0,1]
+
+
 @pytest.mark.parametrize("mode,expected,calls", [
     ("zero", -6, 68), ("ignored", 0, 0), ("cancelled", -4, 0), ("bad_lead", -1, 0),
     ("fft_cancel", -4, 3), ("fft_timeout", -3, 3), ("clock_regression", -7, 3),
@@ -230,3 +242,4 @@ def test_failure_cancellation_or_stale_retained_proposal_cannot_authorize_handof
     if mode == "zero":
         assert final[6] == 0 and final[4] == 8 and all(kind != 4 for kind, _ in state['retained'])
     if mode == "wait_timeout": assert state['now'] >= 51_000_000 and final[5] > 0
+    if mode == "handoff_late": assert sum(kind == 4 for kind,_ in state['retained']) == 2

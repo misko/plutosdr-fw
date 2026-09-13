@@ -54,6 +54,11 @@ It resolves the original measured epoch from retained IQ before extrapolating
 timing; nominally advancing an old proposal toward the newest IQ could move a
 drifting signal beyond the resolver guard. Subsequent causal measurements own
 that propagation, within the unchanged source, history and freshness budgets.
+If an IQ publication makes a proposed handoff stale while it is retained,
+the worker may re-enter causal scheduling once. Both proposals remain in the
+journal; only a proposal that also passes the post-retention source check can
+return READY. Repeated lateness still rejects, and frame ordinals, supported
+history, five-millisecond lead and last-supported-plus-32 horizon are preserved.
 Supported coarse history is converted to the native rate and passed through
 `glrt_tracking_controller_init_handoff`; the controller rereads source time
 after retaining a descriptor and before SUBMIT. `handoffs` counts runs with

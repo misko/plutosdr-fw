@@ -60,7 +60,7 @@ static int source(struct execution *e, int handoff)
     if(!v.observed_ns || v.observed_ns>w->last_ns) return stop(w,GLRT_WORKER_PORT);
     if(v.source_now>cfg->source_deadline) return stop(w,GLRT_WORKER_DEADLINE);
     if(handoff && (v.source_now>UINT64_MAX-cfg->lead_samples ||
-        w->trace.job.start<v.source_now+cfg->lead_samples)) return stop(w,GLRT_WORKER_STALE);
+        w->trace.job.start<v.source_now+cfg->lead_samples)) return GLRT_WORKER_STALE;
     return 0;
 }
 
@@ -69,7 +69,7 @@ static int run(struct glrt_tracking_worker *w,
     const struct glrt_cpu_candidate *candidate, unsigned software)
 {
     struct execution execution={w,cfg};
-    unsigned n;
+    unsigned n,handoff_refreshes=0;
     int rc;
     if(!w) return GLRT_WORKER_INVALID;
     memset(w,0,sizeof(*w));
@@ -118,8 +118,21 @@ static int run(struct glrt_tracking_worker *w,
             w->waits++;
             if(cfg->ports.wait(cfg->ports.context)) return stop(w,GLRT_WORKER_PORT);
         } else if(rc==GLRT_BOOTSTRAP_READY) {
-            if(source(&execution,1) || retain(&execution,GLRT_WORKER_HANDOFF) || source(&execution,1))
-                return w->status;
+            rc=source(&execution,1);
+            if(!rc) {
+                if(retain(&execution,GLRT_WORKER_HANDOFF)) return w->status;
+                rc=source(&execution,1);
+            }
+            if(rc==GLRT_WORKER_STALE) {
+                /* A buffer may advance source time while the proposal is
+                 * retained. Re-enter causal scheduling once, preserving
+                 * history, frame ordinals and every source/wall/horizon cap.
+                 * A retained proposal never authorizes native submission. */
+                if(handoff_refreshes++) return stop(w,GLRT_WORKER_STALE);
+                w->live.core.ready=0;
+                continue;
+            }
+            if(rc) return w->status;
             w->status=GLRT_WORKER_READY;return w->status;
         } else return stop(w,w->live.core.failure==GLRT_BOOTSTRAP_SOURCE_LOSS ? GLRT_WORKER_SOURCE :
             w->live.core.failure==GLRT_BOOTSTRAP_BUDGET ? GLRT_WORKER_DEADLINE : GLRT_WORKER_HISTORY);
