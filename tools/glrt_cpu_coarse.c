@@ -127,32 +127,45 @@ int glrt_cpu_coarse_grid(uint32_t grid[11][GLRT_CPU_COARSE_EPOCHS], const int16_
     return 0;
 }
 
-int glrt_cpu_coarse_select(struct glrt_cpu_coarse_workspace *w, int (*poll)(void *), void *context)
+int glrt_cpu_coarse_select_bounded(const struct glrt_cpu_coarse_workspace *w,
+    struct glrt_cpu_coarse_peak *peaks, unsigned budget, uint32_t *count,
+    int (*poll)(void *), void *context)
 {
     unsigned k,f,e,r;
-    if(!w) return -1;
-    w->count=0;memset(w->peaks,0,sizeof(w->peaks));
-    if(!poll || w->completed_epochs!=GLRT_CPU_COARSE_EPOCHS) return -1;
-    for(k=0;k<8;k++) {
+    if(count) *count=0;
+    if(!peaks || !budget || budget>64) return -1;
+    memset(peaks,0,budget*sizeof(*peaks));
+    if(!w || !count || !poll || w->completed_epochs!=GLRT_CPU_COARSE_EPOCHS) return -1;
+    for(k=0;k<budget;k++) {
         struct glrt_cpu_coarse_peak best={0,0,0};
+        if(poll(context)) goto failed;
         for(f=0;f<11;f++) for(e=0;e<GLRT_CPU_COARSE_EPOCHS;e++) {
             struct glrt_cpu_coarse_peak p={e,f,w->grid[f][e]};
             uint32_t left=e ? w->grid[f][e-1] : 0;
             uint32_t right=e+1<GLRT_CPU_COARSE_EPOCHS ? w->grid[f][e+1] : 0;
             if(!p.score || p.score<left || p.score<right || (p.score==left && p.score==right)) continue;
             for(r=0;r<k;r++) {
-                unsigned d=distance(e,w->peaks[r].epoch);
+                unsigned d=distance(e,peaks[r].epoch);
                 if(d>GLRT_CPU_COARSE_EPOCHS/2) d=GLRT_CPU_COARSE_EPOCHS-d;
-                if(d<20 && distance(f,w->peaks[r].frequency)<=1) break;
+                if(d<20 && distance(f,peaks[r].frequency)<=1) break;
             }
             if(r==k && better(&p,&best)) best=p;
         }
         if(!best.score) break;
-        w->peaks[k]=best;
+        peaks[k]=best;
     }
-    if(poll(context)) { memset(w->peaks,0,sizeof(w->peaks)); return -1; }
-    w->count=k;
+    if(poll(context)) goto failed;
+    *count=k;
     return 0;
+failed:
+    memset(peaks,0,budget*sizeof(*peaks));
+    return -1;
+}
+
+int glrt_cpu_coarse_select(struct glrt_cpu_coarse_workspace *w, int (*poll)(void *), void *context)
+{
+    if(!w) return -1;
+    return glrt_cpu_coarse_select_bounded(w,w->peaks,8,&w->count,poll,context);
 }
 
 int glrt_cpu_coarse_search(struct glrt_cpu_coarse_workspace *w, const int16_t *iq,

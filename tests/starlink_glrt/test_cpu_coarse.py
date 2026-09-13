@@ -33,6 +33,8 @@ def api(tmp_path_factory):
     lib.glrt_cpu_coarse_grid.argtypes = [C.c_void_p,C.c_void_p,C.c_void_p,C.c_uint,C.c_uint,
                                         C.POINTER(C.c_uint32),POLL,C.c_void_p]
     lib.glrt_cpu_coarse_select.argtypes = [C.POINTER(Workspace),POLL,C.c_void_p]
+    lib.glrt_cpu_coarse_select_bounded.argtypes = [C.POINTER(Workspace),C.POINTER(Peak),C.c_uint,
+                                                  C.POINTER(C.c_uint32),POLL,C.c_void_p]
     return lib
 
 
@@ -160,3 +162,57 @@ def test_dot_products_match_wide_integer_arithmetic_across_rails_and_alignments(
         '-I',str(ROOT/'tools'),'-I',str(ROOT/'tests/starlink_glrt'),str(source),
         '-lm','-o',str(binary)],check=True)
     subprocess.run([str(binary)],check=True,timeout=10)
+
+
+def sorted_peak_oracle(grid, budget):
+    candidates=[]
+    for f in range(11):
+        for e in range(3333):
+            p=int(grid[f,e]);left=int(grid[f,e-1]) if e else 0
+            right=int(grid[f,e+1]) if e<3332 else 0
+            if p and p>=left and p>=right and not p==left==right:
+                candidates.append((e,f,p))
+    candidates.sort(key=lambda p:(-p[2],abs(p[1]-5),p[0],p[1]))
+    selected=[]
+    for p in candidates:
+        if any(min(abs(p[0]-r[0]),3333-abs(p[0]-r[0]))<20 and abs(p[1]-r[1])<=1 for r in selected):
+            continue
+        selected.append(p)
+        if len(selected)==budget:break
+    return selected
+
+
+@pytest.mark.parametrize('budget',[1,8,32,64])
+@pytest.mark.parametrize('shape',['random','ties','zero'])
+def test_bounded_selection_matches_sorted_oracle(api,budget,shape):
+    w=Workspace();w.completed_epochs=3333
+    grid=np.ctypeslib.as_array(w.grid)
+    grid[:]=np.random.default_rng(54).integers(0,100 if shape=='ties' else 65537,grid.shape)
+    if shape=='zero':grid[:]=0
+    # Boundary peaks exercise circular suppression and center-frequency ties.
+    if shape=='ties':grid[:,0]=grid[:,-1]=65536
+    expected=sorted_peak_oracle(grid,budget)
+    peaks=(Peak*65)();peaks[64].score=12345;count=C.c_uint32(999)
+    assert api.glrt_cpu_coarse_select_bounded(C.byref(w),peaks,budget,C.byref(count),POLL(lambda _:0),None)==0
+    assert [(p.epoch,p.frequency,p.score) for p in peaks[:count.value]]==expected
+    assert peaks[64].score==12345 and not w.count
+
+
+@pytest.mark.parametrize('when',[1,2,32,64,65])
+def test_bounded_selection_cancellation_clears_all_proposals(api,when):
+    w=Workspace();w.completed_epochs=3333
+    np.ctypeslib.as_array(w.grid)[:]=np.random.default_rng(32).integers(0,65537,(11,3333))
+    peaks=(Peak*64)();count=C.c_uint32(999);calls=0
+    def poll(_):
+        nonlocal calls
+        calls+=1
+        return calls==when
+    assert api.glrt_cpu_coarse_select_bounded(C.byref(w),peaks,64,C.byref(count),POLL(poll),None)==-1
+    assert calls==when and count.value==0 and bytes(peaks)==bytes(C.sizeof(peaks))
+
+
+@pytest.mark.parametrize('budget,completed',[(0,3333),(65,3333),(64,3332)])
+def test_bounded_selection_rejects_invalid_admission(api,budget,completed):
+    w=Workspace();w.completed_epochs=completed;peaks=(Peak*64)();count=C.c_uint32(999)
+    assert api.glrt_cpu_coarse_select_bounded(C.byref(w),peaks,budget,C.byref(count),POLL(lambda _:0),None)==-1
+    assert count.value==0
