@@ -46,13 +46,14 @@ int glrt_tracking_visit_run(const struct glrt_visit_ports *p,uint32_t rate,const
         if(p->retain(p->context,"tuned",n,0,&tuned)) return GLRT_VISIT_RETENTION;
         if((rc=guard(p,deadline,&last))) return rc;
         rc=p->run(p->context,n,deadline);
-        /* Verify and retain cleanup even if the child failed. A failed child
-         * never authorizes another tune merely because hardware is now idle. */
+        /* Verify and retain cleanup even if the child failed. Only successful
+         * capture or the explicit clean-loss disposition permits another tune;
+         * an arbitrary failure is never promoted merely because hardware is idle. */
         if(inspect(p,rate,&after)) return GLRT_VISIT_SOURCE;
         if(after.lo_hz!=tuned.lo_hz || after.epoch<tuned.epoch || after.native_latest<tuned.native_latest)
             return GLRT_VISIT_SOURCE;
         if(p->retain(p->context,"after_run",n,rc,&after)) return GLRT_VISIT_RETENTION;
-        if(rc) return GLRT_VISIT_RUN;
+        if(rc && rc!=GLRT_VISIT_CLEAN_LOSS) return GLRT_VISIT_RUN;
         if(after.epoch==tuned.epoch || after.native_latest==tuned.native_latest) return GLRT_VISIT_SOURCE;
         if((rc=guard(p,deadline,&last))) return rc;
     }

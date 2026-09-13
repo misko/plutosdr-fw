@@ -12,6 +12,7 @@ BENCH=r'''
 #include <string.h>
 struct test {
     const char *mode;
+    int loss;
     struct glrt_visit_state state;
     uint64_t now;
     unsigned inspections,tunes,runs,retained;
@@ -49,12 +50,15 @@ static int run(void *p,unsigned n,uint64_t deadline) {
     if(!strcmp(t->mode,"run_rf")) t->state.lo_hz++;
     if(!strcmp(t->mode,"deadline")) t->now=deadline;
     if(!strcmp(t->mode,"clock_regress")) t->now=999;
-    return !strcmp(t->mode,"child_fail") ? -1 : 0;
+    return !strcmp(t->mode,"child_fail") ? -1 :
+        t->loss ? GLRT_VISIT_CLEAN_LOSS :
+        !strcmp(t->mode,"unknown_result") ? 2 : 0;
 }
 static int retain(void *p,const char *kind,unsigned n,int result,const struct glrt_visit_state *s) {
     struct test *t=p;(void)s;assert(n==t->retained/3);
     const char *names[]={"before_tune","tuned","after_run"};assert(!strcmp(kind,names[t->retained%3]));
-    if(!strcmp(kind,"after_run")) assert(result==(!strcmp(t->mode,"child_fail") ? -1 : 0));
+    if(!strcmp(kind,"after_run")) assert(result==(!strcmp(t->mode,"child_fail") ? -1 :
+        t->loss ? GLRT_VISIT_CLEAN_LOSS : !strcmp(t->mode,"unknown_result") ? 2 : 0));
     t->retained++;
     return (!strcmp(t->mode,"retention_before") && t->retained==1) ||
         (!strcmp(t->mode,"retention_tuned") && t->retained==2) ||
@@ -62,6 +66,8 @@ static int retain(void *p,const char *kind,unsigned n,int result,const struct gl
 }
 int main(int argc,char **argv) {
     assert(argc==3);struct test t={0};t.mode=argv[1];t.now=1000;
+    if(!strcmp(t.mode,"loss")) { t.loss=1;t.mode="ready"; }
+    else if(!strncmp(t.mode,"loss_",5)) { t.loss=1;t.mode+=5; }
     unsigned rate=(unsigned)strtoul(argv[2],NULL,10);
     t.state=(struct glrt_visit_state){1690312496,1000000,rate,3,1,1};
     struct glrt_visit_ports p={&t,clock_ns,cancelled,inspect,tune,run,retain};
@@ -95,6 +101,11 @@ def probe(tmp_path_factory):
     ('between_epoch',-2,1,1),('child_fail',-4,1,1),('deadline',-6,1,1),
     ('clock_regress',-6,1,1),('cancel',-7,0,0),('retention_before',-5,0,0),
     ('retention_tuned',-5,1,0),('retention_after',-5,1,1),
+    ('loss',0,2,2),('unknown_result',-4,1,1),
+    ('loss_after_busy',-2,1,1),('loss_no_epoch',-2,1,1),
+    ('loss_no_samples',-2,1,1),('loss_run_rf',-2,1,1),
+    ('loss_retention_after',-5,1,1),('loss_deadline',-6,1,1),
+    ('loss_clock_regress',-6,1,1),('loss_between_epoch',-2,1,1),
 ])
 def test_two_visits_preserve_fixed_rate_and_require_idle_retained_boundaries(probe,rate,mode,result,tunes,runs):
     row=list(map(int,subprocess.check_output([str(probe),mode,str(rate)],text=True).split()))

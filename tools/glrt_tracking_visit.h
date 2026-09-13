@@ -20,12 +20,15 @@ struct glrt_visit_ports {
     int (*inspect)(void *,struct glrt_visit_state *);
     int (*tune)(void *,uint64_t);
     /* Must join its bounded child before returning, even on cancellation.
-     * Return zero only for a successful finite probe, not arbitrary exit 1. */
+     * Return zero for successful finite capture, or GLRT_VISIT_CLEAN_LOSS for
+     * explicitly proven, retained and drained native loss after full cleanup.
+     * An arbitrary failed child never supplies this disposition. */
     int (*run)(void *,unsigned,uint64_t);
     int (*retain)(void *,const char *,unsigned,int,const struct glrt_visit_state *);
 };
 enum glrt_visit_result {
-    GLRT_VISIT_DONE=0, GLRT_VISIT_INVALID=-1, GLRT_VISIT_SOURCE=-2,
+    GLRT_VISIT_DONE=0, GLRT_VISIT_CLEAN_LOSS=1,
+    GLRT_VISIT_INVALID=-1, GLRT_VISIT_SOURCE=-2,
     GLRT_VISIT_TUNE=-3, GLRT_VISIT_RUN=-4, GLRT_VISIT_RETENTION=-5,
     GLRT_VISIT_DEADLINE=-6, GLRT_VISIT_CANCELLED=-7
 };

@@ -134,6 +134,7 @@ void live_join(struct test_live *t)
     t->live.started=0;
 }
 int live_restart(struct test_live *t) { return restart_owner(&t->live,t->capture); }
+int live_visit_loss(struct test_live *t) { return live_visit_clean_loss(&t->live,1); }
 int live_rebase(struct test_live *t,uint64_t *first)
 {
     int rc=rebase_source(&t->live,t->capture,9122201,first);
@@ -251,7 +252,7 @@ def live_api(tmp_path_factory):
     lib.unused_probe_main.argtypes = [c.c_int, c.POINTER(c.c_char_p)]
     lib.live_rank.argtypes = [c.c_void_p,c.c_void_p,c.c_void_p,c.c_uint,c.c_void_p,c.c_void_p]
     lib.live_free_unstarted.argtypes = [c.c_void_p]
-    for name in ("live_start", "live_done", "live_stop", "live_close_source", "live_join", "live_restart"):
+    for name in ("live_start", "live_done", "live_stop", "live_close_source", "live_join", "live_restart", "live_visit_loss"):
         getattr(lib, name).argtypes = [c.c_void_p]
     lib.live_finish.argtypes = [c.c_void_p, c.c_void_p]
     rom = root/"hdl/library/starlink_glrt"
@@ -647,6 +648,7 @@ def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
             # This is the same capture-thread ordering as the executable:
             # finished worker -> join -> retained/drained source check -> release owner.
             lib.live_join(handle)
+            assert lib.live_visit_loss(handle)==int(not (mode=='loss_then_supported' and episode==1))
             totals=(c.c_uint64*8)();lib.live_totals(handle,totals)
             if initial_deadline is None: initial_deadline=totals[7]
             assert totals[7]==initial_deadline
@@ -668,6 +670,8 @@ def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
             fault={'full_profile':1,'worker_error':2,'retention_error':3,'restart_budget':4,
                    'cancel':6,'deadline':7}.get(mode)
             if fault: lib.live_restart_fault(handle,fault)
+            if mode in ('worker_error','retention_error','cancel'):
+                assert lib.live_visit_loss(handle)==0
             if mode=='uncleared': radio.valid=True
             if mode=='source_gap': radio.gap=True
             if mode=='wrong_epoch': radio.epoch+=1

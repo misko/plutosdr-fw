@@ -13,6 +13,17 @@ pytestmark=pytest.mark.fftw
 WRAPPER=r'''
 #include "glrt_cpu_visit_probe.c"
 int inspect_idle_words(const uint32_t w[24],uint32_t rate) { return visit_idle_snapshot(w,rate); }
+int loss_disposition(unsigned fault) {
+    struct live s={0};s.done=1;s.result=GLRT_NATIVE_ACQUISITION_LOST;s.native_clean_loss=1;
+    interrupted=fault==1;
+    if(fault==2) s.done=0;
+    if(fault==3) s.started=1;
+    if(fault==4) s.observer_started=1;
+    if(fault==5) s.result=GLRT_NATIVE_RETENTION_ERROR;
+    if(fault==6) s.native_clean_loss=0;
+    if(fault==9) s.stop=1;
+    return live_visit_clean_loss(fault==8 ? NULL : &s,fault!=7);
+}
 const char *iio_device_get_id(const struct iio_device *d) { (void)d;return "iio:device0"; }
 int iio_channel_attr_read_longlong(const struct iio_channel *c,const char *n,long long *out)
 { (void)c;(void)n;(void)out;return -1; }
@@ -22,6 +33,9 @@ static int simulated_child(int argc,char **argv) {
     if(argc!=6) return 9;
     printf("retained child output\n");fprintf(stderr,"retained child diagnostics\n");
     if(!strcmp(argv[1],"fail")) return 1;
+    if(!strcmp(argv[1],"clean_loss")) return LIVE_VISIT_CLEAN_LOSS_EXIT;
+    if(!strcmp(argv[1],"unknown")) return 4;
+    if(!strcmp(argv[1],"signal")) { raise(SIGKILL);return 0; }
     if(!strcmp(argv[1],"hang")) {
         signal(SIGTERM,SIG_IGN);
         while(1) pause();
@@ -64,15 +78,20 @@ def probe(tmp_path_factory):
     return lib
 
 
-@pytest.mark.parametrize('mode',['pass','fail','hang','existing'])
+@pytest.mark.parametrize('mode',['pass','fail','hang','existing','clean_loss','unknown','signal'])
 def test_child_is_reaped_before_return_and_evidence_is_never_overwritten(probe,tmp_path,mode):
     if mode=='existing':
         (tmp_path/'visit-0').mkdir();(tmp_path/'visit-0/stdout.json').write_text('preserved')
-    assert probe.exercise_child(os.fsencode(tmp_path),mode.encode())==(0 if mode=='pass' else -1)
+    assert probe.exercise_child(os.fsencode(tmp_path),mode.encode())==({'pass':0,'clean_loss':1}.get(mode,-1))
     if mode=='existing': assert (tmp_path/'visit-0/stdout.json').read_text()=='preserved'
-    elif mode!='hang':
+    elif mode not in ('hang','signal'):
         assert (tmp_path/'visit-0/stdout.json').read_text()=='retained child output\n'
         assert (tmp_path/'visit-0/stderr.txt').read_text()=='retained child diagnostics\n'
+
+
+@pytest.mark.parametrize('fault',range(10))
+def test_clean_loss_requires_terminal_joined_native_provenance(probe,fault):
+    assert probe.loss_disposition(fault)==int(fault==0)
 
 
 @pytest.mark.parametrize('rate',[30000000,60000000])

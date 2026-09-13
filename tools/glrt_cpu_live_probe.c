@@ -610,7 +610,13 @@ static int open_native_episode(struct live *s,struct glrt_native_posix *p,
     return n>0 && (size_t)n<sizeof(path) ?
         glrt_native_posix_open(p,&s->native,device,path,8U*1024U*1024U) : -1;
 }
-int main(int argc,char **argv)
+#define LIVE_VISIT_CLEAN_LOSS_EXIT 3
+static int live_visit_clean_loss(const struct live *s,int worker_complete)
+{
+    return s && worker_complete && s->done && !s->started && !s->observer_started &&
+        !interrupted && !s->stop && s->result==GLRT_NATIVE_ACQUISITION_LOST && s->native_clean_loss;
+}
+static int live_probe_run(int argc,char **argv,int visit_mode)
 {
     struct live *s=NULL;
     struct iio_context *ctx=NULL;struct iio_device *iq=NULL,*phy=NULL;struct iio_buffer *buffer=NULL;
@@ -624,7 +630,7 @@ int main(int argc,char **argv)
     uint32_t rate=0,visit=9122201,w[24],block=0;
     uint64_t first=0,now=0,boundary=0,max_refill_ns=0,previous=0,published=0;
     char text[4096],label[80],path[PATH_MAX],resolved[PATH_MAX];
-    int n,rc=1,mutex=0,owned=0,rebased=0,joined=1,worker_complete=0;
+    int n,rc=1,mutex=0,owned=0,rebased=0,joined=1,worker_complete=0,visit_loss=0;
     uint32_t completed_refills=0;
     const char *stage="arguments";
 #define NEED(x,name) do { stage=name; if(!(x)) goto done; } while(0)
@@ -729,7 +735,8 @@ int main(int argc,char **argv)
     }
     if(worker_complete) { stage="worker_complete"; }
     else { NEED(wide(capture.words+4)==CHUNK*limits.blocks && wide(capture.words+6)==CHUNK*limits.blocks && !(capture.words[19]&3),"finite_source_complete"); }
-    rc=worker_complete && s->result ? 1 : 0;
+    visit_loss=visit_mode && live_visit_clean_loss(s,worker_complete);
+    rc=worker_complete && s->result && !visit_loss ? 1 : 0;
 done:
     if(s && s->started) {
         void *result=NULL;
@@ -771,6 +778,9 @@ done:
         if(mutex && pthread_mutex_destroy(&s->mutex)) rc=1;
     }
     fftw_free(fft_storage);free(ring);alarm(0);
+    /* The typed visit result is available only after every cleanup and
+     * evidence close succeeded. Standalone probe exit semantics are unchanged. */
+    if(visit_loss && !rc) rc=interrupted ? 1 : LIVE_VISIT_CLEAN_LOSS_EXIT;
     printf("{\"scope\":\"bounded_live_cpu_acquisition_native_feedback\",\"rate\":%u,\"status\":%d,"
         "\"stage\":\"%s\",\"blocks\":%u,\"attempts\":%u,\"handoffs\":%u,\"native_results\":%u,\"max_refill_gap_ns\":%" PRIu64
         ",\"reacquisitions\":%u,\"native_runs\":%u,\"native_completed_runs\":%u"
@@ -780,3 +790,4 @@ done:
         s && s->selected_iq ? "selected_windows" : "full",completed_refills,worker_complete,s ? s->scan_iq_samples : 0);
     free(s);return rc;
 }
+int main(int argc,char **argv) { return live_probe_run(argc,argv,0); }

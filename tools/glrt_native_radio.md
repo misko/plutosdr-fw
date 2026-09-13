@@ -351,3 +351,20 @@ allows them only in epoch zero with capture disabled and tracking drained,
 cleared and fault-free. Every nonzero acquisition epoch still requires zero
 CDC/pacer drops. This matches the existing finite probe's baseline-versus-active
 epoch distinction; it neither erases a counter nor accepts loss during capture.
+### Continuing visits after clean native loss
+
+The two-frequency composition has an internal clean-loss disposition. The
+standalone live probe keeps its existing exit semantics. Only the visit child
+can return exit 3, and only for a completed and joined worker whose native
+controller established acquisition loss, retained/popped every configured head,
+drained and cleared the controller, retained all paired IQ, and joined its
+observer. Cancellation, retention failures and all final capture/source,
+storage-close and cleanup failures prevent that disposition.
+
+The parent maps exit 3 to `GLRT_VISIT_CLEAN_LOSS` and retains result 1 on the
+`after_run` transition. It then applies the same idle, fixed-RF, advancing
+epoch/counter, retention, cancellation and global-deadline checks used after a
+successful capture before tuning again. Unknown exits and signals stop the
+sequence. This permits scanning after a qualified loss; it neither changes
+native support gates nor establishes sustained lock. Physical qualification
+must separately exercise a handoff, clean loss and subsequent frequency visit.

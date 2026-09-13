@@ -16,6 +16,7 @@ struct visit_context {
     int (*probe_main)(int,char **);
 };
 static int visit_cancelled(void *unused) { (void)unused;return interrupted!=0; }
+static int visit_probe_main(int argc,char **argv) { return live_probe_run(argc,argv,1); }
 static int channel_is(struct iio_channel *channel,const char *name,const char *expected)
 {
     char raw[128];ssize_t n;
@@ -123,7 +124,9 @@ static int visit_child(void *pointer,unsigned number,uint64_t deadline)
         if(stopping && (!now || now<stop_at || now-stop_at>=UINT64_C(2000000000))) kill(pid,SIGKILL);
         nanosleep(&pause,NULL);
     }
-    return !stopping && WIFEXITED(status) && WEXITSTATUS(status)==0 ? 0 : -1;
+    if(stopping || !WIFEXITED(status)) return -1;
+    if(WEXITSTATUS(status)==LIVE_VISIT_CLEAN_LOSS_EXIT) return GLRT_VISIT_CLEAN_LOSS;
+    return WEXITSTATUS(status)==0 ? 0 : -1;
 fail:
     if(stdout_fd>=0) close(stdout_fd);
     if(stderr_fd>=0) close(stderr_fd);
@@ -139,7 +142,7 @@ int main(int argc,char **argv)
         errno=0;lo[n]=strtoull(argv[6+n],&end,10);
         if(errno || *end || !*argv[6+n]) return 2;
     }
-    context.args=argv;context.rate=(uint32_t)strtoul(argv[1],NULL,10);context.probe_main=glrt_cpu_probe_main;
+    context.args=argv;context.rate=(uint32_t)strtoul(argv[1],NULL,10);context.probe_main=visit_probe_main;
     if(snprintf(path,sizeof(path),"%s/visits.txt",argv[5])<=0 || !(context.journal=fopen(path,"wx"))) return 2;
     action.sa_handler=signal_stop;sigemptyset(&action.sa_mask);
     if(sigaction(SIGALRM,&action,NULL) || sigaction(SIGTERM,&action,NULL) || sigaction(SIGINT,&action,NULL)) return 2;
