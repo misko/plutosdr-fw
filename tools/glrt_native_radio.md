@@ -277,3 +277,28 @@ These are declared model inputs, not measurements of loaded Linux behavior.
 This closes the tested controller-history transfer gap. Connecting the live
 radio capture owner, measuring admission under receiver load, qualifying the
 remaining startup cases, and deployment still remain.
+
+### Passive coarse observer
+
+`glrt_tracking_observer.[ch]` clones a validated 2.5-MS/s coarse history and
+measures one retained pilot every nine frames. It keeps an independent history
+and has no native-controller, RF-configuration or submission port. The caller
+retains the imported history and attests the same four direct reference banks
+used by startup. Every new software observation and its exact IQ must be
+retained before its history update commits.
+
+One step returns WAIT, MEASURED, DONE or an explicit terminal failure. The
+observer allows at most 200 measurements, five seconds of wall time and five
+seconds of source look-ahead from its first predicted pilot. It preserves the
+eight-support, 96-frame fit and last-supported-plus-32 prediction limits.
+Cancellation, deadlines, source loss and retention failure cannot commit a new
+history point. Source timestamps are checked against a clock read after the
+owner snapshot, since a producer may publish while the observer waits for the
+owner lock. As elsewhere, close the owner, join every worker, then destroy it.
+
+This component is passive infrastructure for comparing coarse support with
+native loss. It does not feed coarse observations into native feedback, relax
+native gates, qualify a new support policy or establish sustained tracking.
+`tests/starlink_glrt/test_tracking_observer.py` exercises actual copied IQ,
+all four reference phases, large source coordinates, finite loss, retention
+transactions, cancellation and concurrent-publication timestamp ordering.
