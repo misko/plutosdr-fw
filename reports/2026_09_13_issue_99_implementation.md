@@ -82,12 +82,13 @@ but a `.dfu` suffix alone does not establish a volatile destination.
 | Verification | Result |
 |---|---|
 | UML KUnit, production EAR/MTD code | 7 cases passed |
-| Updater, active U-Boot C, controller C and release tooling | 59 tests passed |
-| Target ARM BusyBox updater fixtures and complete candidate, under QEMU | 33 tests passed |
+| Updater, active U-Boot C, controller C and release/source tooling | 61 tests passed |
+| Target ARM BusyBox updater fixtures and complete candidate, under QEMU | 34 tests passed |
 | ARM `fdtget` and `dumpimage` with candidate rootfs libraries | Passed |
 | ARM kernel, modules, DT build and U-Boot build | Passed |
 | Packaged DT layout and conservative erase span | Passed, all 3 DTs |
 | Repeat build using the recorded recipe | FIT and FRM SHA-256 identical |
+| New source-lock tags, remote pins, gitlinks and Buildroot recipes | Passed |
 
 The negative-control flash model reproduces the misleading logical readback:
 an ignored Winbond bank write directs upper-bank data onto physical boot bytes,
@@ -124,6 +125,13 @@ Build outputs are in `build/issue99/candidate`; local evidence logs are in
 retains its embedded kernel configuration except LOCALVERSION, pins build time,
 and refuses dirty component trees. The published base DFU hash is
 `435a26369018e86ee66262b79c32895dbaaacef510a1efb71c566d6409555344`.
+
+`manifests/flash-safety-v1-source.yaml` locks the new source graph. PR CI checks
+it against the current gitlinks and retains historical release-lock checks.
+The dedicated GitHub-hosted flash job runs the host C/updater tests and KUnit;
+it has no radio access. The protected main build/release route still names the
+published counter release and must be advanced as part of qualified promotion;
+this draft does not change that release or bypass its checks.
 
 ## Deployment and qualification still required
 

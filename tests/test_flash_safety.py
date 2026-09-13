@@ -15,6 +15,16 @@ BOARD = ROOT / "buildroot/board/pluto"
 PROFILE = ROOT / "manifests/pluto-legacy-flash-layout.json"
 
 
+def test_current_flash_safety_source_graph():
+    manifest = dict(line.split(": ", 1) for line in
+                    (ROOT / "manifests/flash-safety-v1-source.yaml").read_text().splitlines()
+                    if ": " in line and not line.startswith("#"))
+    assert manifest["release_state"] == "candidate"
+    for component in ("buildroot", "linux", "hdl", "hdl-quantulum", "u-boot-xlnx"):
+        pin = subprocess.check_output(["git", "ls-files", "--stage", component], cwd=ROOT, text=True).split()[1]
+        assert manifest["submodule_" + component.replace("-", "_")] == pin
+
+
 @pytest.mark.parametrize("size,allowed", [(12935447, True), (14680063, True),
     (14680064, True), (14680065, False), (14744943, False)])
 def test_exact_incident_ranges(size, allowed):

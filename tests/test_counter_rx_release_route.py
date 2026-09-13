@@ -17,10 +17,16 @@ def test_counter_release_route_and_locks():
         for line in (ROOT / 'manifests/counter-rx-v1-source.yaml').read_text().splitlines()
         if ': ' in line and not line.startswith('#')
     )
+    release = dict(
+        line.split(': ', 1)
+        for line in (ROOT / 'manifests/counter-rx-v1.yaml').read_text().splitlines()
+        if ': ' in line and not line.startswith('#')
+    )
+    # The released counter graph remains immutable after newer candidates land.
     for component in ('buildroot', 'linux', 'hdl', 'hdl-quantulum', 'u-boot-xlnx'):
         pin = subprocess.check_output(
-            ['git', 'ls-files', '--stage', component], cwd=ROOT, text=True
-        ).split()[1]
+            ['git', 'ls-tree', release['firmware_source'], component], cwd=ROOT, text=True
+        ).split()[2]
         assert manifest['submodule_' + component.replace('-', '_')] == pin
     assert manifest['libiio_0_25_source'] == '47a75cbc5e7d24a063b8b54eb531fdba6602b85c'
     assert manifest['libiio_0_25_archive_sha256'] == 'a6676eee9318a38d25e098ce7dce78c3af7df3f8e357f40efdf7f059e8ef2d50'
