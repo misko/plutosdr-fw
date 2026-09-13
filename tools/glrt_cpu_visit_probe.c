@@ -27,6 +27,14 @@ static int channel_number(struct iio_channel *channel,const char *name,long long
 {
     return !channel || iio_channel_attr_read_longlong(channel,name,out) ? -1 : 0;
 }
+static int visit_idle_snapshot(const uint32_t w[24],uint32_t rate)
+{
+    /* Epoch zero precedes the first real-refill REBASE. Calibration/boot
+     * counters are retained but are not losses from a tracking acquisition.
+     * Every nonzero acquisition epoch must still have zero source drops. */
+    return glrt_tracking_snapshot_drained(w) && !(w[5]&16) && !w[6] && !w[7] &&
+        w[20]==rate && (!w[2] || (!w[18] && !w[19]));
+}
 static int visit_inspect(void *pointer,struct glrt_visit_state *state)
 {
     struct visit_context *v=pointer;struct iio_context *ctx=iio_create_local_context();
@@ -54,7 +62,7 @@ static int visit_inspect(void *pointer,struct glrt_visit_state *state)
     {
         int length=attr(iq,"tracking_snapshot",raw,NULL);
         if(length<=0 || glrt_tracking_snapshot_parse(raw,(size_t)length,w) ||
-           !glrt_tracking_snapshot_drained(w) || (w[5]&16) || w[6] || w[7] || w[18] || w[19] || w[20]!=v->rate)
+           !visit_idle_snapshot(w,v->rate))
             goto done;
         /* Retain the exact snapshot that passed validation. A second read
          * advances the hardware counter and cannot prove this inspection. */

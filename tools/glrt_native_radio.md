@@ -344,3 +344,10 @@ This advances radio-local scanning across frequencies, while leaving sustained
 tracking, adaptive revisit order, continuation after qualified native loss and
 precision refinement as separate unqualified requirements. It does not select
 lower-edge frequencies with the upper-edge reference bank.
+
+At a fresh boot, epoch zero can contain drop counts from calibration before
+the first real-refill REBASE. The visit preflight retains those counters and
+allows them only in epoch zero with capture disabled and tracking drained,
+cleared and fault-free. Every nonzero acquisition epoch still requires zero
+CDC/pacer drops. This matches the existing finite probe's baseline-versus-active
+epoch distinction; it neither erases a counter nor accepts loss during capture.

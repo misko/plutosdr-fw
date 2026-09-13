@@ -12,6 +12,7 @@ pytestmark=pytest.mark.fftw
 
 WRAPPER=r'''
 #include "glrt_cpu_visit_probe.c"
+int inspect_idle_words(const uint32_t w[24],uint32_t rate) { return visit_idle_snapshot(w,rate); }
 const char *iio_device_get_id(const struct iio_device *d) { (void)d;return "iio:device0"; }
 int iio_channel_attr_read_longlong(const struct iio_channel *c,const char *n,long long *out)
 { (void)c;(void)n;(void)out;return -1; }
@@ -59,6 +60,7 @@ def probe(tmp_path_factory):
         '-I',str(out),'-I',str(root/'tools'),*include,str(out/'wrapper.c'),str(fixture/'backend.c'),
         *(str(root/'tools'/name) for name in names),*libraries,'-lfftw3','-lm','-o',str(out/'visit.so')],check=True)
     lib=c.CDLL(str(out/'visit.so'));lib.exercise_child.argtypes=[c.c_char_p,c.c_char_p]
+    lib.inspect_idle_words.argtypes=[c.POINTER(c.c_uint32),c.c_uint32]
     return lib
 
 
@@ -71,3 +73,18 @@ def test_child_is_reaped_before_return_and_evidence_is_never_overwritten(probe,t
     elif mode!='hang':
         assert (tmp_path/'visit-0/stdout.json').read_text()=='retained child output\n'
         assert (tmp_path/'visit-0/stderr.txt').read_text()=='retained child diagnostics\n'
+
+
+@pytest.mark.parametrize('rate',[30000000,60000000])
+@pytest.mark.parametrize('epoch',[0,1,7])
+@pytest.mark.parametrize('mode',['idle','boot_drops','active','fault','configured','wrong_rate','unread'])
+def test_only_epoch_zero_can_have_pre_acquisition_drop_counters(probe,rate,epoch,mode):
+    words=(c.c_uint32*24)();words[2]=epoch;words[20]=rate
+    words[0]=0x474c5431;words[1]=1;words[21]=rate*33//25000;words[22]=0xb04a2fab;words[23]=1
+    if mode=='boot_drops': words[18]=4;words[19]=5413144
+    if mode=='active': words[5]=16
+    if mode=='fault': words[6]=1
+    if mode=='configured': words[7]=1
+    if mode=='wrong_rate': words[20]=2500000
+    if mode=='unread': words[9]=1
+    assert probe.inspect_idle_words(words,rate)==int(mode=='idle' or (mode=='boot_drops' and epoch==0))
