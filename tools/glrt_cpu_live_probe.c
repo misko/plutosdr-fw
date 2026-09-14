@@ -27,6 +27,8 @@
 #define PAIR_LIMIT 64U
 #define PAIR_SAMPLES 3333U
 #define RESTART_LIMIT 3U
+#define SCAN80_RESOLVER_POWER_FLOOR 0.03
+#define SCAN80_WEAK_FALLBACK_INTERVAL 4U
 struct paired_head { uint32_t words[32]; };
 struct dwell_limits { unsigned blocks,attempts,alarm_seconds; uint64_t worker_ns; int selected_iq; unsigned observer_spacing,rank_budget; int restart_on_loss; };
 static int dwell_limits(const char *blocks,struct dwell_limits *out)
@@ -317,6 +319,12 @@ static unsigned proposal_count(const struct live *s)
 { return s->rank_budget>8 ? s->wide_count : s->coarse.count; }
 static const struct glrt_cpu_coarse_peak *proposal_peaks(const struct live *s)
 { return s->rank_budget>8 ? s->wide_peaks : s->coarse.peaks; }
+/* This is a scheduling prefilter, not an acquisition acceptance gate. It
+ * usually avoids the expensive resolver for weak scan80 proposals, but every
+ * fourth weak proposal still gets the full resolver. That preserves continuing
+ * sensitivity below the evidence-derived floor. Older profiles are unchanged. */
+static int rank_fast_reject(unsigned budget,double power,unsigned attempt)
+{ return budget==80 && power<SCAN80_RESOLVER_POWER_FLOOR && attempt%SCAN80_WEAK_FALLBACK_INTERVAL; }
 /* Cheap ordering only: one pilot prefix per coarse basin, with CFO searched
  * by FFT. Scan80 also checks +/-2 coarse samples. The selected proposal must
  * still pass the unchanged four-pilot resolver, history gates and deadlines. */
@@ -546,6 +554,14 @@ static void *worker_thread(void *pointer)
                 s->rank_budget==80 ? 512U : 4096U,s->rank_budget,s->rank_budget==80 ? 2U : 0U,selected_shift);
             fputs("}\n",s->journal);
             if(ferror(s->journal) || fflush(s->journal)) { result=-1;break; }
+            if(rank_fast_reject(s->rank_budget,scores[selected],s->attempts)) {
+                fprintf(s->journal,"{\"kind\":\"worker_terminal\",\"attempt\":%u,\"status\":%d,"
+                    "\"completed_ns\":%" PRIu64 ",\"retained_past\":0,\"supported_history\":0,"
+                    "\"fft_calls\":0,\"prefiltered\":1,\"source\":",s->attempts,GLRT_WORKER_HISTORY,clock_ns(NULL));
+                view(s->journal,&v);fputs("}\n",s->journal);
+                if(ferror(s->journal) || fflush(s->journal)) { result=-1;break; }
+                continue;
+            }
             candidate.peak=proposal_peaks(s)[selected];
             if((int)candidate.peak.epoch+selected_shift<0) candidate.peak.epoch+=3333U;
             candidate.peak.epoch=(unsigned)((int)candidate.peak.epoch+selected_shift);

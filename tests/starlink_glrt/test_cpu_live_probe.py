@@ -106,6 +106,8 @@ int live_final(unsigned admitted,unsigned delivered,unsigned flags,unsigned retu
 }
 int live_worker_terminal_clean(int result,int finite_source_complete)
 { return worker_terminal_is_clean(result,finite_source_complete); }
+int live_rank_fast_reject(unsigned budget,double power,unsigned attempt)
+{ return rank_fast_reject(budget,power,attempt); }
 void live_pair_stage(struct test_live *t,uint64_t native_start,int fail)
 {
     struct live *s=&t->live;uint32_t *w=s->paired[0].words;
@@ -132,6 +134,7 @@ int live_observer_seed_start(struct test_live *t)
 }
 int live_observer_join(struct test_live *t) { return join_observer(&t->live); }
 void live_observer_spacing(struct test_live *t,unsigned spacing) { t->live.observer_spacing=spacing; }
+void live_deadline(struct test_live *t,uint64_t nanoseconds) { t->live.deadline_ns=clock_ns(NULL)+nanoseconds; }
 int live_pair_copy(struct test_live *t,unsigned *copied)
 {
     int result=paired_copy(&t->live);*copied=t->live.paired_copied;return result;
@@ -270,6 +273,8 @@ def live_api(tmp_path_factory):
     lib.live_capture_done.argtypes = [c.c_void_p]
     lib.live_final.argtypes = [c.c_uint]*5
     lib.live_worker_terminal_clean.argtypes = [c.c_int,c.c_int]
+    lib.live_rank_fast_reject.argtypes = [c.c_uint,c.c_double,c.c_uint]
+    lib.live_deadline.argtypes = [c.c_void_p,c.c_uint64]
     lib.live_pair_stage.argtypes = [c.c_void_p,c.c_uint64,c.c_int]
     lib.live_pair_copy.argtypes = [c.c_void_p,c.c_void_p]
     lib.live_observer_fail.argtypes = [c.c_void_p,c.c_int]
@@ -345,6 +350,43 @@ def test_early_stop_requires_idle_complete_counters_with_bounded_tail(live_api, 
 def test_finite_source_accepts_only_clean_worker_cancellation(live_api,result,finite,expected):
     lib,_=live_api
     assert lib.live_worker_terminal_clean(result,finite)==expected
+
+
+@pytest.mark.parametrize('budget,power,attempt,expected',[
+    (80,0.0,1,1),(80,0.029999,2,1),(80,0.029999,4,0),
+    (80,0.03,1,0),(80,0.05,1,0),(64,0.0,1,0),(8,0.0,1,0)])
+def test_scan80_only_fast_rejects_below_resolver_power_floor(live_api,budget,power,attempt,expected):
+    lib,_=live_api
+    assert lib.live_rank_fast_reject(budget,power,attempt)==expected
+
+
+def test_scan80_noise_records_prefiltered_attempt_without_resolver(live_api,tmp_path):
+    lib,refs=live_api;handle=lib.live_new(refs.ctypes.data,bank().ctypes.data,
+        os.fsencode(tmp_path),c.byref(Ports()),30000000)
+    assert lib.live_set_dwell(handle,b'1536-selected-observer3-scan80-local2',(c.c_uint64*4)())==0
+    # Leave capture headroom so the finite-source stop cannot race the worker's
+    # first scan on a busy test host.
+    lib.live_select_windows(handle,os.fsencode(tmp_path),8,0)
+    lib.live_deadline(handle,30_000_000_000)
+    iq=np.random.default_rng(8030).integers(-100,101,(16384,2),dtype=np.int16)
+    assert lib.live_publish(handle,iq.ctypes.data,len(iq))==0
+    lib.live_start(handle)
+    try:
+        deadline=time.monotonic()+10
+        while len((tmp_path/'worker.jsonl').read_text().splitlines())<3:
+            assert time.monotonic()<deadline
+            time.sleep(.001)
+    finally:
+        lib.live_stop(handle)
+        out=(c.c_uint64*5)();lib.live_finish(handle,out)
+    rows=[json.loads(line) for line in (tmp_path/'worker.jsonl').read_text().splitlines()]
+    assert [row['kind'] for row in rows[:3]]==['scan','candidate_order','worker_terminal']
+    rank,terminal=rows[1:3]
+    assert max(rank['single_pilot_power'])<0.03
+    assert terminal['status']==-6 and terminal['prefiltered']==1
+    assert terminal['retained_past']==terminal['supported_history']==terminal['fft_calls']==0
+    assert c.c_int64(out[0]).value in (0,-4)
+    assert out[1]>=1 and list(out)[2:]==[0,0,0]
 
 
 def test_native_episodes_use_separate_exclusive_bounded_journals(live_api,tmp_path):
