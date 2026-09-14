@@ -51,7 +51,8 @@ void *live_new(const int16_t *refs,const int16_t *bank,const char *directory,
     t->ring=malloc(RING*4U);t->fft=fftw_malloc(GLRT_RESOLVER_FFT*sizeof(*t->fft));
     if(!t->ring || !t->fft || pthread_mutex_init(&s->mutex,NULL)) abort();
     memcpy(s->refs,refs,sizeof(s->refs));memcpy(s->bank,bank,sizeof(s->bank));
-    s->native=*ports;s->epoch=3;s->rate=rate;s->attempt_limit=ATTEMPTS;s->restart_on_loss=1;t->end=1000000;
+    s->native=*ports;s->epoch=3;s->rate=rate;s->attempt_limit=ATTEMPTS;s->restart_on_loss=1;
+    s->native_result_limit=NATIVE_RESULTS;s->native_seconds=NATIVE_SECONDS;t->end=1000000;
     s->fft=fftw_plan_dft_1d(GLRT_RESOLVER_FFT,t->fft,t->fft,FFTW_FORWARD,FFTW_ESTIMATE|FFTW_UNALIGNED);
     if(!s->fft || glrt_tracking_iq_owner_init(&s->owner,t->ring,RING,s->epoch,t->end)) abort();
     snprintf(path,sizeof(path),"%s/worker.jsonl",directory);s->journal=fopen(path,"wx");
@@ -79,6 +80,7 @@ int live_set_dwell(struct test_live *t,const char *blocks,uint64_t out[4])
     if(t) { t->live.attempt_limit=limits.attempts;t->live.selected_iq=limits.selected_iq;
         t->live.observer_spacing=limits.observer_spacing;t->live.rank_budget=limits.rank_budget;
         t->live.restart_on_loss=limits.restart_on_loss;
+        t->live.native_result_limit=limits.native_results;t->live.native_seconds=limits.native_seconds;
         if(limits.rank_budget>8 && !t->live.ranking_fft) {
             t->live.ranking_fft=fftw_plan_dft_1d(limits.rank_budget==80 ? 512 : 4096,
                 t->fft,t->fft,FFTW_FORWARD,FFTW_ESTIMATE|FFTW_UNALIGNED);
@@ -90,6 +92,13 @@ int live_set_dwell(struct test_live *t,const char *blocks,uint64_t out[4])
 }
 int live_restart_on_loss(const char *blocks)
 { struct dwell_limits limits;return dwell_limits(blocks,&limits) ? -1 : limits.restart_on_loss; }
+int live_native_limits(const char *blocks,uint64_t out[2])
+{
+    struct dwell_limits limits;
+    if(dwell_limits(blocks,&limits)) return -1;
+    out[0]=limits.native_results;out[1]=(uint64_t)limits.native_seconds;
+    return 0;
+}
 void live_select_windows(struct test_live *t,const char *directory,unsigned attempts,int fail)
 {
     char path[4096];struct live *s=&t->live;
@@ -284,6 +293,7 @@ def live_api(tmp_path_factory):
     lib.live_rebase.argtypes = [c.c_void_p,c.c_void_p]
     lib.live_totals.argtypes = [c.c_void_p,c.c_void_p]
     lib.live_restart_fault.argtypes = [c.c_void_p,c.c_uint]
+    lib.live_native_limits.argtypes = [c.c_char_p,c.c_void_p]
     lib.unused_probe_main.argtypes = [c.c_int, c.POINTER(c.c_char_p)]
     lib.live_rank.argtypes = [c.c_void_p,c.c_void_p,c.c_void_p,c.c_uint,c.c_void_p,c.c_void_p]
     lib.live_rank_shift.argtypes = [c.c_void_p,c.c_void_p,c.c_void_p,c.c_uint,c.c_void_p,c.c_void_p,c.c_void_p]
@@ -304,6 +314,7 @@ def live_api(tmp_path_factory):
     (b'45000', [45000,200,325,300000000000]),
     (b'45000-selected-observer3-scan64', [45000,256,325,300000000000]),
     (b'45000-selected-observer3-scan80-local2', [45000,256,325,300000000000]),
+    (b'45000-selected-observer3-scan80-local2-track10', [45000,256,325,300000000000]),
     (b'1536-selected', [1536,6,25,12000000000]),
     (b'1536-selected-observer3', [1536,6,25,12000000000]),
     (b'1536-selected-observer3-scan64', [1536,6,25,12000000000]),
@@ -318,7 +329,20 @@ def test_dwell_profiles_have_finite_capture_and_worker_limits(live_api, blocks, 
 
 
 @pytest.mark.parametrize('profile,expected',[
-    (b'45000',1),(b'45000-selected-observer3-scan64',1),(b'45000-selected-observer3-scan80-local2',1),(b'1536',0),
+    (b'1536',[1500,3]),
+    (b'45000-selected-observer3-scan80-local2',[1500,3]),
+    (b'45000-selected-observer3-scan80-local2-track10',[7500,12]),
+])
+def test_native_tracking_horizon_is_explicit_per_profile(live_api,profile,expected):
+    lib,_=live_api
+    out=(c.c_uint64*2)()
+    assert lib.live_native_limits(profile,out)==0
+    assert list(out)==expected
+
+
+@pytest.mark.parametrize('profile,expected',[
+    (b'45000',1),(b'45000-selected-observer3-scan64',1),(b'45000-selected-observer3-scan80-local2',1),
+    (b'45000-selected-observer3-scan80-local2-track10',1),(b'1536',0),
     (b'4096',0),(b'1536-selected',0),(b'1536-selected-observer3',0),
     (b'1536-selected-observer3-scan64',0),(b'1536-selected-observer3-scan80-local2',0),(b'unknown',-1)])
 def test_only_long_profiles_restart_after_clean_native_loss(live_api,profile,expected):
@@ -913,6 +937,13 @@ def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
         result=review_epochs(capture_text,rows,journals,status)
         assert result['reacquisitions']==len(episodes)-1
         if mode=='loss_then_supported':
+            assert result['native_results_per_completed_run']==1500
+            with pytest.raises(AssertionError):
+                review_epochs(capture_text,rows,journals,status,
+                              native_results_per_completed_run=7500)
+            with pytest.raises(ValueError,match='positive integer'):
+                review_epochs(capture_text,rows,journals,status,
+                              native_results_per_completed_run=0)
             source_lost_rows=copy.deepcopy(rows);source_lost_status=dict(status)
             source_lost_terminal=[r for r in source_lost_rows if r['kind']=='native_terminal'][-1]
             source_lost_terminal['result']=-3;source_lost_terminal['configured']+=7

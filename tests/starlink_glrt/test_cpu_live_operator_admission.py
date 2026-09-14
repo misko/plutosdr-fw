@@ -66,6 +66,15 @@ def test_three_frame_profile_retains_selected_iq_and_one_episode(storage_operato
     assert not any(name.startswith('native-') for name in names)
 
 
+def test_ten_second_tracking_is_opt_in_and_long_scan80_only(storage_operator):
+    profile='45000-selected-observer3-scan80-local2-track10'
+    assert storage_operator.observer_profile(45000,3,80,10)==profile
+    assert 'scan.iq.ci16' in storage_operator.capture_artifacts(45000,3,80,10)
+    for blocks,spacing,budget in ((1536,3,80),(45000,3,64),(45000,9,80)):
+        with pytest.raises(ValueError,match='ten-second tracking'):
+            storage_operator.observer_profile(blocks,spacing,budget,10)
+
+
 @pytest.mark.parametrize('mounted', [False,True])
 @pytest.mark.parametrize('attempted,terminal,retrieved,expected', [
     (False,False,False,True), (True,False,False,False),

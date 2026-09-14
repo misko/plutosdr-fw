@@ -7,7 +7,9 @@ from .starlink_glrt_tracking_abi import TrackingSnapshot
 from .starlink_glrt_tracking_journal import review as review_native
 
 
-def review_epochs(capture_text, rows, journals, status):
+def review_epochs(capture_text, rows, journals, status, native_results_per_completed_run=1500):
+    if type(native_results_per_completed_run) is not int or native_results_per_completed_run<=0:
+        raise ValueError('native_results_per_completed_run must be a positive integer')
     rate=status['rate']; ratio=rate//2500000
     assert rate in (30000000,60000000)
     bindings=[]; before=[]
@@ -51,13 +53,15 @@ def review_epochs(capture_text, rows, journals, status):
         assert t['epoch']==binding[1] and t['retained_popped']==len(heads)
         if t['result'] in (0,-4):
             assert t['configured']==t['retained_popped']
+            if t['result']==0:
+                assert len(heads)==native_results_per_completed_run
         else:
             assert t['result']==-3 and t['configured']>t['retained_popped']
         assert t['paired_result']==0
         assert any(r['attempt']==t['attempt'] and r['epoch']==binding[1] for r in scans)
         total+=len(heads); handoffs+=bool(heads)
         assert t['paired_queued']==t['paired_copied']==min(total,64)
-        completed+=t['result']==0 and len(heads)==1500
+        completed+=t['result']==0 and len(heads)==native_results_per_completed_run
         for head in heads:
             assert head.start>=binding[3]*ratio
             if len(paired)<64: paired.append((episode,head.sequence,head.start,binding[1]))
@@ -83,4 +87,5 @@ def review_epochs(capture_text, rows, journals, status):
     return dict(status='pass',scope='bounded_reacquisition_epochs_and_native_ownership',
                 epoch_bindings=bindings,episodes=results,reacquisitions=len(restart),
                 native_results=total,native_completed_runs=completed,paired_results=len(pairs),
+                native_results_per_completed_run=native_results_per_completed_run,
                 live_tracking_qualified=False)

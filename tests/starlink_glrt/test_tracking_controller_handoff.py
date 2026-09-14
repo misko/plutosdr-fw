@@ -78,6 +78,26 @@ def test_history_drives_continuation_before_new_measurements_and_preserves_ordin
     with pytest.raises(ValueError): legacy_review(journal(radio),epoch=3)
 
 
+def test_ten_second_30_msps_handoff_runs_all_7500_scheduled_results(
+        handoff_api,pilot_moments):
+    rate=30000000
+    radio,history,batch=prepare(
+        handoff_api,pilot_moments,rate,frames=7500,initialize=False)
+    assert handoff_api.glrt_tracking_controller_init_handoff(
+        radio.state,c.byref(radio.ports),c.byref(batch),c.byref(history),600,7500,12)==0
+    for _ in range(30000):
+        status=radio.tick()
+        if status!=1:
+            break
+        radio.advance(rate//1000)
+    assert status==0
+    result=review(journal(radio),epoch=3,rate=rate)
+    assert len(result['heads'])==result['supported']==7500
+    assert result['estimates'][0]['frame']==600
+    assert result['estimates'][-1]['frame']==8099
+    assert sum(item.repeats for item in radio.descriptors)==7500
+
+
 @pytest.mark.parametrize("rate", [2500000,5000000,15000000])
 def test_lost_new_support_uses_only_remaining_horizon(handoff_api,pilot_moments,rate):
     radio,history,_=prepare(handoff_api,pilot_moments,rate)

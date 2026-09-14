@@ -37,21 +37,24 @@ def retention_budget_kib(blocks):
     return 256*1024 if blocks == 45000 else 16384*blocks*4//1024
 
 
-def observer_profile(blocks, spacing, candidate_budget=8):
+def observer_profile(blocks, spacing, candidate_budget=8, tracking_seconds=2):
     retention_budget_kib(blocks)
+    if tracking_seconds not in (2,10) or (tracking_seconds==10 and (blocks,spacing,candidate_budget)!=(45000,3,80)):
+        raise ValueError('ten-second tracking requires the long scan80 observer3 profile')
     if spacing not in (3,9) or (spacing==3 and blocks!=1536 and not (blocks==45000 and candidate_budget in (64,80))):
         raise ValueError('three-frame observer requires a bounded selected-IQ profile')
     if candidate_budget not in (8,64,80) or (candidate_budget>8 and (blocks not in (1536,45000) or spacing!=3)):
         raise ValueError('expanded candidates require a bounded selected-IQ three-frame observer profile')
     if candidate_budget>8:
         suffix='scan64' if candidate_budget==64 else 'scan80-local2'
-        return f'1536-selected-observer3-{suffix}' if blocks==1536 else f'45000-selected-observer3-{suffix}'
+        profile=f'1536-selected-observer3-{suffix}' if blocks==1536 else f'45000-selected-observer3-{suffix}'
+        return profile+'-track10' if tracking_seconds==10 else profile
     return '1536-selected-observer3' if spacing==3 else str(blocks)
 
 
-def capture_artifacts(blocks, observer_spacing=9, candidate_budget=8):
+def capture_artifacts(blocks, observer_spacing=9, candidate_budget=8, tracking_seconds=2):
     retention_budget_kib(blocks)
-    observer_profile(blocks,observer_spacing,candidate_budget)
+    observer_profile(blocks,observer_spacing,candidate_budget,tracking_seconds)
     names = tuple('scan.iq.ci16' if (blocks == 45000 or observer_spacing==3) and name == 'iq.ci16' else name
                   for name in ARTIFACTS)
     # At most three clean-loss restarts. Unopened episode files are recorded
@@ -137,6 +140,8 @@ def main():
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--observer-spacing',type=int,choices=(3,9),default=9)
     parser.add_argument('--candidate-budget',type=int,choices=(8,64,80),default=8)
+    parser.add_argument('--tracking-seconds',type=int,choices=(2,10),default=2,
+                        help='successful native horizon; 10 is long-scan80 only')
     parser.add_argument('--blocks', type=int, choices=(1536, 4096, 45000), default=1536,
                         help='1536/4096 retain full IQ for 10.066/26.844 s; '
                              '45000 retains searched windows for at most 294.912 s; expanded scans permit 256 attempts')
@@ -144,8 +149,8 @@ def main():
                         help='Receive LO for this one bounded dwell; default is the historical .20 upper edge')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
-    selected_profile=observer_profile(args.blocks,args.observer_spacing,args.candidate_budget)
-    artifacts = capture_artifacts(args.blocks,args.observer_spacing,args.candidate_budget)
+    selected_profile=observer_profile(args.blocks,args.observer_spacing,args.candidate_budget,args.tracking_seconds)
+    artifacts = capture_artifacts(args.blocks,args.observer_spacing,args.candidate_budget,args.tracking_seconds)
     if not 70000000 <= args.lo_hz <= 6000000000:
         raise ValueError('receive LO is outside the AD9361 range')
     plan, profile = g.deployment_identity(args.deployment, serial=ENDPOINT[0], host=ENDPOINT[1])
@@ -165,6 +170,8 @@ def main():
                 'candidate_budget': args.candidate_budget,
                 'ranking_fft': 512 if args.candidate_budget==80 else 4096 if args.candidate_budget==64 else 16384,
                 'ranking_timing_radius': 2 if args.candidate_budget==80 else 0,
+                'native_tracking': {'rate_hz': 750, 'maximum_results_per_episode': 750*args.tracking_seconds,
+                                    'maximum_seconds_per_episode': args.tracking_seconds},
                 'retention_mode': 'selected_windows' if args.blocks == 45000 or args.observer_spacing==3 else 'full',
                 'passive_observer': {'rate': 2500000, 'feedback_authority': False,
                                      'frame_spacing': args.observer_spacing,
