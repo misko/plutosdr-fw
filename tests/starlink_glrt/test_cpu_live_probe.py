@@ -315,6 +315,7 @@ def live_api(tmp_path_factory):
     (b'45000-selected-observer3-scan64', [45000,256,325,300000000000]),
     (b'45000-selected-observer3-scan80-local2', [45000,256,325,300000000000]),
     (b'45000-selected-observer3-scan80-local2-track10', [45000,256,325,300000000000]),
+    (b'45000-selected-observer9-scan80-local2-track10', [45000,256,325,300000000000]),
     (b'1536-selected', [1536,6,25,12000000000]),
     (b'1536-selected-observer3', [1536,6,25,12000000000]),
     (b'1536-selected-observer3-scan64', [1536,6,25,12000000000]),
@@ -332,6 +333,7 @@ def test_dwell_profiles_have_finite_capture_and_worker_limits(live_api, blocks, 
     (b'1536',[1500,3]),
     (b'45000-selected-observer3-scan80-local2',[1500,3]),
     (b'45000-selected-observer3-scan80-local2-track10',[7500,12]),
+    (b'45000-selected-observer9-scan80-local2-track10',[7500,12]),
 ])
 def test_native_tracking_horizon_is_explicit_per_profile(live_api,profile,expected):
     lib,_=live_api
@@ -342,7 +344,8 @@ def test_native_tracking_horizon_is_explicit_per_profile(live_api,profile,expect
 
 @pytest.mark.parametrize('profile,expected',[
     (b'45000',1),(b'45000-selected-observer3-scan64',1),(b'45000-selected-observer3-scan80-local2',1),
-    (b'45000-selected-observer3-scan80-local2-track10',1),(b'1536',0),
+    (b'45000-selected-observer3-scan80-local2-track10',1),
+    (b'45000-selected-observer9-scan80-local2-track10',1),(b'1536',0),
     (b'4096',0),(b'1536-selected',0),(b'1536-selected-observer3',0),
     (b'1536-selected-observer3-scan64',0),(b'1536-selected-observer3-scan80-local2',0),(b'unknown',-1)])
 def test_only_long_profiles_restart_after_clean_native_loss(live_api,profile,expected):

@@ -57,6 +57,8 @@ static int dwell_limits(const char *blocks,struct dwell_limits *out)
         *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,80,1,NATIVE_RESULTS,NATIVE_SECONDS};
     else if(!strcmp(blocks,"45000-selected-observer3-scan80-local2-track10"))
         *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_SECONDS};
+    else if(!strcmp(blocks,"45000-selected-observer9-scan80-local2-track10"))
+        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_SECONDS};
     else if(!strcmp(blocks,"1536-selected"))
         *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,9,8,0,NATIVE_RESULTS,NATIVE_SECONDS};
     else if(!strcmp(blocks,"1536-selected-observer3"))
@@ -721,7 +723,7 @@ static int live_probe_run(int argc,char **argv,int visit_mode)
 #define NEED(x,name) do { stage=name; if(!(x)) goto done; } while(0)
     if((argc!=6 && argc!=7) || (strcmp(argv[1],"30000000") && strcmp(argv[1],"60000000")) ||
        dwell_limits(argc==7 ? argv[6] : NULL,&limits)) {
-        fprintf(stderr,"usage: %s 30000000|60000000 SERIAL BANK REFERENCES NEW_OUTPUT_DIRECTORY [1536|4096|45000|1536-selected|1536-selected-observer3|1536-selected-observer3-scan64|45000-selected-observer3-scan64|1536-selected-observer3-scan80-local2|45000-selected-observer3-scan80-local2|45000-selected-observer3-scan80-local2-track10]\n",argv[0]);return 2;
+        fprintf(stderr,"usage: %s 30000000|60000000 SERIAL BANK REFERENCES NEW_OUTPUT_DIRECTORY [1536|4096|45000|1536-selected|1536-selected-observer3|1536-selected-observer3-scan64|45000-selected-observer3-scan64|1536-selected-observer3-scan80-local2|45000-selected-observer3-scan80-local2|45000-selected-observer3-scan80-local2-track10|45000-selected-observer9-scan80-local2-track10]\n",argv[0]);return 2;
     }
     rate=(uint32_t)strtoul(argv[1],NULL,10);
     action.sa_handler=signal_stop;sigemptyset(&action.sa_mask);

@@ -39,15 +39,20 @@ def retention_budget_kib(blocks):
 
 def observer_profile(blocks, spacing, candidate_budget=8, tracking_seconds=2):
     retention_budget_kib(blocks)
-    if tracking_seconds not in (2,10) or (tracking_seconds==10 and (blocks,spacing,candidate_budget)!=(45000,3,80)):
+    if tracking_seconds not in (2,10) or (tracking_seconds==10 and
+            (blocks,candidate_budget)!=(45000,80)):
         raise ValueError('ten-second tracking requires the long scan80 observer3 profile')
-    if spacing not in (3,9) or (spacing==3 and blocks!=1536 and not (blocks==45000 and candidate_budget in (64,80))):
+    if spacing not in (3,9) or (spacing==3 and blocks!=1536 and
+            not (blocks==45000 and candidate_budget in (64,80))):
         raise ValueError('three-frame observer requires a bounded selected-IQ profile')
-    if candidate_budget not in (8,64,80) or (candidate_budget>8 and (blocks not in (1536,45000) or spacing!=3)):
+    observer9_scan80=(blocks,spacing,candidate_budget,tracking_seconds)==(45000,9,80,10)
+    if candidate_budget not in (8,64,80) or (candidate_budget>8 and
+            (blocks not in (1536,45000) or (spacing!=3 and not observer9_scan80))):
         raise ValueError('expanded candidates require a bounded selected-IQ three-frame observer profile')
     if candidate_budget>8:
         suffix='scan64' if candidate_budget==64 else 'scan80-local2'
-        profile=f'1536-selected-observer3-{suffix}' if blocks==1536 else f'45000-selected-observer3-{suffix}'
+        observer='observer9' if observer9_scan80 else 'observer3'
+        profile=f'1536-selected-observer3-{suffix}' if blocks==1536 else f'45000-selected-{observer}-{suffix}'
         return profile+'-track10' if tracking_seconds==10 else profile
     return '1536-selected-observer3' if spacing==3 else str(blocks)
 

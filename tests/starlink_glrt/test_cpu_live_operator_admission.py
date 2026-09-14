@@ -69,10 +69,24 @@ def test_three_frame_profile_retains_selected_iq_and_one_episode(storage_operato
 def test_ten_second_tracking_is_opt_in_and_long_scan80_only(storage_operator):
     profile='45000-selected-observer3-scan80-local2-track10'
     assert storage_operator.observer_profile(45000,3,80,10)==profile
+    assert storage_operator.observer_profile(45000,9,80,10)==\
+        '45000-selected-observer9-scan80-local2-track10'
     assert 'scan.iq.ci16' in storage_operator.capture_artifacts(45000,3,80,10)
-    for blocks,spacing,budget in ((1536,3,80),(45000,3,64),(45000,9,80)):
+    for blocks,spacing,budget in ((1536,3,80),(45000,3,64),(1536,9,80)):
         with pytest.raises(ValueError,match='ten-second tracking'):
             storage_operator.observer_profile(blocks,spacing,budget,10)
+
+
+def test_observer9_profile_can_close_measured_scan80_catchup_backlog():
+    source_rate=2_500_000
+    measured_initial_lag=1.12*source_rate
+    measured_step_cost=.0024*source_rate
+    maximum_measurements=200
+    def required(spacing):
+        net_catchup=spacing*source_rate/750-measured_step_cost
+        return int(measured_initial_lag//net_catchup)+1
+    assert required(3)>maximum_measurements
+    assert required(9)==117<maximum_measurements
 
 
 @pytest.mark.parametrize('mounted', [False,True])
