@@ -30,7 +30,7 @@
 #define NATIVE_RESULTS 1500U
 #define LONG_NATIVE_RESULTS 7500U
 #define NATIVE_SECONDS 3.0
-#define LONG_NATIVE_SECONDS 12.0
+#define LONG_NATIVE_WALL_SECONDS 120.0
 #define SCAN80_RESOLVER_POWER_FLOOR 0.03
 #define SCAN80_WEAK_FALLBACK_INTERVAL 4U
 struct paired_head { uint32_t words[32]; };
@@ -57,11 +57,11 @@ static int dwell_limits(const char *blocks,struct dwell_limits *out)
     else if(!strcmp(blocks,"45000-selected-observer3-scan80-local2"))
         *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,80,1,NATIVE_RESULTS,NATIVE_SECONDS,0};
     else if(!strcmp(blocks,"45000-selected-observer3-scan80-local2-track10"))
-        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_SECONDS,0};
+        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_WALL_SECONDS,0};
     else if(!strcmp(blocks,"45000-selected-observer9-scan80-local2-track10"))
-        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_SECONDS,0};
+        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_WALL_SECONDS,0};
     else if(!strcmp(blocks,"45000-selected-observer9-scan80-local2-track10-authority"))
-        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_SECONDS,1};
+        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_WALL_SECONDS,1};
     else if(!strcmp(blocks,"1536-selected"))
         *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,9,8,0,NATIVE_RESULTS,NATIVE_SECONDS,0};
     else if(!strcmp(blocks,"1536-selected-observer3"))

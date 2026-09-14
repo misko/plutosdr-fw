@@ -33,6 +33,13 @@ neither source renews that horizon, the controller drains and reports clean
 acquisition loss. The journal reviewer reconstructs the causal authority
 horizon from initial history, accepted native estimates and authority records;
 removing or altering an authority record invalidates later descriptors.
+The target is 7500 FPGA results, representing ten seconds at the 750-Hz pilot
+cadence. ARM sysfs retention drains results more slowly than signal time, so
+the long profiles give the controller a separate 120-second wall deadline.
+That deadline does not enlarge the ten-second source horizon or any scheduling
+authority; it only permits already authorized FPGA results to be retained,
+associated and popped. The global 300-second worker and 325-second cancellation
+bounds remain unchanged.
 
 The capture limit is 1536 refills: 25165824 complex samples, or 10.0663296
 seconds of RF at the exported rate. There are at most six coarse attempts,

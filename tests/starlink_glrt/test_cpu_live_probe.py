@@ -338,11 +338,11 @@ def test_dwell_profiles_have_finite_capture_and_worker_limits(live_api, blocks, 
 @pytest.mark.parametrize('profile,expected',[
     (b'1536',[1500,3]),
     (b'45000-selected-observer3-scan80-local2',[1500,3]),
-    (b'45000-selected-observer3-scan80-local2-track10',[7500,12]),
-    (b'45000-selected-observer9-scan80-local2-track10',[7500,12]),
-    (b'45000-selected-observer9-scan80-local2-track10-authority',[7500,12]),
+    (b'45000-selected-observer3-scan80-local2-track10',[7500,120]),
+    (b'45000-selected-observer9-scan80-local2-track10',[7500,120]),
+    (b'45000-selected-observer9-scan80-local2-track10-authority',[7500,120]),
 ])
-def test_native_tracking_horizon_is_explicit_per_profile(live_api,profile,expected):
+def test_native_result_horizon_and_wall_deadline_are_explicit_per_profile(live_api,profile,expected):
     lib,_=live_api
     out=(c.c_uint64*2)()
     assert lib.live_native_limits(profile,out)==0
