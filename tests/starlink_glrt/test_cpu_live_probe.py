@@ -79,8 +79,9 @@ int live_set_dwell(struct test_live *t,const char *blocks,uint64_t out[4])
     if(t) { t->live.attempt_limit=limits.attempts;t->live.selected_iq=limits.selected_iq;
         t->live.observer_spacing=limits.observer_spacing;t->live.rank_budget=limits.rank_budget;
         t->live.restart_on_loss=limits.restart_on_loss;
-        if(limits.rank_budget==64 && !t->live.ranking_fft) {
-            t->live.ranking_fft=fftw_plan_dft_1d(4096,t->fft,t->fft,FFTW_FORWARD,FFTW_ESTIMATE|FFTW_UNALIGNED);
+        if(limits.rank_budget>8 && !t->live.ranking_fft) {
+            t->live.ranking_fft=fftw_plan_dft_1d(limits.rank_budget==80 ? 512 : 4096,
+                t->fft,t->fft,FFTW_FORWARD,FFTW_ESTIMATE|FFTW_UNALIGNED);
             if(!t->live.ranking_fft) abort();
         } }
     out[0]=limits.blocks;out[1]=limits.attempts;
@@ -191,13 +192,22 @@ void live_close_source(struct test_live *t) { if(glrt_tracking_iq_owner_close(&t
 int live_rank(struct test_live *t,const int16_t *iq,const unsigned *epochs,unsigned count,
               double *scores,unsigned *selected)
 {
-    struct live *s=&t->live;
+    struct live *s=&t->live;int selected_shift;
     memcpy(s->scan_iq,iq,sizeof(s->scan_iq));s->coarse.count=count;
     for(unsigned k=0;k<count && k<8;k++) s->coarse.peaks[k].epoch=epochs[k];
     s->wide_count=count;
-    for(unsigned k=0;k<count && k<64;k++) s->wide_peaks[k].epoch=epochs[k];
+    for(unsigned k=0;k<count && k<80;k++) s->wide_peaks[k].epoch=epochs[k];
     s->deadline_ns=clock_ns(NULL)+UINT64_C(3000000000);
-    return rank_candidates(s,scores,selected);
+    return rank_candidates(s,scores,selected,&selected_shift);
+}
+int live_rank_shift(struct test_live *t,const int16_t *iq,const unsigned *epochs,unsigned count,
+                    double *scores,unsigned *selected,int *selected_shift)
+{
+    struct live *s=&t->live;
+    memcpy(s->scan_iq,iq,sizeof(s->scan_iq));s->wide_count=count;
+    for(unsigned k=0;k<count && k<80;k++) s->wide_peaks[k].epoch=epochs[k];
+    s->deadline_ns=clock_ns(NULL)+UINT64_C(3000000000);
+    return rank_candidates(s,scores,selected,selected_shift);
 }
 void live_free_unstarted(struct test_live *t)
 {
@@ -271,6 +281,7 @@ def live_api(tmp_path_factory):
     lib.live_restart_fault.argtypes = [c.c_void_p,c.c_uint]
     lib.unused_probe_main.argtypes = [c.c_int, c.POINTER(c.c_char_p)]
     lib.live_rank.argtypes = [c.c_void_p,c.c_void_p,c.c_void_p,c.c_uint,c.c_void_p,c.c_void_p]
+    lib.live_rank_shift.argtypes = [c.c_void_p,c.c_void_p,c.c_void_p,c.c_uint,c.c_void_p,c.c_void_p,c.c_void_p]
     lib.live_free_unstarted.argtypes = [c.c_void_p]
     for name in ("live_start", "live_done", "live_stop", "live_close_source", "live_join", "live_restart", "live_visit_loss", "live_visit_mode"):
         getattr(lib, name).argtypes = [c.c_void_p]
@@ -287,9 +298,11 @@ def live_api(tmp_path_factory):
     (b'4096', [4096,16,45,30000000000]),
     (b'45000', [45000,200,325,300000000000]),
     (b'45000-selected-observer3-scan64', [45000,256,325,300000000000]),
+    (b'45000-selected-observer3-scan80-local2', [45000,256,325,300000000000]),
     (b'1536-selected', [1536,6,25,12000000000]),
     (b'1536-selected-observer3', [1536,6,25,12000000000]),
     (b'1536-selected-observer3-scan64', [1536,6,25,12000000000]),
+    (b'1536-selected-observer3-scan80-local2', [1536,6,25,12000000000]),
 ])
 def test_dwell_profiles_have_finite_capture_and_worker_limits(live_api, blocks, expected):
     lib, _ = live_api
@@ -300,9 +313,9 @@ def test_dwell_profiles_have_finite_capture_and_worker_limits(live_api, blocks, 
 
 
 @pytest.mark.parametrize('profile,expected',[
-    (b'45000',1),(b'45000-selected-observer3-scan64',1),(b'1536',0),
+    (b'45000',1),(b'45000-selected-observer3-scan64',1),(b'45000-selected-observer3-scan80-local2',1),(b'1536',0),
     (b'4096',0),(b'1536-selected',0),(b'1536-selected-observer3',0),
-    (b'1536-selected-observer3-scan64',0),(b'unknown',-1)])
+    (b'1536-selected-observer3-scan64',0),(b'1536-selected-observer3-scan80-local2',0),(b'unknown',-1)])
 def test_only_long_profiles_restart_after_clean_native_loss(live_api,profile,expected):
     lib,_=live_api
     assert lib.live_restart_on_loss(profile)==expected
@@ -415,6 +428,27 @@ def test_original_pilot_order_matches_independent_fft(live_api, tmp_path, mode,w
     assert rc == 0 and selected.value == np.argmax(expected)
     np.testing.assert_allclose(scores,expected,rtol=2e-12,atol=2e-15)
     if mode == 'secondary_pilot': assert selected.value == 1
+
+
+def test_scan80_local_timing_search_selects_corrected_epoch(live_api,tmp_path):
+    lib,refs=live_api;handle=lib.live_new(refs.ctypes.data,bank().ctypes.data,
+        os.fsencode(tmp_path),c.byref(Ports()),60000000)
+    assert lib.live_set_dwell(handle,b'1536-selected-observer3-scan80-local2',(c.c_uint64*4)())==0
+    iq=np.random.default_rng(8042).integers(-50,51,(14000,2),dtype=np.int16)
+    epochs=np.arange(80,dtype=np.uint32)*39+100
+    selected_epoch=int(epochs[37]);corrected_epoch=selected_epoch+2
+    ref=refs[0,:512,0].astype(float)+1j*refs[0,:512,1]
+    pilot=ref*np.exp(2j*np.pi*31*np.arange(512)/512)
+    iq[corrected_epoch+22:corrected_epoch+22+512]=np.rint(
+        np.column_stack((pilot.real,pilot.imag))).astype(np.int16)
+    scores=np.full(80,999.,dtype=np.float64);selected=c.c_uint(999);shift=c.c_int(999)
+    try:
+        rc=lib.live_rank_shift(handle,iq.ctypes.data,epochs.ctypes.data,len(epochs),
+            scores.ctypes.data,c.byref(selected),c.byref(shift))
+    finally:
+        lib.live_free_unstarted(handle)
+    assert rc==0 and selected.value==37 and shift.value==2
+    assert scores[37]>0.99 and np.count_nonzero(scores>0.1)==1
 
 
 def check_observer_evidence(directory,iq,origin,worker_rows,rate,spacing=9):

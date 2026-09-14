@@ -35,7 +35,7 @@ static double startup_carrier(const struct glrt_tracking_bootstrap *s,uint32_t t
     double mx=0,mf=0,xx=0,xf=0,predicted;
     unsigned n;
     if(s->jobs<3 || s->jobs>=8 || h->count!=s->jobs || !h->valid ||
-       target<=h->last_supported || target-h->last_supported>GLRT_BOOTSTRAP_SPACING)
+       target<=h->last_supported || target-h->last_supported>s->spacing)
         return s->seed_cfo;
     for(n=0;n<h->count;n++) {
         mx-=(double)(h->last_supported-h->observations[n].frame);
@@ -61,7 +61,16 @@ int glrt_tracking_bootstrap_init(struct glrt_tracking_bootstrap *s, uint32_t epo
     if (!epoch || fraction>=65536 || !isfinite(cfo) || fabs(cfo)+250>=RATE/2.0 ||
         start>UINT64_MAX-SAMPLES || glrt_tracking_trend_reset(&s->trend,epoch,RATE))
         return fail(s,GLRT_BOOTSTRAP_INVALID);
-    s->seed_start=start; s->seed_fraction=fraction; s->seed_cfo=cfo; s->valid=1;
+    s->seed_start=start; s->seed_fraction=fraction; s->seed_cfo=cfo;
+    s->spacing=GLRT_BOOTSTRAP_SPACING; s->valid=1;
+    return 0;
+}
+
+int glrt_tracking_bootstrap_set_spacing(struct glrt_tracking_bootstrap *s,uint32_t spacing)
+{
+    if(!s || !s->valid || s->jobs || s->pending || s->ready ||
+       (spacing!=3 && spacing!=GLRT_BOOTSTRAP_SPACING)) return -1;
+    s->spacing=spacing;
     return 0;
 }
 
@@ -83,9 +92,11 @@ static int next(struct glrt_tracking_bootstrap *s, uint64_t earliest,
         return fail(s,GLRT_BOOTSTRAP_SOURCE_LOSS);
     s->last_available=available; s->clock_seen=1;
     if (s->jobs>=GLRT_BOOTSTRAP_LIMIT) return fail(s,GLRT_BOOTSTRAP_BUDGET);
-    target=s->jobs*GLRT_BOOTSTRAP_SPACING;
+    if(s->spacing!=3 && s->spacing!=GLRT_BOOTSTRAP_SPACING)
+        return fail(s,GLRT_BOOTSTRAP_INVALID);
+    target=s->jobs*s->spacing;
     if (s->jobs<8) {
-        /* Nine 750-Hz repeats span exactly 30,000 coarse samples. */
+        /* Advance by the explicitly selected 750-Hz frame cadence. */
         uint64_t advance=(uint64_t)(target-s->seed_frame)*RATE/750;
         if (s->seed_start>UINT64_MAX-advance) return fail(s,GLRT_BOOTSTRAP_INVALID);
         batch=(struct glrt_tracking_batch){.rate=RATE,.prediction={
@@ -102,11 +113,11 @@ static int next(struct glrt_tracking_bootstrap *s, uint64_t earliest,
         return GLRT_BOOTSTRAP_PAST;
     }
     if (s->jobs<8) return live ? GLRT_BOOTSTRAP_WAIT : fail(s,GLRT_BOOTSTRAP_HISTORY);
-    first=target-GLRT_BOOTSTRAP_SPACING+1;
+    first=target-s->spacing+1;
     /* The trend still enforces the same last-supported +32 horizon. A live
      * DMA block can lag the receiver beyond the legacy eighteen-position
      * search, so consider every eight-repeat batch inside that horizon. */
-    last=live ? s->trend.history.last_supported+32-7 : target+GLRT_BOOTSTRAP_SPACING;
+    last=live ? s->trend.history.last_supported+32-7 : target+s->spacing;
     for (; first<=last; first++) {
         if (glrt_tracking_trend_batch(&s->trend,first,8,1,0,&batch,&slope) ||
             glrt_tracking_prediction(&batch,0,&job)) continue;
@@ -157,7 +168,7 @@ int glrt_tracking_bootstrap_observe(struct glrt_tracking_bootstrap *s, uint32_t 
 {
     int rc;
     if (!s || !s->valid || !s->pending || !job || !estimate || epoch!=s->trend.history.epoch ||
-        frame!=s->jobs*GLRT_BOOTSTRAP_SPACING || job->start!=s->pending_job.start ||
+        frame!=s->jobs*s->spacing || job->start!=s->pending_job.start ||
         job->phase_step!=s->pending_job.phase_step || job->reference_phase!=s->pending_job.reference_phase)
         return fail(s,GLRT_BOOTSTRAP_INVALID);
     rc=glrt_tracking_trend_observe(&s->trend,epoch,frame,job->start,job->reference_phase,estimate);

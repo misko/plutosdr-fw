@@ -30,7 +30,7 @@ int glrt_cpu_coarse_grid(uint32_t grid[11][GLRT_CPU_COARSE_EPOCHS], const int16_
     const int16_t [12][11][11][2], unsigned begin, unsigned end,
     uint32_t *completed, int (*poll)(void *), void *context);
 int glrt_cpu_coarse_select(struct glrt_cpu_coarse_workspace *, int (*poll)(void *), void *context);
-/* Internal opt-in proposal budget, 1..64. Does not change the legacy eight
+/* Internal opt-in proposal budget, 1..80. Does not change the legacy eight
  * outputs or workspace layout. Caller supplies budget entries and count.
  * Uses at most 439956 bytes of temporary heap storage. Poll during grid
  * collection, heap construction, each extraction and publication; failure publishes count=0 and

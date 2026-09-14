@@ -18,7 +18,7 @@ enum glrt_bootstrap_failure { GLRT_BOOTSTRAP_NONE, GLRT_BOOTSTRAP_INVALID,
  * One job may be outstanding. The existing trend's acceptance and 32-repeat
  * forecast limits are unchanged. During initial jobs 3..7, three or more
  * earlier accepted pilots can predict the next carrier using a linear ramp.
- * All prior startup jobs must be accepted, the lead is at most nine frames,
+ * All prior startup jobs must be accepted, the lead is bounded by the selected cadence,
  * and the forecast must remain within 250 Hz of the last accepted carrier.
  * Otherwise startup holds that carrier. No future batch is authorized before
  * the existing eight-observation history gate. This is not a higher-rate
@@ -28,7 +28,7 @@ struct glrt_tracking_bootstrap {
     struct glrt_tracking_job pending_job;
     uint64_t seed_start, last_available;
     double seed_cfo;
-    uint32_t seed_fraction, seed_frame, jobs, pending, ready, valid, clock_seen;
+    uint32_t seed_fraction, seed_frame, jobs, pending, ready, valid, clock_seen, spacing;
     uint32_t failure;
 };
 
@@ -37,6 +37,10 @@ struct glrt_tracking_bootstrap {
  * caller. No accepted tracking estimate is created by initialization. */
 int glrt_tracking_bootstrap_init(struct glrt_tracking_bootstrap *, uint32_t epoch,
     uint64_t start, uint32_t fraction, double cfo_hz);
+
+/* Select startup cadence before the first job. Nine frames remains the
+ * default; three frames is the measured lower-cadence ARM option. */
+int glrt_tracking_bootstrap_set_spacing(struct glrt_tracking_bootstrap *, uint32_t spacing);
 
 /* earliest is inclusive and available is exclusive in original coarse-lane
  * samples; available must advance with actual acquisition during computation.

@@ -53,7 +53,7 @@ struct glrt_tracking_worker_config {
     void *fft_context;
     struct glrt_tracking_worker_ports ports;
     uint64_t source_deadline, wall_budget_ns; /* explicit budget, <=5 seconds */
-    uint32_t maximum_seed_age, lead_samples;
+    uint32_t maximum_seed_age, lead_samples, bootstrap_spacing;
 };
 /* Run one real GLA1 candidate in a background worker, never the IIO capture
  * thread. The caller attests event sequence, source/profile and ROM identity.

@@ -182,7 +182,7 @@ def sorted_peak_oracle(grid, budget):
     return selected
 
 
-@pytest.mark.parametrize('budget',[1,8,32,64])
+@pytest.mark.parametrize('budget',[1,8,32,64,80])
 @pytest.mark.parametrize('shape',['random','ties','zero'])
 def test_bounded_selection_matches_sorted_oracle(api,budget,shape):
     w=Workspace();w.completed_epochs=3333
@@ -192,28 +192,28 @@ def test_bounded_selection_matches_sorted_oracle(api,budget,shape):
     # Boundary peaks exercise circular suppression and center-frequency ties.
     if shape=='ties':grid[:,0]=grid[:,-1]=65536
     expected=sorted_peak_oracle(grid,budget)
-    peaks=(Peak*65)();peaks[64].score=12345;count=C.c_uint32(999)
+    peaks=(Peak*81)();peaks[80].score=12345;count=C.c_uint32(999)
     assert api.glrt_cpu_coarse_select_bounded(C.byref(w),peaks,budget,C.byref(count),POLL(lambda _:0),None)==0
     assert [(p.epoch,p.frequency,p.score) for p in peaks[:count.value]]==expected
-    assert peaks[64].score==12345 and not w.count
+    assert peaks[80].score==12345 and not w.count
 
 
-@pytest.mark.parametrize('when',[1,2,32,64,65])
+@pytest.mark.parametrize('when',[1,2,32,64,80,81])
 def test_bounded_selection_cancellation_clears_all_proposals(api,when):
     w=Workspace();w.completed_epochs=3333
     np.ctypeslib.as_array(w.grid)[:]=np.random.default_rng(32).integers(0,65537,(11,3333))
-    peaks=(Peak*64)();count=C.c_uint32(999);calls=0
+    peaks=(Peak*80)();count=C.c_uint32(999);calls=0
     def poll(_):
         nonlocal calls
         calls+=1
         return calls==when
-    assert api.glrt_cpu_coarse_select_bounded(C.byref(w),peaks,64,C.byref(count),POLL(poll),None)==-1
+    assert api.glrt_cpu_coarse_select_bounded(C.byref(w),peaks,80,C.byref(count),POLL(poll),None)==-1
     assert calls==when and count.value==0 and bytes(peaks)==bytes(C.sizeof(peaks))
 
 
-@pytest.mark.parametrize('budget,completed',[(0,3333),(65,3333),(64,3332)])
+@pytest.mark.parametrize('budget,completed',[(0,3333),(81,3333),(80,3332)])
 def test_bounded_selection_rejects_invalid_admission(api,budget,completed):
-    w=Workspace();w.completed_epochs=completed;peaks=(Peak*64)();count=C.c_uint32(999)
+    w=Workspace();w.completed_epochs=completed;peaks=(Peak*80)();count=C.c_uint32(999)
     assert api.glrt_cpu_coarse_select_bounded(C.byref(w),peaks,budget,C.byref(count),POLL(lambda _:0),None)==-1
     assert count.value==0
 
@@ -221,16 +221,16 @@ def test_bounded_selection_rejects_invalid_admission(api,budget,completed):
 def test_heap_failure_at_publication_clears_completed_selection(api):
     w=Workspace();w.completed_epochs=3333
     np.ctypeslib.as_array(w.grid)[:]=np.random.default_rng(91).integers(0,65537,(11,3333))
-    peaks=(Peak*64)();count=C.c_uint32();calls=0;stop=0
+    peaks=(Peak*80)();count=C.c_uint32();calls=0;stop=0
     def poll(_):
         nonlocal calls
         calls+=1
         return calls==stop
     callback=POLL(poll)
-    assert api.glrt_cpu_coarse_select_bounded(C.byref(w),peaks,64,C.byref(count),callback,None)==0
-    assert count.value==64
+    assert api.glrt_cpu_coarse_select_bounded(C.byref(w),peaks,80,C.byref(count),callback,None)==0
+    assert count.value==80
     stop=calls;calls=0
-    assert api.glrt_cpu_coarse_select_bounded(C.byref(w),peaks,64,C.byref(count),callback,None)==-1
+    assert api.glrt_cpu_coarse_select_bounded(C.byref(w),peaks,80,C.byref(count),callback,None)==-1
     assert calls==stop and count.value==0 and bytes(peaks)==bytes(C.sizeof(peaks))
 
 

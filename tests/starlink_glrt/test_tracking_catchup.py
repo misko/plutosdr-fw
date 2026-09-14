@@ -17,7 +17,7 @@ class Bootstrap(c.Structure):
     _fields_ = [("trend", TrackingTrend), ("pending_job", Job),
         ("seed_start", c.c_uint64), ("last_available", c.c_uint64), ("seed_cfo", c.c_double)]+[
         (name, c.c_uint32) for name in ("seed_fraction", "seed_frame", "jobs", "pending",
-                                      "ready", "valid", "clock_seen", "failure")]
+                                      "ready", "valid", "clock_seen", "spacing", "failure")]
 
 
 @pytest.fixture(scope="module")
@@ -31,6 +31,7 @@ def bootstrap(tmp_path_factory):
     lib = c.CDLL(str(path))
     lib.glrt_tracking_bootstrap_init.argtypes = [c.POINTER(Bootstrap), c.c_uint32,
         c.c_uint64, c.c_uint32, c.c_double]
+    lib.glrt_tracking_bootstrap_set_spacing.argtypes = [c.POINTER(Bootstrap), c.c_uint32]
     lib.glrt_tracking_bootstrap_next.argtypes = [c.POINTER(Bootstrap), c.c_uint64,
         c.c_uint64, c.c_uint32, c.POINTER(c.c_uint32), c.POINTER(Job), c.POINTER(TrackingBatch)]
     lib.glrt_tracking_bootstrap_observe.argtypes = [c.POINTER(Bootstrap), c.c_uint32,
@@ -43,6 +44,18 @@ def fresh(lib, start=1000000, fraction=0, cfo=400000, epoch=3):
     state = Bootstrap()
     assert lib.glrt_tracking_bootstrap_init(c.byref(state), epoch, start, fraction, cfo) == 0
     return state
+
+
+def test_three_frame_spacing_is_explicit_and_locked_after_first_job(bootstrap):
+    state=fresh(bootstrap)
+    assert state.spacing == 9
+    assert bootstrap.glrt_tracking_bootstrap_set_spacing(c.byref(state),3) == 0
+    rc,frame,_,_=next_job(bootstrap,state,state.seed_start,state.seed_start+3300)
+    assert rc == 1 and frame == 0 and state.spacing == 3
+    assert bootstrap.glrt_tracking_bootstrap_set_spacing(c.byref(state),9) == -1
+    for invalid in (0,1,2,4,8,10):
+        other=fresh(bootstrap)
+        assert bootstrap.glrt_tracking_bootstrap_set_spacing(c.byref(other),invalid) == -1
 
 
 def next_job(lib, state, earliest, available, lead=2500):

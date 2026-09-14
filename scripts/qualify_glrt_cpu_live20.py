@@ -29,7 +29,7 @@ ARTIFACTS = ('capture.txt', 'iq.ci16', 'worker.jsonl', 'worker.iq.ci16', 'grids.
 def retention_budget_kib(blocks):
     if blocks not in (1536, 4096, 45000):
         raise ValueError('unsupported capture length')
-    # Long scan64 mode bounds worker IQ to 80 MB, searched IQ to 14.4 MB and
+    # Long expanded-scan modes bound worker IQ to 80 MB, searched IQ to 14.4 MB and
     # grids to 37.6 MB. The 256-MiB allowance also covers capture/worker
     # journals, native evidence and <= 10.56 MB of observer IQ (4*200*3300*4)
     # without retaining all 2.95 GB of raw IQ. Short profiles permit one episode
@@ -39,12 +39,13 @@ def retention_budget_kib(blocks):
 
 def observer_profile(blocks, spacing, candidate_budget=8):
     retention_budget_kib(blocks)
-    if spacing not in (3,9) or (spacing==3 and blocks!=1536 and not (blocks==45000 and candidate_budget==64)):
+    if spacing not in (3,9) or (spacing==3 and blocks!=1536 and not (blocks==45000 and candidate_budget in (64,80))):
         raise ValueError('three-frame observer requires a bounded selected-IQ profile')
-    if candidate_budget not in (8,64) or (candidate_budget==64 and (blocks not in (1536,45000) or spacing!=3)):
-        raise ValueError('64 candidates require a bounded selected-IQ three-frame observer profile')
-    if candidate_budget==64:
-        return '1536-selected-observer3-scan64' if blocks==1536 else '45000-selected-observer3-scan64'
+    if candidate_budget not in (8,64,80) or (candidate_budget>8 and (blocks not in (1536,45000) or spacing!=3)):
+        raise ValueError('expanded candidates require a bounded selected-IQ three-frame observer profile')
+    if candidate_budget>8:
+        suffix='scan64' if candidate_budget==64 else 'scan80-local2'
+        return f'1536-selected-observer3-{suffix}' if blocks==1536 else f'45000-selected-observer3-{suffix}'
     return '1536-selected-observer3' if spacing==3 else str(blocks)
 
 
@@ -135,10 +136,10 @@ def main():
     parser.add_argument('--rate', type=int, choices=(30000000, 60000000), required=True)
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--observer-spacing',type=int,choices=(3,9),default=9)
-    parser.add_argument('--candidate-budget',type=int,choices=(8,64),default=8)
+    parser.add_argument('--candidate-budget',type=int,choices=(8,64,80),default=8)
     parser.add_argument('--blocks', type=int, choices=(1536, 4096, 45000), default=1536,
                         help='1536/4096 retain full IQ for 10.066/26.844 s; '
-                             '45000 retains searched windows for at most 294.912 s; scan64 permits 256 attempts')
+                             '45000 retains searched windows for at most 294.912 s; expanded scans permit 256 attempts')
     parser.add_argument('--lo-hz', type=int, default=1690312496,
                         help='Receive LO for this one bounded dwell; default is the historical .20 upper edge')
     parser.add_argument('--output', type=Path, required=True)
@@ -162,7 +163,8 @@ def main():
                 'rf_duration_limit_s': 16384*args.blocks/2500000, 'payload_sha256': hashes,
                 'profile': selected_profile,
                 'candidate_budget': args.candidate_budget,
-                'ranking_fft': 4096 if args.candidate_budget==64 else 16384,
+                'ranking_fft': 512 if args.candidate_budget==80 else 4096 if args.candidate_budget==64 else 16384,
+                'ranking_timing_radius': 2 if args.candidate_budget==80 else 0,
                 'retention_mode': 'selected_windows' if args.blocks == 45000 or args.observer_spacing==3 else 'full',
                 'passive_observer': {'rate': 2500000, 'feedback_authority': False,
                                      'frame_spacing': args.observer_spacing,

@@ -106,6 +106,9 @@ static int run(struct glrt_tracking_worker *w,
         guarded_fft,&execution,cfg->source_deadline,&w->resolved,&w->live);
     if(rc!=GLRT_SEED_READY)
         return stop(w,w->status<0 ? w->status : GLRT_WORKER_INVALID);
+    if(cfg->bootstrap_spacing &&
+       glrt_tracking_bootstrap_set_spacing(&w->live.core,cfg->bootstrap_spacing))
+        return stop(w,GLRT_WORKER_INVALID);
     if(source(&execution,0) || retain(&execution,GLRT_WORKER_RESOLVED)) return w->status;
     for(;;) {
         if(poll(&execution)) return w->status;

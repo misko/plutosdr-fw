@@ -147,7 +147,7 @@ int glrt_cpu_coarse_select_bounded(const struct glrt_cpu_coarse_workspace *w,
     unsigned k=0,f,e,r,length=0;
     struct glrt_cpu_coarse_peak *heap=NULL;
     if(count) *count=0;
-    if(!peaks || !budget || budget>64) return -1;
+    if(!peaks || !budget || budget>80) return -1;
     memset(peaks,0,budget*sizeof(*peaks));
     if(!w || !count || !poll || w->completed_epochs!=GLRT_CPU_COARSE_EPOCHS) return -1;
     if(poll(context)) goto failed;
