@@ -442,13 +442,14 @@ int glrt_native_controller_tick(struct glrt_native_controller *c)
             struct glrt_native_batch b;
             double rate;
             uint32_t count = c->frames-c->next_frame;
+            uint32_t authorized = last_authorized_support(c);
             int predicted;
             if (count > 16) count = 16;
             /* Use the remaining valid native horizon even when a full batch
              * would exceed it. No job may extend past last_supported + 32. */
-            if (c->trend.history.initialized && c->next_frame >= c->trend.history.last_supported &&
-                c->next_frame-c->trend.history.last_supported <= 32) {
-                uint32_t remaining = 33-(c->next_frame-c->trend.history.last_supported);
+            if ((c->trend.history.initialized || c->authority_valid) &&
+                c->next_frame >= authorized && c->next_frame-authorized <= 32) {
+                uint32_t remaining = 33-(c->next_frame-authorized);
                 if (count > remaining) count = remaining;
             }
             if (c->next_tag == UINT32_MAX) return finish_error(c,GLRT_NATIVE_PROTOCOL_ERROR);

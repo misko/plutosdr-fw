@@ -166,6 +166,22 @@ def test_refresh_refuses_owned_work_and_retention_failure_stops_safely(
     assert sum(item.repeats for item in radio.descriptors)==23
 
 
+def test_coarse_authority_uses_its_partial_final_horizon_when_native_rejects(
+        handoff_api,pilot_moments):
+    first=600
+    radio,history,batch=prepare(handoff_api,pilot_moments,first=first)
+    refreshed=extend_from_prediction(handoff_api,history,batch,first,599,608,617)
+    radio.reject=True
+    assert radio.tick()==1 and radio.tick()==1
+    assert handoff_api.glrt_tracking_controller_refresh_handoff(
+        radio.state,c.byref(refreshed))==0
+    assert radio.run()==-4
+    result=review(journal(radio),epoch=3,rate=2500000)
+    assert not result['supported']
+    assert result['estimates'][-1]['frame']==617+32
+    assert sum(item.repeats for item in radio.descriptors)==617+33-first
+
+
 @pytest.mark.parametrize("rate", [2500000,5000000,15000000])
 def test_lost_new_support_uses_only_remaining_horizon(handoff_api,pilot_moments,rate):
     radio,history,_=prepare(handoff_api,pilot_moments,rate)
