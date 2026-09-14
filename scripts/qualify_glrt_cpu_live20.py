@@ -29,8 +29,8 @@ ARTIFACTS = ('capture.txt', 'iq.ci16', 'worker.jsonl', 'worker.iq.ci16', 'grids.
 def retention_budget_kib(blocks):
     if blocks not in (1536, 4096, 45000):
         raise ValueError('unsupported capture length')
-    # Selected mode bounds worker IQ to 80 MB, searched IQ to 11.2 MB and
-    # grids to 29.4 MB. The 256-MiB allowance also covers capture/worker
+    # Long scan64 mode bounds worker IQ to 80 MB, searched IQ to 14.4 MB and
+    # grids to 37.6 MB. The 256-MiB allowance also covers capture/worker
     # journals, native evidence and <= 10.56 MB of observer IQ (4*200*3300*4)
     # without retaining all 2.95 GB of raw IQ. Short profiles permit one episode
     # (2.64 MB); their existing 40-MiB filesystem / 80-MiB memory margin covers it.
@@ -39,17 +39,18 @@ def retention_budget_kib(blocks):
 
 def observer_profile(blocks, spacing, candidate_budget=8):
     retention_budget_kib(blocks)
-    if spacing not in (3,9) or (spacing==3 and blocks!=1536):
-        raise ValueError('three-frame observer requires the bounded 1536-block profile')
-    if candidate_budget not in (8,64) or (candidate_budget==64 and (blocks!=1536 or spacing!=3)):
-        raise ValueError('64 candidates require the bounded three-frame observer profile')
-    if candidate_budget==64: return '1536-selected-observer3-scan64'
+    if spacing not in (3,9) or (spacing==3 and blocks!=1536 and not (blocks==45000 and candidate_budget==64)):
+        raise ValueError('three-frame observer requires a bounded selected-IQ profile')
+    if candidate_budget not in (8,64) or (candidate_budget==64 and (blocks not in (1536,45000) or spacing!=3)):
+        raise ValueError('64 candidates require a bounded selected-IQ three-frame observer profile')
+    if candidate_budget==64:
+        return '1536-selected-observer3-scan64' if blocks==1536 else '45000-selected-observer3-scan64'
     return '1536-selected-observer3' if spacing==3 else str(blocks)
 
 
-def capture_artifacts(blocks, observer_spacing=9):
+def capture_artifacts(blocks, observer_spacing=9, candidate_budget=8):
     retention_budget_kib(blocks)
-    observer_profile(blocks,observer_spacing)
+    observer_profile(blocks,observer_spacing,candidate_budget)
     names = tuple('scan.iq.ci16' if (blocks == 45000 or observer_spacing==3) and name == 'iq.ci16' else name
                   for name in ARTIFACTS)
     # At most three clean-loss restarts. Unopened episode files are recorded
@@ -137,13 +138,13 @@ def main():
     parser.add_argument('--candidate-budget',type=int,choices=(8,64),default=8)
     parser.add_argument('--blocks', type=int, choices=(1536, 4096, 45000), default=1536,
                         help='1536/4096 retain full IQ for 10.066/26.844 s; '
-                             '45000 retains searched windows for at most 294.912 s or 200 attempts')
+                             '45000 retains searched windows for at most 294.912 s; scan64 permits 256 attempts')
     parser.add_argument('--lo-hz', type=int, default=1690312496,
                         help='Receive LO for this one bounded dwell; default is the historical .20 upper edge')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     selected_profile=observer_profile(args.blocks,args.observer_spacing,args.candidate_budget)
-    artifacts = capture_artifacts(args.blocks,args.observer_spacing)
+    artifacts = capture_artifacts(args.blocks,args.observer_spacing,args.candidate_budget)
     if not 70000000 <= args.lo_hz <= 6000000000:
         raise ValueError('receive LO is outside the AD9361 range')
     plan, profile = g.deployment_identity(args.deployment, serial=ENDPOINT[0], host=ENDPOINT[1])

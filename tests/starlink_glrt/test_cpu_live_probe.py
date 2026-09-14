@@ -51,7 +51,7 @@ void *live_new(const int16_t *refs,const int16_t *bank,const char *directory,
     t->ring=malloc(RING*4U);t->fft=fftw_malloc(GLRT_RESOLVER_FFT*sizeof(*t->fft));
     if(!t->ring || !t->fft || pthread_mutex_init(&s->mutex,NULL)) abort();
     memcpy(s->refs,refs,sizeof(s->refs));memcpy(s->bank,bank,sizeof(s->bank));
-    s->native=*ports;s->epoch=3;s->rate=rate;s->attempt_limit=ATTEMPTS;t->end=1000000;
+    s->native=*ports;s->epoch=3;s->rate=rate;s->attempt_limit=ATTEMPTS;s->restart_on_loss=1;t->end=1000000;
     s->fft=fftw_plan_dft_1d(GLRT_RESOLVER_FFT,t->fft,t->fft,FFTW_FORWARD,FFTW_ESTIMATE|FFTW_UNALIGNED);
     if(!s->fft || glrt_tracking_iq_owner_init(&s->owner,t->ring,RING,s->epoch,t->end)) abort();
     snprintf(path,sizeof(path),"%s/worker.jsonl",directory);s->journal=fopen(path,"wx");
@@ -78,6 +78,7 @@ int live_set_dwell(struct test_live *t,const char *blocks,uint64_t out[4])
     if(dwell_limits(blocks,&limits)) return -1;
     if(t) { t->live.attempt_limit=limits.attempts;t->live.selected_iq=limits.selected_iq;
         t->live.observer_spacing=limits.observer_spacing;t->live.rank_budget=limits.rank_budget;
+        t->live.restart_on_loss=limits.restart_on_loss;
         if(limits.rank_budget==64 && !t->live.ranking_fft) {
             t->live.ranking_fft=fftw_plan_dft_1d(4096,t->fft,t->fft,FFTW_FORWARD,FFTW_ESTIMATE|FFTW_UNALIGNED);
             if(!t->live.ranking_fft) abort();
@@ -86,6 +87,8 @@ int live_set_dwell(struct test_live *t,const char *blocks,uint64_t out[4])
     out[2]=limits.alarm_seconds;out[3]=limits.worker_ns;
     return 0;
 }
+int live_restart_on_loss(const char *blocks)
+{ struct dwell_limits limits;return dwell_limits(blocks,&limits) ? -1 : limits.restart_on_loss; }
 void live_select_windows(struct test_live *t,const char *directory,unsigned attempts,int fail)
 {
     char path[4096];struct live *s=&t->live;
@@ -100,6 +103,8 @@ int live_final(unsigned admitted,unsigned delivered,unsigned flags,unsigned retu
     struct glrt_capture_snapshot s={0};s.words[4]=admitted;s.words[6]=delivered;s.words[19]=flags;
     return capture_early_final(&s,returned,limit);
 }
+int live_worker_terminal_clean(int result,int finite_source_complete)
+{ return worker_terminal_is_clean(result,finite_source_complete); }
 void live_pair_stage(struct test_live *t,uint64_t native_start,int fail)
 {
     struct live *s=&t->live;uint32_t *w=s->paired[0].words;
@@ -250,9 +255,11 @@ def live_api(tmp_path_factory):
     lib.live_journal_file.argtypes = [c.c_char_p,c.c_uint,c.c_char_p,c.c_char_p]
     lib.live_publish.argtypes = [c.c_void_p, c.c_void_p, c.c_size_t]
     lib.live_set_dwell.argtypes = [c.c_void_p, c.c_char_p, c.c_void_p]
+    lib.live_restart_on_loss.argtypes = [c.c_char_p]
     lib.live_select_windows.argtypes = [c.c_void_p,c.c_char_p,c.c_uint,c.c_int]
     lib.live_capture_done.argtypes = [c.c_void_p]
     lib.live_final.argtypes = [c.c_uint]*5
+    lib.live_worker_terminal_clean.argtypes = [c.c_int,c.c_int]
     lib.live_pair_stage.argtypes = [c.c_void_p,c.c_uint64,c.c_int]
     lib.live_pair_copy.argtypes = [c.c_void_p,c.c_void_p]
     lib.live_observer_fail.argtypes = [c.c_void_p,c.c_int]
@@ -279,6 +286,7 @@ def live_api(tmp_path_factory):
     (None, [1536,6,25,12000000000]), (b'1536', [1536,6,25,12000000000]),
     (b'4096', [4096,16,45,30000000000]),
     (b'45000', [45000,200,325,300000000000]),
+    (b'45000-selected-observer3-scan64', [45000,256,325,300000000000]),
     (b'1536-selected', [1536,6,25,12000000000]),
     (b'1536-selected-observer3', [1536,6,25,12000000000]),
     (b'1536-selected-observer3-scan64', [1536,6,25,12000000000]),
@@ -289,6 +297,15 @@ def test_dwell_profiles_have_finite_capture_and_worker_limits(live_api, blocks, 
     assert lib.live_set_dwell(None, blocks, out) == 0
     assert list(out) == expected
     assert out[0]*16384/2500000 < 300
+
+
+@pytest.mark.parametrize('profile,expected',[
+    (b'45000',1),(b'45000-selected-observer3-scan64',1),(b'1536',0),
+    (b'4096',0),(b'1536-selected',0),(b'1536-selected-observer3',0),
+    (b'1536-selected-observer3-scan64',0),(b'unknown',-1)])
+def test_only_long_profiles_restart_after_clean_native_loss(live_api,profile,expected):
+    lib,_=live_api
+    assert lib.live_restart_on_loss(profile)==expected
 
 
 @pytest.mark.parametrize('blocks', [b'0', b'4097', b'-1', b'4096garbage', b'4294967296'])
@@ -308,6 +325,13 @@ def test_invalid_dwell_rejected_before_opening_evidence_or_radio(live_api, tmp_p
 def test_early_stop_requires_idle_complete_counters_with_bounded_tail(live_api, admitted, delivered, flags, expected):
     lib,_=live_api
     assert lib.live_final(admitted,delivered,flags,2,4)==expected
+
+
+@pytest.mark.parametrize('result,finite,expected',[
+    (0,0,1),(0,1,1),(-4,1,1),(-4,0,0),(-1,1,0),(-5,1,0),(-6,1,0)])
+def test_finite_source_accepts_only_clean_worker_cancellation(live_api,result,finite,expected):
+    lib,_=live_api
+    assert lib.live_worker_terminal_clean(result,finite)==expected
 
 
 def test_native_episodes_use_separate_exclusive_bounded_journals(live_api,tmp_path):
@@ -812,6 +836,13 @@ def test_clean_native_loss_reacquires_in_new_epoch_with_global_budgets(
                     native_results=totals[3],native_completed_runs=totals[4],handoffs=out[2])
         result=review_epochs(capture_text,rows,journals,status)
         assert result['reacquisitions']==len(episodes)-1
+        if mode=='loss_then_supported':
+            source_lost_rows=copy.deepcopy(rows);source_lost_status=dict(status)
+            source_lost_terminal=[r for r in source_lost_rows if r['kind']=='native_terminal'][-1]
+            source_lost_terminal['result']=-3;source_lost_terminal['configured']+=7
+            source_lost_status['native_completed_runs']=0
+            source_lost=review_epochs(capture_text,source_lost_rows,journals,source_lost_status)
+            assert source_lost['episodes'][-1]['controller_result']==-3
         for mutation in ('missing_episode','wrong_epoch','reset_budget','wrong_total','wrong_pair','uncleared_loss'):
             altered_rows=copy.deepcopy(rows);altered_status=dict(status);altered_journals=dict(journals)
             if mutation=='missing_episode': altered_journals.pop('native-1.journal')

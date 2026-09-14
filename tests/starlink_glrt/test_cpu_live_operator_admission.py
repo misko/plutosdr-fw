@@ -214,8 +214,8 @@ def test_selected_capture_budget_and_artifacts_are_explicit(storage_operator):
     assert selected[-3:] == ('native-1.journal','native-2.journal','native-3.journal')
     assert storage_operator.retention_budget_kib(45000) == 256*1024
     assert {'observer.jsonl','observer.iq.ci16'} <= set(selected)
-    # The additional worst-case IQ uses 10.56 MB, inside the unchanged allowance.
-    assert 80_000_000+11_200_000+29_400_000+4*200*3300*4+4*8*1024**2 < 256*1024**2
+    # The long scan64 profile's worst-case selected IQ and grids fit the allowance.
+    assert 80_000_000+14_400_000+37_600_000+4*200*3300*4+4*8*1024**2 < 256*1024**2
     for blocks in (1536,4096):
         assert storage_operator.capture_artifacts(blocks) == storage_operator.ARTIFACTS
     for blocks in (0,45001):
@@ -223,14 +223,15 @@ def test_selected_capture_budget_and_artifacts_are_explicit(storage_operator):
 
 
 @pytest.mark.parametrize('blocks,spacing,budget,valid',[
-    (1536,3,64,True),(1536,9,64,False),(4096,3,64,False),(45000,9,64,False),
+    (1536,3,64,True),(45000,3,64,True),(1536,9,64,False),(4096,3,64,False),(45000,9,64,False),
     (1536,3,65,False),(1536,3,0,False)])
 def test_expanded_scan_is_admitted_only_in_short_selected_profile(storage_operator,blocks,spacing,budget,valid):
     if valid:
-        assert storage_operator.observer_profile(blocks,spacing,budget)=='1536-selected-observer3-scan64'
-        artifacts=storage_operator.capture_artifacts(blocks,spacing)
+        expected='1536-selected-observer3-scan64' if blocks==1536 else '45000-selected-observer3-scan64'
+        assert storage_operator.observer_profile(blocks,spacing,budget)==expected
+        artifacts=storage_operator.capture_artifacts(blocks,spacing,budget)
         assert 'scan.iq.ci16' in artifacts and 'iq.ci16' not in artifacts
-        assert not any(n.startswith('native-') for n in artifacts)
+        assert any(n.startswith('native-') for n in artifacts)==(blocks==45000)
     else:
         with pytest.raises(ValueError):storage_operator.observer_profile(blocks,spacing,budget)
 

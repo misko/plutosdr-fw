@@ -31,7 +31,7 @@ def review_epochs(capture_text, rows, journals, status):
     scans=[r for r in rows if r['kind']=='scan']
     assert len(restart)==len(before)==len(bindings)-1
     assert [r['attempt'] for r in scans]==list(range(1,len(scans)+1))
-    assert len(scans)<=status['attempts']<=200
+    assert len(scans)<=status['attempts']<=256
     assert {r['epoch'] for r in scans}<=set(b[1] for b in bindings)
     assert len({r['native_episode'] for r in terminal})==len(terminal)==status['native_runs']
     assert len({r['deadline_ns'] for r in restart})<=1
@@ -48,7 +48,11 @@ def review_epochs(capture_text, rows, journals, status):
         checked=review_native(raw,epoch=binding[1],rate=rate)
         assert len(rr)==1
         t=rr[0]; heads=checked['heads']
-        assert t['epoch']==binding[1] and t['configured']==t['retained_popped']==len(heads)
+        assert t['epoch']==binding[1] and t['retained_popped']==len(heads)
+        if t['result'] in (0,-4):
+            assert t['configured']==t['retained_popped']
+        else:
+            assert t['result']==-3 and t['configured']>t['retained_popped']
         assert t['paired_result']==0
         assert any(r['attempt']==t['attempt'] and r['epoch']==binding[1] for r in scans)
         total+=len(heads); handoffs+=bool(heads)
@@ -64,7 +68,7 @@ def review_epochs(capture_text, rows, journals, status):
             assert before[episode].latest_index<=bindings[episode+1][2]
             assert heads[-1].start+heads[-1].count-1<=before[episode].latest_index
             assert r['native_episode']==episode+1
-            assert r['attempts_used']==t['attempt']<r['attempt_limit']<=200
+            assert r['attempts_used']==t['attempt']<r['attempt_limit']<=256
             assert all(s['attempt']<=r['attempts_used'] for s in scans if s['epoch']==binding[1])
             assert all(s['attempt']>r['attempts_used'] for s in scans if s['epoch']==bindings[episode+1][1])
         results.append(dict(episode=episode,epoch=binding[1],results=len(heads),

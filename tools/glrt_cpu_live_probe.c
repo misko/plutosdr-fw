@@ -28,21 +28,23 @@
 #define PAIR_SAMPLES 3333U
 #define RESTART_LIMIT 3U
 struct paired_head { uint32_t words[32]; };
-struct dwell_limits { unsigned blocks,attempts,alarm_seconds; uint64_t worker_ns; int selected_iq; unsigned observer_spacing,rank_budget; };
+struct dwell_limits { unsigned blocks,attempts,alarm_seconds; uint64_t worker_ns; int selected_iq; unsigned observer_spacing,rank_budget; int restart_on_loss; };
 static int dwell_limits(const char *blocks,struct dwell_limits *out)
 {
     if(!blocks || !strcmp(blocks,"1536"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),0,9,8};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),0,9,8,0};
     else if(!strcmp(blocks,"4096"))
-        *out=(struct dwell_limits){4096,16,45,UINT64_C(30000000000),0,9,8};
+        *out=(struct dwell_limits){4096,16,45,UINT64_C(30000000000),0,9,8,0};
     else if(!strcmp(blocks,"45000"))
-        *out=(struct dwell_limits){45000,200,325,UINT64_C(300000000000),1,9,8};
+        *out=(struct dwell_limits){45000,200,325,UINT64_C(300000000000),1,9,8,1};
+    else if(!strcmp(blocks,"45000-selected-observer3-scan64"))
+        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,64,1};
     else if(!strcmp(blocks,"1536-selected"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,9,8};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,9,8,0};
     else if(!strcmp(blocks,"1536-selected-observer3"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,8};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,8,0};
     else if(!strcmp(blocks,"1536-selected-observer3-scan64"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,64};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,64,0};
     else return -1;
     return 0;
 }
@@ -77,7 +79,7 @@ struct live {
     uint64_t iq_samples,deadline_ns,scan_iq_samples;
     struct paired_head paired[PAIR_LIMIT];
     uint32_t paired_queued,paired_copied,paired_episode_first;
-    int selected_iq,visit_mode;
+    int selected_iq,visit_mode,restart_on_loss;
     unsigned observer_spacing;
     pthread_t observer_thread;
     int observer_started,observer_stop,observer_result;
@@ -274,6 +276,10 @@ static int capture_early_final(const struct glrt_capture_snapshot *capture,unsig
     const uint32_t *w=capture->words;
     return !(w[19]&3) && wide(w+4)==wide(w+6) &&
         wide(w+4)>=(uint64_t)returned*CHUNK && wide(w+4)<=(uint64_t)limit*CHUNK;
+}
+static int worker_terminal_is_clean(int result,int finite_source_complete)
+{
+    return !result || (finite_source_complete && result==GLRT_WORKER_CANCELLED);
 }
 struct partition {
     struct live *live;
@@ -557,7 +563,7 @@ static void *worker_thread(void *pointer)
 static int restart_owner(struct live *s,FILE *capture_journal)
 {
     char raw[4096];uint32_t w[24];int n;
-    if(s->observer_spacing==3 || s->visit_mode || s->started || s->observer_started || !s->done || !s->selected_iq || !s->native_clean_loss ||
+    if(!s->restart_on_loss || s->visit_mode || s->started || s->observer_started || !s->done || !s->selected_iq || !s->native_clean_loss ||
        s->result!=GLRT_NATIVE_ACQUISITION_LOST || s->restarts>=RESTART_LIMIT ||
        s->attempts>=s->attempt_limit || cancelled(s)) return 0;
     n=s->native.read(s->native.context,"tracking_snapshot",raw,sizeof(raw));
@@ -655,12 +661,13 @@ static int live_probe_run(int argc,char **argv,int visit_mode)
     uint64_t first=0,now=0,boundary=0,max_refill_ns=0,previous=0,published=0;
     char text[4096],label[80],path[PATH_MAX],resolved[PATH_MAX];
     int n,rc=1,mutex=0,owned=0,rebased=0,joined=1,worker_complete=0,visit_loss=0;
+    int finite_source_complete=0;
     uint32_t completed_refills=0;
     const char *stage="arguments";
 #define NEED(x,name) do { stage=name; if(!(x)) goto done; } while(0)
     if((argc!=6 && argc!=7) || (strcmp(argv[1],"30000000") && strcmp(argv[1],"60000000")) ||
        dwell_limits(argc==7 ? argv[6] : NULL,&limits)) {
-        fprintf(stderr,"usage: %s 30000000|60000000 SERIAL BANK REFERENCES NEW_OUTPUT_DIRECTORY [1536|4096|45000|1536-selected|1536-selected-observer3|1536-selected-observer3-scan64]\n",argv[0]);return 2;
+        fprintf(stderr,"usage: %s 30000000|60000000 SERIAL BANK REFERENCES NEW_OUTPUT_DIRECTORY [1536|4096|45000|1536-selected|1536-selected-observer3|1536-selected-observer3-scan64|45000-selected-observer3-scan64]\n",argv[0]);return 2;
     }
     rate=(uint32_t)strtoul(argv[1],NULL,10);
     action.sa_handler=signal_stop;sigemptyset(&action.sa_mask);
@@ -669,6 +676,7 @@ static int live_probe_run(int argc,char **argv,int visit_mode)
     NEED((s=calloc(1,sizeof(*s))) && (ring=malloc(RING*4U)),"storage");
     s->rate=rate;s->attempt_limit=limits.attempts;s->selected_iq=limits.selected_iq;s->visit_mode=visit_mode;
     s->observer_spacing=limits.observer_spacing;s->rank_budget=limits.rank_budget;
+    s->restart_on_loss=limits.restart_on_loss;
     NEED(!pthread_mutex_init(&s->mutex,NULL),"mutex");mutex=1;
     NEED(!load(argv[3],s->bank,sizeof(s->bank)) && !load(argv[4],s->refs,sizeof(s->refs)),"reference_files");
     NEED((fft_storage=fftw_malloc(GLRT_RESOLVER_FFT*sizeof(*fft_storage)))!=NULL,"fft_storage");
@@ -763,7 +771,10 @@ static int live_probe_run(int argc,char **argv,int visit_mode)
         }
     }
     if(worker_complete) { stage="worker_complete"; }
-    else { NEED(wide(capture.words+4)==CHUNK*limits.blocks && wide(capture.words+6)==CHUNK*limits.blocks && !(capture.words[19]&3),"finite_source_complete"); }
+    else {
+        NEED(wide(capture.words+4)==CHUNK*limits.blocks && wide(capture.words+6)==CHUNK*limits.blocks && !(capture.words[19]&3),"finite_source_complete");
+        finite_source_complete=1;
+    }
     visit_loss=visit_mode && live_visit_clean_loss(s,worker_complete);
     rc=worker_complete && s->result && !visit_loss ? 1 : 0;
 done:
@@ -773,7 +784,7 @@ done:
         else { s->stop=1;if(pthread_mutex_unlock(&s->mutex)) rc=1; }
         if(owned && glrt_tracking_iq_owner_close(&s->owner,rc!=0)) rc=1;
         if(pthread_join(s->thread,&result)) { joined=0;rc=1; }
-        else if(result || !s->done || s->result) rc=1;
+        else if(result || !s->done || !worker_terminal_is_clean(s->result,finite_source_complete)) rc=1;
     }
     if(buffer) { iio_buffer_destroy(buffer);buffer=NULL; }
     if(iq && journal) {
