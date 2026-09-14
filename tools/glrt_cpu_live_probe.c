@@ -42,31 +42,34 @@ struct dwell_limits {
     int restart_on_loss;
     uint32_t native_results;
     double native_seconds;
+    int coarse_authority;
 };
 static int dwell_limits(const char *blocks,struct dwell_limits *out)
 {
     if(!blocks || !strcmp(blocks,"1536"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),0,9,8,0,NATIVE_RESULTS,NATIVE_SECONDS};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),0,9,8,0,NATIVE_RESULTS,NATIVE_SECONDS,0};
     else if(!strcmp(blocks,"4096"))
-        *out=(struct dwell_limits){4096,16,45,UINT64_C(30000000000),0,9,8,0,NATIVE_RESULTS,NATIVE_SECONDS};
+        *out=(struct dwell_limits){4096,16,45,UINT64_C(30000000000),0,9,8,0,NATIVE_RESULTS,NATIVE_SECONDS,0};
     else if(!strcmp(blocks,"45000"))
-        *out=(struct dwell_limits){45000,200,325,UINT64_C(300000000000),1,9,8,1,NATIVE_RESULTS,NATIVE_SECONDS};
+        *out=(struct dwell_limits){45000,200,325,UINT64_C(300000000000),1,9,8,1,NATIVE_RESULTS,NATIVE_SECONDS,0};
     else if(!strcmp(blocks,"45000-selected-observer3-scan64"))
-        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,64,1,NATIVE_RESULTS,NATIVE_SECONDS};
+        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,64,1,NATIVE_RESULTS,NATIVE_SECONDS,0};
     else if(!strcmp(blocks,"45000-selected-observer3-scan80-local2"))
-        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,80,1,NATIVE_RESULTS,NATIVE_SECONDS};
+        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,80,1,NATIVE_RESULTS,NATIVE_SECONDS,0};
     else if(!strcmp(blocks,"45000-selected-observer3-scan80-local2-track10"))
-        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_SECONDS};
+        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_SECONDS,0};
     else if(!strcmp(blocks,"45000-selected-observer9-scan80-local2-track10"))
-        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_SECONDS};
+        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_SECONDS,0};
+    else if(!strcmp(blocks,"45000-selected-observer9-scan80-local2-track10-authority"))
+        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_SECONDS,1};
     else if(!strcmp(blocks,"1536-selected"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,9,8,0,NATIVE_RESULTS,NATIVE_SECONDS};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,9,8,0,NATIVE_RESULTS,NATIVE_SECONDS,0};
     else if(!strcmp(blocks,"1536-selected-observer3"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,8,0,NATIVE_RESULTS,NATIVE_SECONDS};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,8,0,NATIVE_RESULTS,NATIVE_SECONDS,0};
     else if(!strcmp(blocks,"1536-selected-observer3-scan64"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,64,0,NATIVE_RESULTS,NATIVE_SECONDS};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,64,0,NATIVE_RESULTS,NATIVE_SECONDS,0};
     else if(!strcmp(blocks,"1536-selected-observer3-scan80-local2"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,80,0,NATIVE_RESULTS,NATIVE_SECONDS};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,80,0,NATIVE_RESULTS,NATIVE_SECONDS,0};
     else return -1;
     return 0;
 }
@@ -81,6 +84,7 @@ static uint64_t clock_ns(void *unused)
 }
 struct live {
     pthread_mutex_t mutex;
+    pthread_mutex_t authority_mutex;
     pthread_t thread;
     int stop,done,result,started;
     uint32_t epoch,rate,attempts,handoffs,attempt_limit;
@@ -110,6 +114,9 @@ struct live {
     int16_t observer_scratch[6600];
     FILE *observer_journal,*observer_iq;
     uint32_t observer_retained;
+    struct glrt_tracking_trend observer_authority;
+    uint32_t authority_generation,authority_applied,authority_refreshes;
+    int coarse_authority;
 };
 static int cancelled(void *pointer)
 {
@@ -148,7 +155,8 @@ static int observer_cancelled(void *pointer)
 static int observer_retain(void *pointer,const struct glrt_tracking_observer_trace *t,const int16_t *iq)
 {
     struct live *s=pointer;FILE *f=s->observer_journal;
-    if(!f || !s->observer_iq || s->observer_retained>=200*(RESTART_LIMIT+1) ||
+    if(!f || !s->observer_iq || s->observer_retained>=
+       (s->coarse_authority ? 1024U : 200U)*(RESTART_LIMIT+1) ||
        fwrite(iq,4,3300,s->observer_iq)!=3300 || fflush(s->observer_iq)) return -1;
     fprintf(f,"{\"kind\":\"measurement\",\"attempt\":%u,\"episode\":%u,\"epoch\":%u,\"rate\":2500000,"
         "\"recorded_ns\":%" PRIu64 ",\"sequence\":%u,\"frame\":%u,\"first\":%" PRIu64
@@ -171,6 +179,14 @@ static void *observer_thread(void *pointer)
     struct glrt_tracking_observer_ports ports={s,clock_ns,observer_cancelled,observer_retain};
     do {
         rc=glrt_tracking_observer_step(&s->observer,&s->owner,s->refs,s->observer_scratch,&ports,&trace);
+        if(rc==GLRT_OBSERVER_MEASURED && s->coarse_authority) {
+            if(pthread_mutex_lock(&s->authority_mutex)) {
+                s->observer.status=rc=GLRT_OBSERVER_INVALID;
+            } else {
+                s->observer_authority=s->observer.trend;s->authority_generation++;
+                if(pthread_mutex_unlock(&s->authority_mutex)) s->observer.status=rc=GLRT_OBSERVER_INVALID;
+            }
+        }
         if(rc==GLRT_OBSERVER_WAIT && pause_worker(s)) {
             s->observer.status=rc=GLRT_OBSERVER_INVALID;
         }
@@ -190,18 +206,26 @@ static int start_observer(struct live *s)
     struct glrt_tracking_batch batch;struct glrt_tracking_job job;double slope;
     uint64_t now=clock_ns(NULL);uint32_t first=history->history.last_seen;
     unsigned spacing=s->observer_spacing ? s->observer_spacing : 9;
+    unsigned maximum=s->coarse_authority ? 1024 : 200;
+    uint64_t source_span=s->coarse_authority ? UINT64_C(30000000) : UINT64_C(7500000);
+    uint64_t budget=s->coarse_authority ? UINT64_C(15000000000) : UINT64_C(3000000000);
     if((spacing!=3 && spacing!=9) || s->observer_started || !s->observer_journal || !s->observer_iq || first>UINT32_MAX-spacing)
         return GLRT_NATIVE_RETENTION_ERROR;
     first+=spacing;
     if(glrt_tracking_trend_batch(history,first,1,1,0,&batch,&slope) ||
-       glrt_tracking_prediction(&batch,0,&job) || job.start>UINT64_MAX-7500000 ||
-       glrt_tracking_observer_init_cadence(&s->observer,history,first,spacing,200,job.start+7500000,now,UINT64_C(3000000000)))
+       glrt_tracking_prediction(&batch,0,&job) || job.start>UINT64_MAX-source_span ||
+       glrt_tracking_observer_init_cadence(&s->observer,history,first,spacing,maximum,job.start+source_span,now,budget))
         return GLRT_NATIVE_PROTOCOL_ERROR;
+    if(s->coarse_authority) {
+        if(pthread_mutex_lock(&s->authority_mutex)) return GLRT_NATIVE_IO_ERROR;
+        s->observer_authority=s->observer.trend;s->authority_generation++;
+        if(pthread_mutex_unlock(&s->authority_mutex)) return GLRT_NATIVE_IO_ERROR;
+    }
     fprintf(s->observer_journal,"{\"kind\":\"start\",\"attempt\":%u,\"episode\":%u,\"epoch\":%u,"
-        "\"rate\":2500000,\"native_rate\":%u,\"first_frame\":%u,\"maximum_measurements\":200,"
+        "\"rate\":2500000,\"native_rate\":%u,\"first_frame\":%u,\"maximum_measurements\":%u,"
         "\"source_limit\":%" PRIu64 ",\"started_ns\":%" PRIu64 ",\"deadline_ns\":%" PRIu64
-        ",\"retained_total\":%u,\"frame_spacing\":%u}\n",s->attempts,s->restarts,s->epoch,s->rate,first,
-        s->observer.source_limit,now,s->observer.deadline_ns,s->observer_retained,spacing);
+        ",\"retained_total\":%u,\"frame_spacing\":%u,\"coarse_authority\":%d}\n",s->attempts,s->restarts,s->epoch,s->rate,first,maximum,
+        s->observer.source_limit,now,s->observer.deadline_ns,s->observer_retained,spacing,s->coarse_authority);
     if(ferror(s->observer_journal) || fflush(s->observer_journal)) return GLRT_NATIVE_RETENTION_ERROR;
     s->observer_stop=0;s->observer_result=GLRT_OBSERVER_WAIT;
     if(pthread_create(&s->observer_thread,NULL,observer_thread,s)) return GLRT_NATIVE_IO_ERROR;
@@ -451,6 +475,35 @@ static int paired_copy(struct live *s)
     }
     return 0;
 }
+static int refresh_native_authority(struct live *s)
+{
+    struct glrt_tracking_trend coarse,native;
+    uint32_t generation,first,remaining,last;
+    int rc;
+    if(!s->coarse_authority || !s->controller.started || s->controller.stopping ||
+       s->controller.done || s->controller.next_frame>=s->controller.frames) return 0;
+    if(pthread_mutex_lock(&s->authority_mutex)) return GLRT_NATIVE_IO_ERROR;
+    coarse=s->observer_authority;generation=s->authority_generation;
+    if(pthread_mutex_unlock(&s->authority_mutex)) return GLRT_NATIVE_IO_ERROR;
+    if(!generation || generation==s->authority_applied) return 0;
+    last=s->controller.trend.history.last_supported;
+    if(s->controller.authority_valid && s->controller.authority.history.last_supported>last)
+        last=s->controller.authority.history.last_supported;
+    if(coarse.history.last_supported<=last) { s->authority_applied=generation;return 0; }
+    first=s->controller.next_frame;remaining=s->controller.frames-first;
+    /* The observer may temporarily be ahead of the descriptor frontier. Wait
+     * for owned work to advance; never discard the newer generation. */
+    if(first<=coarse.history.last_seen ||
+       glrt_tracking_trend_from_coarse(&coarse,s->rate,first,remaining,&native)) return 0;
+    rc=glrt_tracking_controller_refresh_handoff(&s->controller,&native);
+    if(rc) return rc==-1 ? 0 : rc;
+    s->authority_applied=generation;s->authority_refreshes++;
+    fprintf(s->journal,"{\"kind\":\"coarse_authority\",\"attempt\":%u,\"native_episode\":%u,"
+        "\"epoch\":%u,\"generation\":%u,\"refresh\":%u,\"next_frame\":%u,"
+        "\"last_seen\":%u,\"last_supported\":%u}\n",s->attempts,s->restarts,s->epoch,
+        generation,s->authority_refreshes,first,coarse.history.last_seen,coarse.history.last_supported);
+    return ferror(s->journal) || fflush(s->journal) ? GLRT_NATIVE_RETENTION_ERROR : 0;
+}
 static int run_native_feedback(struct live *s)
 {
     struct glrt_tracking_trend native;
@@ -485,6 +538,8 @@ static int run_native_feedback(struct live *s)
     do {
         struct timespec pause={0,100000};
         if(cancelled(s)) glrt_native_controller_request_stop(&s->controller);
+        if(!pair_result) pair_result=refresh_native_authority(s);
+        if(pair_result) glrt_native_controller_request_stop(&s->controller);
         rc=glrt_native_controller_tick(&s->controller);
         if(!pair_result) pair_result=paired_copy(s);
         if(pair_result) glrt_native_controller_request_stop(&s->controller);
@@ -510,9 +565,9 @@ static int run_native_feedback(struct live *s)
         s->controller.sequence && s->controller.sequence==s->controller.configured &&
         !pair_result && s->paired_copied==s->paired_queued;
     fprintf(s->journal,"{\"kind\":\"native_terminal\",\"attempt\":%u,\"native_episode\":%u,\"epoch\":%u,\"result\":%d,\"configured\":%u,\"retained_popped\":%u,"
-        "\"paired_result\":%d,\"paired_queued\":%u,\"paired_copied\":%u}\n",
+        "\"paired_result\":%d,\"paired_queued\":%u,\"paired_copied\":%u,\"authority_refreshes\":%u}\n",
         s->attempts,s->restarts,s->epoch,rc,s->controller.configured,s->controller.sequence,pair_result,
-        s->paired_queued,s->paired_copied);
+        s->paired_queued,s->paired_copied,s->authority_refreshes);
     return ferror(s->journal) || fflush(s->journal) ? -1 : pair_result ? pair_result : rc;
 }
 static int run_feedback(struct live *s)
@@ -723,7 +778,7 @@ static int live_probe_run(int argc,char **argv,int visit_mode)
 #define NEED(x,name) do { stage=name; if(!(x)) goto done; } while(0)
     if((argc!=6 && argc!=7) || (strcmp(argv[1],"30000000") && strcmp(argv[1],"60000000")) ||
        dwell_limits(argc==7 ? argv[6] : NULL,&limits)) {
-        fprintf(stderr,"usage: %s 30000000|60000000 SERIAL BANK REFERENCES NEW_OUTPUT_DIRECTORY [1536|4096|45000|1536-selected|1536-selected-observer3|1536-selected-observer3-scan64|45000-selected-observer3-scan64|1536-selected-observer3-scan80-local2|45000-selected-observer3-scan80-local2|45000-selected-observer3-scan80-local2-track10|45000-selected-observer9-scan80-local2-track10]\n",argv[0]);return 2;
+        fprintf(stderr,"usage: %s 30000000|60000000 SERIAL BANK REFERENCES NEW_OUTPUT_DIRECTORY [1536|4096|45000|1536-selected|1536-selected-observer3|1536-selected-observer3-scan64|45000-selected-observer3-scan64|1536-selected-observer3-scan80-local2|45000-selected-observer3-scan80-local2|45000-selected-observer3-scan80-local2-track10|45000-selected-observer9-scan80-local2-track10|45000-selected-observer9-scan80-local2-track10-authority]\n",argv[0]);return 2;
     }
     rate=(uint32_t)strtoul(argv[1],NULL,10);
     action.sa_handler=signal_stop;sigemptyset(&action.sa_mask);
@@ -733,8 +788,10 @@ static int live_probe_run(int argc,char **argv,int visit_mode)
     s->rate=rate;s->attempt_limit=limits.attempts;s->selected_iq=limits.selected_iq;s->visit_mode=visit_mode;
     s->observer_spacing=limits.observer_spacing;s->rank_budget=limits.rank_budget;
     s->restart_on_loss=limits.restart_on_loss;
+    s->coarse_authority=limits.coarse_authority;
     s->native_result_limit=limits.native_results;s->native_seconds=limits.native_seconds;
     NEED(!pthread_mutex_init(&s->mutex,NULL),"mutex");mutex=1;
+    NEED(!pthread_mutex_init(&s->authority_mutex,NULL),"authority_mutex");mutex=2;
     NEED(!load(argv[3],s->bank,sizeof(s->bank)) && !load(argv[4],s->refs,sizeof(s->refs)),"reference_files");
     NEED((fft_storage=fftw_malloc(GLRT_RESOLVER_FFT*sizeof(*fft_storage)))!=NULL,"fft_storage");
     s->fft=fftw_plan_dft_1d(GLRT_RESOLVER_FFT,fft_storage,fft_storage,FFTW_FORWARD,FFTW_ESTIMATE|FFTW_UNALIGNED);
@@ -873,6 +930,7 @@ done:
         if(s->observer_iq && fclose(s->observer_iq)) rc=1;
         if(s->fft) fftw_destroy_plan(s->fft);
         if(s->ranking_fft) fftw_destroy_plan(s->ranking_fft);
+        if(mutex>1 && pthread_mutex_destroy(&s->authority_mutex)) rc=1;
         if(mutex && pthread_mutex_destroy(&s->mutex)) rc=1;
     }
     fftw_free(fft_storage);free(ring);alarm(0);

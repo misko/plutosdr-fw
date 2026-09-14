@@ -25,6 +25,8 @@ def handoff_api(controller):
     trend.core.__wrapped__(controller)
     controller.glrt_tracking_controller_init_handoff.argtypes=[c.c_void_p,c.POINTER(Ports),
         c.POINTER(TrackingBatch),c.POINTER(trend.TrackingTrend),c.c_uint32,c.c_uint32,c.c_double]
+    controller.glrt_tracking_controller_refresh_handoff.argtypes=[
+        c.c_void_p,c.POINTER(trend.TrackingTrend)]
     return controller
 
 
@@ -45,6 +47,17 @@ def prepare(lib,pilot_moments,rate=2500000,*,first=600,wrapped=False,frames=128,
         assert lib.glrt_tracking_controller_init_handoff(radio.state,c.byref(radio.ports),
             c.byref(batch),c.byref(history),first,frames,2)==0
     return radio,history,batch
+
+
+def extend_from_prediction(lib,history,batch,first,*frames):
+    refreshed=trend.TrackingTrend.from_buffer_copy(bytes(history))
+    p=batch.prediction
+    for frame in frames:
+        origin=Fraction(p.start*65536+p.fraction+(frame-first)*p.period,65536)
+        phase=(p.step+(frame-first)*p.delta)%(2**48)
+        if phase>=2**47: phase-=2**48
+        assert trend.observe(lib,refreshed,frame,origin,Fraction(phase*batch.rate,2**48))==1
+    return refreshed
 
 
 @pytest.mark.parametrize("rate", [2500000,5000000,15000000])
@@ -96,6 +109,61 @@ def test_ten_second_30_msps_handoff_runs_all_7500_scheduled_results(
     assert result['estimates'][0]['frame']==600
     assert result['estimates'][-1]['frame']==8099
     assert sum(item.repeats for item in radio.descriptors)==7500
+
+
+def test_drained_coarse_authority_renews_only_future_tracking_work(
+        handoff_api,pilot_moments):
+    first=600
+    radio,history,batch=prepare(handoff_api,pilot_moments,first=first)
+    refreshed=extend_from_prediction(handoff_api,history,batch,first,599,608,617)
+    radio.reject=True
+    assert radio.tick()==1
+    assert radio.tick()==1
+    assert sum(item.repeats for item in radio.descriptors)==23
+    # Work through frame 622 is already immutable. The new history is retained
+    # before it can authorize frame 623 or any later descriptor, while native
+    # results from the two owned batches continue to arrive in order.
+    assert handoff_api.glrt_tracking_controller_refresh_handoff(
+        radio.state,c.byref(refreshed))==0
+    for _ in range(10000):
+        assert radio.tick()==1
+        radio.advance()
+        if sum(item.repeats for item in radio.descriptors)>23:
+            radio.reject=False
+            break
+    else: pytest.fail("refreshed authority did not schedule future work")
+    assert radio.run()==0
+    data=journal(radio)
+    result=review(data,epoch=3,rate=2500000)
+    assert [e['frame'] for e in result['estimates']]==list(range(first,first+128))
+    assert 0<result['supported']<128
+    actions=[(kind,name) for kind,name,_ in radio.events]
+    authority=actions.index(('retain','tracking_authority'))
+    assert actions[authority+1:].index(('write','tracking_submit'))>=0
+    assert sum(item.repeats for item in radio.descriptors)==128
+    entries,_=records(data)
+    stripped=b'GLRJ1\n'+b''.join(retained(row.kind,row.payload) for row in entries
+                                if row.kind!='tracking_authority')
+    with pytest.raises(ValueError,match='authority'):
+        review(stripped,epoch=3,rate=2500000)
+
+
+def test_refresh_refuses_owned_work_and_retention_failure_stops_safely(
+        handoff_api,pilot_moments):
+    first=600
+    radio,history,batch=prepare(handoff_api,pilot_moments,first=first)
+    refreshed=extend_from_prediction(handoff_api,history,batch,first,599,608,617)
+    # Before startup no future descriptor frontier has been established.
+    assert handoff_api.glrt_tracking_controller_refresh_handoff(
+        radio.state,c.byref(refreshed))==-1
+    assert not any(name=='tracking_authority' for kind,name,_ in radio.events if kind=='retain')
+    assert radio.tick()==1
+    assert radio.tick()==1
+    radio.fail_retain='tracking_authority'
+    assert handoff_api.glrt_tracking_controller_refresh_handoff(
+        radio.state,c.byref(refreshed))==-6
+    assert radio.run()==-6
+    assert sum(item.repeats for item in radio.descriptors)==23
 
 
 @pytest.mark.parametrize("rate", [2500000,5000000,15000000])

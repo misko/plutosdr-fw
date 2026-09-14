@@ -16,6 +16,24 @@ not an installed autonomous service.
 | FPGA scheduled measurements | 30 or 60 MS/s | 39600 or 79200 samples per 1.32-ms pilot, scheduled from supported history |
 | ARM native feedback | Native-rate coordinates, 750-Hz pilot cadence | Retains and associates each GLT1 head, updates history and submits finite future descriptors |
 
+The opt-in `45000-selected-observer9-scan80-local2-track10-authority`
+profile keeps the 2.5-MS/s observer as a causal scheduling authority for future
+30-MS/s descriptors. Every accepted observer update is copied under a separate
+mutex, converted to native coordinates only when its last observation precedes
+the next unowned frame, and retained as `tracking_authority` before it can
+authorize a descriptor. Submitted FPGA jobs are never changed. Native results
+continue to be retained, associated and labeled as diagnostics; supported
+native history takes precedence when it is available.
+
+This profile alone raises the observer bound from 200 to 1024 measurements,
+its source span from three to twelve seconds and its wall bound to fifteen
+seconds. At nine-frame spacing, 834 measurements cover ten seconds. Each
+descriptor remains within 32 frames of retained native or coarse support. If
+neither source renews that horizon, the controller drains and reports clean
+acquisition loss. The journal reviewer reconstructs the causal authority
+horizon from initial history, accepted native estimates and authority records;
+removing or altering an authority record invalidates later descriptors.
+
 The capture limit is 1536 refills: 25165824 complex samples, or 10.0663296
 seconds of RF at the exported rate. There are at most six coarse attempts,
 a twelve-second worker deadline, three seconds per resolver worker, and at
@@ -172,6 +190,14 @@ source, epoch, retention, cancellation and rebase faults at both rates.
 Exclusive per-episode journal tests prevent overwrite and a fifth file.
 Those generated port results are not RF evidence.
 
+The authority test forces every native diagnostic estimate to reject while
+feeding retained positive pilot IQ to the coarse observer. It completes 256
+contiguous FPGA jobs at both permitted observer cadences using explicit
+authority records. Held-out zero and seeded-noise inputs still fail the
+unchanged coarse and resolver gates and submit no jobs. Controller tests cover
+a full 7500-result 30-MS/s schedule, retention failure, immutable owned work,
+finite horizon loss and journal removal of the only authority record.
+
 The first physical 30-MS/s run is
 `/srv/bulk/leo/glrt-deployment-20260909/radio20-iq-tracking-20260912/cpu-live30-v2/`.
 It completed the entire capture while all six candidates failed support.
@@ -214,6 +240,11 @@ python scripts/qualify_glrt_cpu_live20.py \
   --rate 30000000 --binary /path/to/glrt-cpu-live-probe \
   --output /path/to/new/evidence/directory
 ```
+
+The first bounded authority qualification additionally supplies
+`--blocks 45000 --observer-spacing 9 --candidate-budget 80
+--tracking-seconds 10 --coarse-authority`. The operator records the opt-in
+profile and the 1024-measurement observer bound in `operator.json`.
 
 The operator requires the existing production capture authority and PPU serial
 lock. It never removes another invocation's files or retries an uncertain

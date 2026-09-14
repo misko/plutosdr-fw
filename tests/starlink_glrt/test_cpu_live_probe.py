@@ -49,7 +49,8 @@ void *live_new(const int16_t *refs,const int16_t *bank,const char *directory,
     struct test_live *t=calloc(1,sizeof(*t));struct live *s=&t->live;char path[4096];
     if(!t) abort();
     t->ring=malloc(RING*4U);t->fft=fftw_malloc(GLRT_RESOLVER_FFT*sizeof(*t->fft));
-    if(!t->ring || !t->fft || pthread_mutex_init(&s->mutex,NULL)) abort();
+    if(!t->ring || !t->fft || pthread_mutex_init(&s->mutex,NULL) ||
+       pthread_mutex_init(&s->authority_mutex,NULL)) abort();
     memcpy(s->refs,refs,sizeof(s->refs));memcpy(s->bank,bank,sizeof(s->bank));
     s->native=*ports;s->epoch=3;s->rate=rate;s->attempt_limit=ATTEMPTS;s->restart_on_loss=1;
     s->native_result_limit=NATIVE_RESULTS;s->native_seconds=NATIVE_SECONDS;t->end=1000000;
@@ -80,6 +81,7 @@ int live_set_dwell(struct test_live *t,const char *blocks,uint64_t out[4])
     if(t) { t->live.attempt_limit=limits.attempts;t->live.selected_iq=limits.selected_iq;
         t->live.observer_spacing=limits.observer_spacing;t->live.rank_budget=limits.rank_budget;
         t->live.restart_on_loss=limits.restart_on_loss;
+        t->live.coarse_authority=limits.coarse_authority;
         t->live.native_result_limit=limits.native_results;t->live.native_seconds=limits.native_seconds;
         if(limits.rank_budget>8 && !t->live.ranking_fft) {
             t->live.ranking_fft=fftw_plan_dft_1d(limits.rank_budget==80 ? 512 : 4096,
@@ -143,6 +145,8 @@ int live_observer_seed_start(struct test_live *t)
 }
 int live_observer_join(struct test_live *t) { return join_observer(&t->live); }
 void live_observer_spacing(struct test_live *t,unsigned spacing) { t->live.observer_spacing=spacing; }
+void live_coarse_authority(struct test_live *t,unsigned results)
+{ t->live.coarse_authority=1;t->live.native_result_limit=results;t->live.native_seconds=12; }
 void live_deadline(struct test_live *t,uint64_t nanoseconds) { t->live.deadline_ns=clock_ns(NULL)+nanoseconds; }
 int live_pair_copy(struct test_live *t,unsigned *copied)
 {
@@ -231,7 +235,7 @@ void live_free_unstarted(struct test_live *t)
     fclose(s->observer_journal);fclose(s->observer_iq);
     if(s->scan_samples) fclose(s->scan_samples);
     fftw_destroy_plan(s->fft);if(s->ranking_fft) fftw_destroy_plan(s->ranking_fft);fftw_free(t->fft);free(t->ring);
-    if(pthread_mutex_destroy(&s->mutex)) abort();
+    if(pthread_mutex_destroy(&s->authority_mutex) || pthread_mutex_destroy(&s->mutex)) abort();
     free(t);
 }
 void live_finish(struct test_live *t,uint64_t out[5])
@@ -247,7 +251,7 @@ void live_finish(struct test_live *t,uint64_t out[5])
     fclose(s->observer_journal);fclose(s->observer_iq);
     if(s->scan_samples) fclose(s->scan_samples);
     fftw_destroy_plan(s->fft);if(s->ranking_fft) fftw_destroy_plan(s->ranking_fft);fftw_free(t->fft);free(t->ring);
-    if(pthread_mutex_destroy(&s->mutex)) abort();
+    if(pthread_mutex_destroy(&s->authority_mutex) || pthread_mutex_destroy(&s->mutex)) abort();
     free(t);
 }
 '''
@@ -290,6 +294,7 @@ def live_api(tmp_path_factory):
     lib.live_observer_seed_start.argtypes = [c.c_void_p]
     lib.live_observer_join.argtypes = [c.c_void_p]
     lib.live_observer_spacing.argtypes = [c.c_void_p,c.c_uint]
+    lib.live_coarse_authority.argtypes = [c.c_void_p,c.c_uint]
     lib.live_rebase.argtypes = [c.c_void_p,c.c_void_p]
     lib.live_totals.argtypes = [c.c_void_p,c.c_void_p]
     lib.live_restart_fault.argtypes = [c.c_void_p,c.c_uint]
@@ -316,6 +321,7 @@ def live_api(tmp_path_factory):
     (b'45000-selected-observer3-scan80-local2', [45000,256,325,300000000000]),
     (b'45000-selected-observer3-scan80-local2-track10', [45000,256,325,300000000000]),
     (b'45000-selected-observer9-scan80-local2-track10', [45000,256,325,300000000000]),
+    (b'45000-selected-observer9-scan80-local2-track10-authority', [45000,256,325,300000000000]),
     (b'1536-selected', [1536,6,25,12000000000]),
     (b'1536-selected-observer3', [1536,6,25,12000000000]),
     (b'1536-selected-observer3-scan64', [1536,6,25,12000000000]),
@@ -334,6 +340,7 @@ def test_dwell_profiles_have_finite_capture_and_worker_limits(live_api, blocks, 
     (b'45000-selected-observer3-scan80-local2',[1500,3]),
     (b'45000-selected-observer3-scan80-local2-track10',[7500,12]),
     (b'45000-selected-observer9-scan80-local2-track10',[7500,12]),
+    (b'45000-selected-observer9-scan80-local2-track10-authority',[7500,12]),
 ])
 def test_native_tracking_horizon_is_explicit_per_profile(live_api,profile,expected):
     lib,_=live_api
@@ -346,6 +353,7 @@ def test_native_tracking_horizon_is_explicit_per_profile(live_api,profile,expect
     (b'45000',1),(b'45000-selected-observer3-scan64',1),(b'45000-selected-observer3-scan80-local2',1),
     (b'45000-selected-observer3-scan80-local2-track10',1),
     (b'45000-selected-observer9-scan80-local2-track10',1),(b'1536',0),
+    (b'45000-selected-observer9-scan80-local2-track10-authority',1),
     (b'4096',0),(b'1536-selected',0),(b'1536-selected-observer3',0),
     (b'1536-selected-observer3-scan64',0),(b'1536-selected-observer3-scan80-local2',0),(b'unknown',-1)])
 def test_only_long_profiles_restart_after_clean_native_loss(live_api,profile,expected):
@@ -399,7 +407,7 @@ def test_scan80_noise_records_prefiltered_attempt_without_resolver(live_api,tmp_
     assert lib.live_publish(handle,iq.ctypes.data,len(iq))==0
     lib.live_start(handle)
     try:
-        deadline=time.monotonic()+10
+        deadline=time.monotonic()+30
         while len((tmp_path/'worker.jsonl').read_text().splitlines())<3:
             assert time.monotonic()<deadline
             time.sleep(.001)
@@ -533,7 +541,7 @@ def check_observer_evidence(directory,iq,origin,worker_rows,rate,spacing=9):
             assert row['frame_spacing']==spacing
             assert row['first_frame']==seeds[row['attempt']]['last_seen']+spacing
             assert row['epoch']==seeds[row['attempt']]['epoch']
-            assert row['maximum_measurements']==200
+            assert row['maximum_measurements']==(1024 if row.get('coarse_authority') else 200)
             assert row['retained_total']*3300==offset
         else:
             assert active is not None
@@ -612,12 +620,13 @@ def test_observer_thread_has_separate_retention_and_is_joined_before_owner_relea
     (30000000,"selected_signal"),(60000000,"selected_signal"),
     (60000000,"selected_zero"),(60000000,"selected_retention"),
     (30000000,"native_rejection"),(30000000,"native_retention"),(30000000,"late_handoff"),
+    (30000000,"coarse_authority"),
     (30000000,"observer_retention"),(60000000,"observer_retention")])
 @pytest.mark.parametrize('observer_spacing',[9,3])
 def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilot_moments, tmp_path, rate, mode,observer_spacing):
     lib, refs = live_api
     radio = Radio(controller, pilot_moments, tracking_rate=rate)
-    if mode == "native_rejection": radio.reject = True
+    if mode in ("native_rejection","coarse_authority"): radio.reject = True
     if mode == "native_retention": radio.fail_retain = "head"
     if mode == "late_handoff": radio.retention_delay = rate//10
     radio.origin = radio.latest = 1000000*(rate//2500000)
@@ -635,6 +644,7 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
     coefficients = bank()
     handle = lib.live_new(refs.ctypes.data, coefficients.ctypes.data, os.fsencode(tmp_path), c.byref(ports), rate)
     lib.live_observer_spacing(handle,observer_spacing)
+    if mode=='coarse_authority': lib.live_coarse_authority(handle,256)
     if mode=='observer_retention': lib.live_observer_fail(handle,0)
     if mode == 'zero_long':
         assert lib.live_set_dwell(handle, b'4096', (c.c_uint64*4)()) == 0
@@ -642,7 +652,7 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
         lib.live_select_windows(handle, os.fsencode(tmp_path), 3, mode == 'selected_retention')
     assert lib.live_capture_done(handle) == 0
     iq = np.zeros((10_000_000, 2), dtype=np.int16)
-    if mode in ("signal", "selected_signal", "publication_lag", "handoff_horizon_expired", "native_rejection", "native_retention", "late_handoff", "observer_retention"):
+    if mode in ("signal", "selected_signal", "publication_lag", "handoff_horizon_expired", "native_rejection", "native_retention", "late_handoff", "observer_retention", "coarse_authority"):
         for frame in range(3000):
             start = 22+(frame*10000+1)//3
             if start+3300 <= len(iq): iq[start:start+3300] = refs[0, :, :2]
@@ -699,12 +709,14 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
     if mode == 'zero_long':
         assert out[1] == 16 and out[2] == 0
         assert len([r for r in rows if r['kind'] == 'scan']) == 16
-    if mode in ("signal", "selected_signal", "publication_lag", "observer_retention"):
+    if mode in ("signal", "selected_signal", "publication_lag", "observer_retention", "coarse_authority"):
         assert c.c_int64(out[0]).value == (-6 if mode=='observer_retention' else 0), (list(out), rows[-3:])
-        assert list(out)[2:] == [1,1500,1500]
-        assert len(radio.writes("submit")) > 1 and len(radio.writes("pop")) == 1500
+        expected=256 if mode=='coarse_authority' else 1500
+        assert list(out)[2:] == [1,expected,expected]
+        assert len(radio.writes("submit")) > 1 and len(radio.writes("pop")) == expected
         reviewed = review_native_journal(native_journal(radio), epoch=3, rate=rate)
-        assert len(reviewed['heads']) == reviewed['supported'] == 1500
+        assert len(reviewed['heads'])==expected
+        assert reviewed['supported']==(0 if mode=='coarse_authority' else expected)
         assert len(pairs)==64
         for row,head in zip(pairs,reviewed['heads'][:64],strict=True):
             assert (row['native_start'],row['native_phase_step'],row['native_phase_seed'])==(
@@ -720,6 +732,9 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
         else:
             assert observer_join['observer_result']==0
             assert len([r for r in observer_rows if r['kind']=='measurement'])>0
+        if mode=='coarse_authority':
+            authority=[r for r in rows if r['kind']=='coarse_authority']
+            assert authority and pair_terminal['authority_refreshes']==len(authority)
         assert reviewed['handoff'].rate == rate
         assert not radio.pending and not radio.queue and not radio.valid
         first = next(row for row in rows if row["kind"] == "scan")

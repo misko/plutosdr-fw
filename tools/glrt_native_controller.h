@@ -31,6 +31,7 @@ struct glrt_native_owned_batch {
 };
 struct glrt_native_controller {
     struct glrt_tracking_trend trend;
+    struct glrt_tracking_trend authority;
     struct glrt_native_owned_batch slots[2];
     struct glrt_native_ports ports;
     struct glrt_native_batch bootstrap;
@@ -41,6 +42,7 @@ struct glrt_native_controller {
     int acquisition_horizon_exhausted;
     int tracking;
     int handoff_pending;
+    int authority_valid;
 };
 /* Bootstrap is a retained acquisition prediction in a freshly rebased source
  * epoch, with zero scheduled counters. It begins at global frame zero. The
@@ -68,6 +70,14 @@ int glrt_tracking_controller_init_handoff(struct glrt_native_controller *,
     const struct glrt_native_ports *, const struct glrt_tracking_batch *,
     const struct glrt_tracking_trend *, uint32_t first_frame,
     uint32_t frames, double seconds);
+/* Supply a separate predictor for work beyond the current descriptor frontier.
+ * The caller supplies causal history in the same rate and epoch, beginning at
+ * exactly the next unowned frame. The refresh is persisted before it can affect
+ * another descriptor and cannot rewrite work already owned by FPGA. Native
+ * result history remains separate, so already submitted results still update
+ * in their original order. */
+int glrt_tracking_controller_refresh_handoff(struct glrt_native_controller *,
+    const struct glrt_tracking_trend *);
 /* Explicit startup mode: a 17..64-repeat externally validated prediction is
  * an authorization horizon. Submit 12 first, then at most four at a time
  * until native rate feedback is available. Supported native results may update

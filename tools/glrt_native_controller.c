@@ -37,6 +37,14 @@ static int snapshot_drained(const struct glrt_native_controller *c, const uint32
     return c->tracking ? glrt_tracking_snapshot_drained(w) : glrt_native_snapshot_drained(w);
 }
 
+static uint32_t last_authorized_support(const struct glrt_native_controller *c)
+{
+    uint32_t last=c->trend.history.last_supported;
+    if(c->authority_valid && c->authority.history.last_supported>last)
+        last=c->authority.history.last_supported;
+    return last;
+}
+
 static int command(struct glrt_native_controller *c, const char *name, const char *text)
 {
     size_t n = strlen(text);
@@ -140,9 +148,10 @@ int glrt_tracking_controller_init_handoff(struct glrt_native_controller *c,
  * and preserve the predictor's physical ring order. 96 rows plus the fixed
  * header fit the existing 4096-byte retained-record bound. No native padding
  * or memory-endian representation is persisted. */
-static int retain_handoff(struct glrt_native_controller *c)
+static int retain_history(struct glrt_native_controller *c,const char *kind,
+    const struct glrt_tracking_trend *trend)
 {
-    const struct glrt_native_trend *h=&c->trend.history;
+    const struct glrt_native_trend *h=&trend->history;
     char raw[4096];
     size_t length;
     unsigned i;
@@ -151,7 +160,7 @@ static int retain_handoff(struct glrt_native_controller *c)
         return GLRT_NATIVE_PROTOCOL_ERROR;
     n=snprintf(raw,sizeof(raw),"GLTH1 00010000 %08" PRIx32 " %08" PRIx32
         " %08" PRIx32 " %08" PRIx32 " %08" PRIx32 " %08" PRIx32 " %08" PRIx32
-        " %016" PRIx64 " %08" PRIx32 " %08" PRIx32 "\n",c->trend.rate,h->epoch,
+        " %016" PRIx64 " %08" PRIx32 " %08" PRIx32 "\n",trend->rate,h->epoch,
         c->next_frame,c->frames,h->first_frame,h->last_seen,h->last_supported,h->anchor,h->count,h->next);
     if (n<0 || (size_t)n>=sizeof(raw)) return GLRT_NATIVE_PROTOCOL_ERROR;
     length=(size_t)n;
@@ -164,8 +173,25 @@ static int retain_handoff(struct glrt_native_controller *c)
         if (n<0 || (size_t)n>=sizeof(raw)-length) return GLRT_NATIVE_PROTOCOL_ERROR;
         length+=(size_t)n;
     }
-    return c->ports.retain(c->ports.context,"tracking_handoff",raw,length) ?
+    return c->ports.retain(c->ports.context,kind,raw,length) ?
         GLRT_NATIVE_RETENTION_ERROR : 0;
+}
+
+int glrt_tracking_controller_refresh_handoff(struct glrt_native_controller *c,
+    const struct glrt_tracking_trend *history)
+{
+    struct glrt_tracking_trend retained;
+    int rc;
+    if(!c || !history || !c->tracking || !c->started || c->stopping || c->done ||
+       c->handoff_pending || c->next_frame>=c->frames ||
+       history->rate!=c->trend.rate || history->history.epoch!=c->trend.history.epoch ||
+       history->history.last_supported<=last_authorized_support(c) ||
+       !glrt_tracking_trend_handoff_valid(history,c->next_frame,c->frames-c->next_frame)) return -1;
+    retained=*history;
+    rc=retain_history(c,"tracking_authority",&retained);
+    if(rc) { stop(c,rc);return rc; }
+    c->authority=retained;c->authority_valid=1;c->acquisition_horizon_exhausted=0;
+    return 0;
 }
 
 static int bootstrap_slice(const struct glrt_native_batch *original,
@@ -320,8 +346,9 @@ static int consume(struct glrt_native_controller *c)
         ((uint64_t)words[4]<<32)|words[3],&e);
     if (!c->stopping) {
         uint32_t frame = owner->first_frame+words[27];
-        int exhausted = c->trend.history.initialized && frame > c->trend.history.last_supported &&
-            frame-c->trend.history.last_supported == 32 && c->next_frame == frame+1 &&
+        uint32_t last=last_authorized_support(c);
+        int exhausted = (c->trend.history.initialized || c->authority_valid) && frame > last &&
+            frame-last == 32 && c->next_frame == frame+1 &&
             c->next_frame < c->frames &&
             (!c->bootstrap_active || c->next_frame >= c->bootstrap.repeats);
         int observed = c->tracking ? glrt_tracking_trend_observe(&c->trend,epoch,frame,
@@ -376,7 +403,7 @@ int glrt_native_controller_tick(struct glrt_native_controller *c)
         if (c->stopping || !snapshot_drained(c,w) || w[7] || !(w[5]&1))
             return finish_error(c,GLRT_NATIVE_PROTOCOL_ERROR);
         if (c->handoff_pending) {
-            rc=retain_handoff(c);
+            rc=retain_history(c,"tracking_handoff",&c->trend);
             if (rc) return finish_error(c,rc);
             c->handoff_pending=0;
         }
@@ -429,6 +456,9 @@ int glrt_native_controller_tick(struct glrt_native_controller *c)
                 struct glrt_tracking_batch next;
                 predicted = !glrt_tracking_trend_batch(&c->trend,c->next_frame,count,c->next_tag,
                     c->slots[0].batch.seed,&next,&rate);
+                if (!predicted && c->authority_valid)
+                    predicted = !glrt_tracking_trend_batch(&c->authority,c->next_frame,count,c->next_tag,
+                        c->slots[0].batch.seed,&next,&rate);
                 if (predicted) b = next.prediction;
             } else predicted = !glrt_native_trend_batch(&c->trend.history,c->next_frame,count,c->next_tag,
                     c->slots[0].batch.seed,&b,&rate);

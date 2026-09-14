@@ -31,13 +31,14 @@ def retention_budget_kib(blocks):
         raise ValueError('unsupported capture length')
     # Long expanded-scan modes bound worker IQ to 80 MB, searched IQ to 14.4 MB and
     # grids to 37.6 MB. The 256-MiB allowance also covers capture/worker
-    # journals, native evidence and <= 10.56 MB of observer IQ (4*200*3300*4)
+    # journals, native evidence and <= 54.1 MB of observer IQ in the opt-in
+    # authority profile (4*1024*3300*4)
     # without retaining all 2.95 GB of raw IQ. Short profiles permit one episode
     # (2.64 MB); their existing 40-MiB filesystem / 80-MiB memory margin covers it.
     return 256*1024 if blocks == 45000 else 16384*blocks*4//1024
 
 
-def observer_profile(blocks, spacing, candidate_budget=8, tracking_seconds=2):
+def observer_profile(blocks, spacing, candidate_budget=8, tracking_seconds=2, coarse_authority=False):
     retention_budget_kib(blocks)
     if tracking_seconds not in (2,10) or (tracking_seconds==10 and
             (blocks,candidate_budget)!=(45000,80)):
@@ -46,6 +47,8 @@ def observer_profile(blocks, spacing, candidate_budget=8, tracking_seconds=2):
             not (blocks==45000 and candidate_budget in (64,80))):
         raise ValueError('three-frame observer requires a bounded selected-IQ profile')
     observer9_scan80=(blocks,spacing,candidate_budget,tracking_seconds)==(45000,9,80,10)
+    if coarse_authority and not observer9_scan80:
+        raise ValueError('coarse authority requires the ten-second long scan80 observer9 profile')
     if candidate_budget not in (8,64,80) or (candidate_budget>8 and
             (blocks not in (1536,45000) or (spacing!=3 and not observer9_scan80))):
         raise ValueError('expanded candidates require a bounded selected-IQ three-frame observer profile')
@@ -53,13 +56,15 @@ def observer_profile(blocks, spacing, candidate_budget=8, tracking_seconds=2):
         suffix='scan64' if candidate_budget==64 else 'scan80-local2'
         observer='observer9' if observer9_scan80 else 'observer3'
         profile=f'1536-selected-observer3-{suffix}' if blocks==1536 else f'45000-selected-{observer}-{suffix}'
-        return profile+'-track10' if tracking_seconds==10 else profile
+        profile=profile+'-track10' if tracking_seconds==10 else profile
+        return profile+'-authority' if coarse_authority else profile
     return '1536-selected-observer3' if spacing==3 else str(blocks)
 
 
-def capture_artifacts(blocks, observer_spacing=9, candidate_budget=8, tracking_seconds=2):
+def capture_artifacts(blocks, observer_spacing=9, candidate_budget=8, tracking_seconds=2,
+                      coarse_authority=False):
     retention_budget_kib(blocks)
-    observer_profile(blocks,observer_spacing,candidate_budget,tracking_seconds)
+    observer_profile(blocks,observer_spacing,candidate_budget,tracking_seconds,coarse_authority)
     names = tuple('scan.iq.ci16' if (blocks == 45000 or observer_spacing==3) and name == 'iq.ci16' else name
                   for name in ARTIFACTS)
     # At most three clean-loss restarts. Unopened episode files are recorded
@@ -147,6 +152,8 @@ def main():
     parser.add_argument('--candidate-budget',type=int,choices=(8,64,80),default=8)
     parser.add_argument('--tracking-seconds',type=int,choices=(2,10),default=2,
                         help='successful native horizon; 10 is long-scan80 only')
+    parser.add_argument('--coarse-authority',action='store_true',
+                        help='let retained 2.5-MS/s observer support future 30-MS/s jobs; long observer9 only')
     parser.add_argument('--blocks', type=int, choices=(1536, 4096, 45000), default=1536,
                         help='1536/4096 retain full IQ for 10.066/26.844 s; '
                              '45000 retains searched windows for at most 294.912 s; expanded scans permit 256 attempts')
@@ -154,8 +161,10 @@ def main():
                         help='Receive LO for this one bounded dwell; default is the historical .20 upper edge')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
-    selected_profile=observer_profile(args.blocks,args.observer_spacing,args.candidate_budget,args.tracking_seconds)
-    artifacts = capture_artifacts(args.blocks,args.observer_spacing,args.candidate_budget,args.tracking_seconds)
+    selected_profile=observer_profile(args.blocks,args.observer_spacing,args.candidate_budget,
+                                      args.tracking_seconds,args.coarse_authority)
+    artifacts = capture_artifacts(args.blocks,args.observer_spacing,args.candidate_budget,
+                                  args.tracking_seconds,args.coarse_authority)
     if not 70000000 <= args.lo_hz <= 6000000000:
         raise ValueError('receive LO is outside the AD9361 range')
     plan, profile = g.deployment_identity(args.deployment, serial=ENDPOINT[0], host=ENDPOINT[1])
@@ -178,9 +187,10 @@ def main():
                 'native_tracking': {'rate_hz': 750, 'maximum_results_per_episode': 750*args.tracking_seconds,
                                     'maximum_seconds_per_episode': args.tracking_seconds},
                 'retention_mode': 'selected_windows' if args.blocks == 45000 or args.observer_spacing==3 else 'full',
-                'passive_observer': {'rate': 2500000, 'feedback_authority': False,
+                'passive_observer': {'rate': 2500000, 'feedback_authority': args.coarse_authority,
                                      'frame_spacing': args.observer_spacing,
-                                     'maximum_measurements_per_episode': 200, 'maximum_episodes': 4 if args.blocks == 45000 else 1},
+                                     'maximum_measurements_per_episode': 1024 if args.coarse_authority else 200,
+                                     'maximum_episodes': 4 if args.blocks == 45000 else 1},
                 'status': 'started', 'live_tracking_qualified': False}
     remote = '/tmp/gli-live20-'+uuid.uuid4().hex
     evidence['remote_directory'] = remote

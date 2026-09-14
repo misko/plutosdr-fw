@@ -39,8 +39,9 @@ struct glrt_tracking_observer_ports {
  * measure every nine frames starting at first_frame. Keep its own history;
  * this module has no native-controller, radio-configuration or SUBMIT port.
  * The caller attests reference identity and retains the imported history.
- * At most 200 measurements, five seconds of wall time and five seconds of
- * source look-ahead from the first predicted pilot are allowed. The existing
+ * At most 1024 measurements, fifteen seconds of wall time and twelve seconds
+ * of source look-ahead from the first predicted pilot are allowed. Callers use
+ * smaller profile-owned bounds unless continuous coarse authority is enabled. The existing
  * eight-support, 96-frame fit and last-supported-plus-32 limits are unchanged.
  * DONE and failures are terminal until init. Init performs no I/O.
  */

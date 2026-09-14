@@ -19,7 +19,7 @@ from .starlink_glrt_schedule_abi import (
 )
 
 KINDS = {"bootstrap_seed", "initial", "descriptor", "head", "estimate", "before_submit",
-         "stopping", "drained", "final", "snapshot", "tracking_handoff"}
+         "stopping", "drained", "final", "snapshot", "tracking_handoff", "tracking_authority"}
 
 
 @dataclass(frozen=True)
@@ -78,6 +78,9 @@ def _descriptors(entries: list[JournalRecord], *, epoch: int, codec: JournalCode
     owners = {}
     next_frame, frame_limit = 0, 225000
     history = None
+    last_authorized = None
+    pending_frame = None
+    head_sequence = 0
     started = False
     for record in entries:
         if record.kind == "tracking_handoff":
@@ -85,8 +88,36 @@ def _descriptors(entries: list[JournalRecord], *, epoch: int, codec: JournalCode
                 raise ValueError("duplicate, late or unsupported tracking handoff")
             history = codec.handoff(record.payload, epoch=epoch)
             next_frame, frame_limit = history.first, history.limit
+            last_authorized = history.last_supported
+        elif record.kind == "tracking_authority":
+            if history is None or codec.handoff is None:
+                raise ValueError("tracking authority lacks an initial handoff")
+            refreshed = codec.handoff(record.payload, epoch=epoch)
+            if refreshed.first != next_frame or refreshed.limit != frame_limit:
+                raise ValueError("tracking authority crosses owned frame bounds")
+            if refreshed.last_supported <= last_authorized:
+                raise ValueError("tracking authority does not advance causal support")
+            history = refreshed
+            last_authorized = refreshed.last_supported
         elif record.kind not in {"bootstrap_seed", "snapshot"}:
             started = True
+        if record.kind == "head" and history is not None:
+            head = codec.head(record.payload.decode("ascii"))
+            if head.tag not in owners or pending_frame is not None:
+                raise ValueError("tracking head lacks retained descriptor ownership")
+            owned_first, owned_batch = owners[head.tag]
+            head.require_association(owned_batch, sequence=head_sequence)
+            pending_frame = owned_first+head.repeat, head.sequence
+            head_sequence += 1
+        elif record.kind == "estimate" and history is not None:
+            fields = record.payload.decode("ascii").split()
+            if pending_frame is None or len(fields)!=9:
+                raise ValueError("tracking estimate lacks retained head")
+            frame, sequence = pending_frame
+            if tuple(map(int,fields[:3]))!=(epoch,sequence,frame):
+                raise ValueError("tracking estimate frame differs from head")
+            if int(fields[8])==0: last_authorized=max(last_authorized,frame)
+            pending_frame=None
         if record.kind != "descriptor":
             continue
         fields = record.payload.decode("ascii").split(maxsplit=2)
@@ -96,10 +127,12 @@ def _descriptors(entries: list[JournalRecord], *, epoch: int, codec: JournalCode
         first, b = int(fields[1]), codec.batch(fields[2])
         if b.epoch != epoch or b.tag in owners or first != next_frame or first+b.repeats > frame_limit:
             raise ValueError("retained descriptor ownership is inconsistent")
-        if history is not None and not owners and first+b.repeats-1-history.last_supported > 32:
-            raise ValueError("initial descriptor exceeds retained tracking horizon")
+        if history is not None and first+b.repeats-1-last_authorized > 32:
+            raise ValueError("descriptor exceeds retained tracking authority")
         owners[b.tag] = first, b
         next_frame += b.repeats
+    if pending_frame is not None:
+        raise ValueError("tracking head lacks retained estimate")
     return owners
 
 

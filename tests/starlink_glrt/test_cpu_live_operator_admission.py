@@ -71,6 +71,10 @@ def test_ten_second_tracking_is_opt_in_and_long_scan80_only(storage_operator):
     assert storage_operator.observer_profile(45000,3,80,10)==profile
     assert storage_operator.observer_profile(45000,9,80,10)==\
         '45000-selected-observer9-scan80-local2-track10'
+    assert storage_operator.observer_profile(45000,9,80,10,True)==\
+        '45000-selected-observer9-scan80-local2-track10-authority'
+    with pytest.raises(ValueError,match='coarse authority'):
+        storage_operator.observer_profile(45000,3,80,10,True)
     assert 'scan.iq.ci16' in storage_operator.capture_artifacts(45000,3,80,10)
     for blocks,spacing,budget in ((1536,3,80),(45000,3,64),(1536,9,80)):
         with pytest.raises(ValueError,match='ten-second tracking'):
@@ -239,6 +243,7 @@ def test_selected_capture_budget_and_artifacts_are_explicit(storage_operator):
     assert {'observer.jsonl','observer.iq.ci16'} <= set(selected)
     # The long expanded-scan profiles' worst-case selected IQ and grids fit the allowance.
     assert 80_000_000+14_400_000+37_600_000+4*200*3300*4+4*8*1024**2 < 256*1024**2
+    assert 80_000_000+14_400_000+37_600_000+4*1024*3300*4+4*8*1024**2 < 256*1024**2
     for blocks in (1536,4096):
         assert storage_operator.capture_artifacts(blocks) == storage_operator.ARTIFACTS
     for blocks in (0,45001):
