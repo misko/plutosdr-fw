@@ -112,6 +112,11 @@ def test_ranked_review_requires_full_scan_and_selects_strongest_activity():
                    "activity_selection":"strongest_one_attempt_scan_power50_wait40_track100"}
     assert review_continuity(wait40,wait40_parent,serial=SERIAL,los=LOS)["activity_selection"]==(
         "strongest_one_attempt_scan_power50_wait40_track100")
+    wait40x2=wait40.replace("sparse100-wait40-after-scout1","sparse100-wait40x2-after-scout1")
+    wait40x2_parent={**wait40_parent,
+                     "activity_selection":"strongest_one_attempt_scan_power50_wait40x2_track100"}
+    assert review_continuity(wait40x2,wait40x2_parent,serial=SERIAL,los=LOS)["activity_selection"]==(
+        "strongest_one_attempt_scan_power50_wait40x2_track100")
 
 
 def test_review_accepts_parent_mapping_of_arbitrary_child_failure():

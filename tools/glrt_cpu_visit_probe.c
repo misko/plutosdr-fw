@@ -27,6 +27,7 @@
 #define WAIT_PRIOR_CONTINUITY30_PLAN "continuity30-prior-wait12-after-scout1"
 #define WAIT100_PLAN "sparse100-wait12-after-scout1"
 #define WAIT40_100_PLAN "sparse100-wait40-after-scout1"
+#define WAIT40X2_100_PLAN "sparse100-wait40x2-after-scout1"
 #define CONTINUITY_ROUNDS 3U
 #define WAIT_CONTINUITY_ROUNDS 12U
 #define WAIT_CONTINUITY_SEGMENTS 3U
@@ -56,6 +57,7 @@ struct visit_context {
     int wait_continuity;
     int wait100;
     int wait40;
+    int wait40x2;
     unsigned continuity_rounds,continuity_segments;
     unsigned segment_rf_samples;
     double activity_floor;
@@ -89,7 +91,8 @@ static int visit_arguments(int argc,char **argv,struct visit_context *v,uint64_t
               !strcmp(argv[argc-1],PRIOR_CONTINUITY30_PLAN) ||
               !strcmp(argv[argc-1],WAIT_PRIOR_CONTINUITY30_PLAN) ||
               !strcmp(argv[argc-1],WAIT100_PLAN) ||
-              !strcmp(argv[argc-1],WAIT40_100_PLAN)) {
+              !strcmp(argv[argc-1],WAIT40_100_PLAN) ||
+              !strcmp(argv[argc-1],WAIT40X2_100_PLAN)) {
         v->profile=SCOUT_PROFILE;v->followup_sparse=1;v->followup_plan=argv[argc-1];
         v->continuity=!strcmp(v->followup_plan,CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,RANKED_CONTINUITY30_PLAN) ||
@@ -97,26 +100,32 @@ static int visit_arguments(int argc,char **argv,struct visit_context *v,uint64_t
             !strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,WAIT100_PLAN) ||
-            !strcmp(v->followup_plan,WAIT40_100_PLAN);
+            !strcmp(v->followup_plan,WAIT40_100_PLAN) ||
+            !strcmp(v->followup_plan,WAIT40X2_100_PLAN);
         v->ranked_continuity=!strcmp(v->followup_plan,RANKED_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,FRESH_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,WAIT100_PLAN) ||
-            !strcmp(v->followup_plan,WAIT40_100_PLAN);
+            !strcmp(v->followup_plan,WAIT40_100_PLAN) ||
+            !strcmp(v->followup_plan,WAIT40X2_100_PLAN);
         v->fresh_continuity=!strcmp(v->followup_plan,FRESH_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,WAIT100_PLAN) ||
-            !strcmp(v->followup_plan,WAIT40_100_PLAN);
+            !strcmp(v->followup_plan,WAIT40_100_PLAN) ||
+            !strcmp(v->followup_plan,WAIT40X2_100_PLAN);
         v->prior_continuity=!strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN);
         v->wait_continuity=!strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN);
-        v->wait100=!strcmp(v->followup_plan,WAIT100_PLAN) || !strcmp(v->followup_plan,WAIT40_100_PLAN);
-        v->wait40=!strcmp(v->followup_plan,WAIT40_100_PLAN);
+        v->wait100=!strcmp(v->followup_plan,WAIT100_PLAN) || !strcmp(v->followup_plan,WAIT40_100_PLAN) ||
+            !strcmp(v->followup_plan,WAIT40X2_100_PLAN);
+        v->wait40=!strcmp(v->followup_plan,WAIT40_100_PLAN) || !strcmp(v->followup_plan,WAIT40X2_100_PLAN);
+        v->wait40x2=!strcmp(v->followup_plan,WAIT40X2_100_PLAN);
         v->continuity_rounds=v->wait40 ? WAIT40_CONTINUITY_ROUNDS :
             (v->wait_continuity || v->wait100) ? WAIT_CONTINUITY_ROUNDS : CONTINUITY_ROUNDS;
-        v->continuity_segments=v->wait100 ? 1U : v->wait_continuity ? WAIT_CONTINUITY_SEGMENTS : CONTINUITY_ROUNDS;
+        v->continuity_segments=v->wait40x2 ? 2U : v->wait100 ? 1U :
+            v->wait_continuity ? WAIT_CONTINUITY_SEGMENTS : CONTINUITY_ROUNDS;
         v->plan_ns=v->wait40 ? WAIT40_100_PLAN_NS :
             v->wait100 ? WAIT100_PLAN_NS : v->wait_continuity ? WAIT_PLAN_NS : DEFAULT_PLAN_NS;
         v->segment_rf_samples=v->wait100 ? FOLLOWUP_RF_SAMPLES : SEGMENT_RF_SAMPLES;
@@ -467,6 +476,7 @@ int main(int argc,char **argv)
             !followup_started ? "none" : selected_activity ? "retained_activity" : "native_handoff");
         if(selected==UINT_MAX) printf("null"); else printf("%u",selected);
         if(context.ranked_continuity) printf(",\"activity_selection\":\"%s\"",
+            context.wait40x2 ? "strongest_one_attempt_scan_power50_wait40x2_track100" :
             context.wait40 ? "strongest_one_attempt_scan_power50_wait40_track100" :
             context.wait100 ? "strongest_one_attempt_scan_power50_wait12_track100" :
             context.wait_continuity ? "strongest_one_attempt_scan_prior_reacquire_wait12" :
