@@ -72,6 +72,13 @@ static int simulated_child(int argc,char **argv) {
     }
     return 0;
 }
+static int simulated_followup_child(int argc,char **argv) {
+    if(argc!=7 || strcmp(argv[6],SPARSE_PROFILE)) return 9;
+    printf("{\"scope\":\"bounded_live_cpu_acquisition_native_feedback\",\"rate\":0,"
+        "\"status\":0,\"blocks\":45000,\"attempts\":2,\"handoffs\":1,"
+        "\"native_results\":751,\"native_completed_runs\":1,\"worker_complete\":1}\n");
+    return 0;
+}
 int exercise_child(const char *directory,const char *mode) {
     char *args[]={"probe",(char *)mode,"serial","bank","refs",(char *)directory};
     struct visit_context context={.args=args,.probe_main=simulated_child};
@@ -97,6 +104,14 @@ int exercise_four_children(const char *directory) {
     interrupted=0;
     for(unsigned n=0;n<4;n++) if(visit_child(&context,n,clock_ns(NULL)+UINT64_C(2000000000))) return -1;
     int status;return waitpid(-1,&status,WNOHANG)==-1 && errno==ECHILD ? 0 : -1;
+}
+int exercise_followup_child(const char *directory) {
+    char *args[]={"probe","sparse_complete","serial","bank","refs",(char *)directory};
+    struct visit_context context={.args=args,.probe_main=simulated_child,
+        .followup_probe_main=simulated_followup_child,.visit_count=4,
+        .profile=SPARSE_PROFILE,.followup_sparse=1};
+    interrupted=0;
+    return visit_child(&context,4,clock_ns(NULL)+UINT64_C(2000000000));
 }
 int parse_plan(unsigned rate,unsigned count,const char *profile) {
     char raw_rate[32];snprintf(raw_rate,sizeof(raw_rate),"%u",rate);
@@ -138,6 +153,7 @@ def probe(tmp_path_factory):
     lib.classify_activity.argtypes=[c.c_char_p]
     lib.invalid_plan.argtypes=[c.c_char_p,c.c_uint,c.c_int]
     lib.exercise_four_children.argtypes=[c.c_char_p]
+    lib.exercise_followup_child.argtypes=[c.c_char_p]
     lib.parse_plan.argtypes=[c.c_uint,c.c_uint,c.c_char_p]
     return lib
 
@@ -177,6 +193,13 @@ def test_four_selected_children_have_separate_evidence_and_are_all_reaped(probe,
     assert sorted(p.name for p in tmp_path.iterdir())==[f'visit-{n}' for n in range(4)]
     for n in range(4):
         assert (tmp_path/f'visit-{n}/stdout.json').read_text()=='retained child output\n'
+
+
+def test_sparse_followup_uses_reacquiring_probe(probe,tmp_path):
+    assert probe.exercise_followup_child(os.fsencode(tmp_path))==0
+    status=json.loads((tmp_path/'visit-4/stdout.json').read_text())
+    assert status['attempts']==2
+    assert status['native_completed_runs']==1
 
 
 @pytest.mark.parametrize('damage,expected',[

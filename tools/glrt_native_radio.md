@@ -424,8 +424,10 @@ The parent then retunes to the selected LO and runs exactly one
 zero process result is accepted only when the retained status proves one
 completed native run with at least 751 scheduled measurements. This represents
 ten seconds of 30-MS/s source time at stride ten and the established sustainable
-75-measurement/s cadence. No-signal, clean-loss, retention, deadline and child
-failures remain separate terminal results.
+75-measurement/s cadence. The long child uses the profile's existing bounded
+clean-loss reacquisition path (at most three restarts); the short frequency
+scouts remain single-visit children. No-signal, exhausted clean-loss,
+retention, deadline and child failures remain separate terminal results.
 
 All scouts share a 60-second controller deadline. The follow-up has its own
 320-second deadline, and the complete radio-local process has a 400-second

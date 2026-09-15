@@ -24,6 +24,7 @@ struct visit_context {
     int followup_sparse;
     int activity_selected;
     int (*probe_main)(int,char **);
+    int (*followup_probe_main)(int,char **);
 };
 static const char *visit_profile(const struct visit_context *v)
 {
@@ -54,6 +55,7 @@ static int visit_arguments(int argc,char **argv,struct visit_context *v,uint64_t
 }
 static int visit_cancelled(void *unused) { (void)unused;return interrupted!=0; }
 static int visit_probe_main(int argc,char **argv) { return live_probe_run(argc,argv,1); }
+static int followup_probe_main(int argc,char **argv) { return live_probe_run(argc,argv,0); }
 static int channel_is(struct iio_channel *channel,const char *name,const char *expected)
 {
     char raw[128];ssize_t n;
@@ -221,7 +223,8 @@ static int visit_child(void *pointer,unsigned number,uint64_t deadline)
         int rc;
         if(dup2(stdout_fd,STDOUT_FILENO)<0 || dup2(stderr_fd,STDERR_FILENO)<0) _exit(2);
         close(stdout_fd);close(stderr_fd);
-        rc=v->probe_main(visit_profile(v) ? 7 : 6,args);
+        rc=(v->followup_probe_main && !strcmp(visit_profile(v),SPARSE_PROFILE) ?
+            v->followup_probe_main : v->probe_main)(visit_profile(v) ? 7 : 6,args);
         if(fflush(stdout) || fflush(stderr)) rc=2;
         _exit(rc);
     }
@@ -263,6 +266,7 @@ int main(int argc,char **argv)
     unsigned selected=UINT_MAX;int followup_started=0;
     if(visit_arguments(argc,argv,&context,lo)) return 2;
     context.probe_main=visit_probe_main;
+    context.followup_probe_main=followup_probe_main;
     if(snprintf(path,sizeof(path),"%s/visits.txt",argv[5])<=0 || !(context.journal=fopen(path,"wx"))) return 2;
     action.sa_handler=signal_stop;sigemptyset(&action.sa_mask);
     if(sigaction(SIGALRM,&action,NULL) || sigaction(SIGTERM,&action,NULL) || sigaction(SIGINT,&action,NULL)) return 2;
