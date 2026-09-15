@@ -15,6 +15,7 @@ WRAPPER=r'''
 #include "glrt_cpu_visit_probe.c"
 int inspect_idle_words(const uint32_t w[24],uint32_t rate) { return visit_idle_snapshot(w,rate); }
 int classify_activity(const char *path) { return visit_activity(path); }
+int classify_activity_scores(const double *scores,unsigned count) { return isolated_activity(scores,count); }
 int loss_disposition(unsigned fault) {
     struct live s={0};s.done=1;s.result=GLRT_NATIVE_ACQUISITION_LOST;s.native_clean_loss=1;
     interrupted=fault==1;
@@ -154,6 +155,7 @@ def probe(tmp_path_factory):
     lib=c.CDLL(str(out/'visit.so'));lib.exercise_child.argtypes=[c.c_char_p,c.c_char_p]
     lib.inspect_idle_words.argtypes=[c.POINTER(c.c_uint32),c.c_uint32]
     lib.classify_activity.argtypes=[c.c_char_p]
+    lib.classify_activity_scores.argtypes=[c.c_void_p,c.c_uint]
     lib.invalid_plan.argtypes=[c.c_char_p,c.c_uint,c.c_int]
     lib.exercise_four_children.argtypes=[c.c_char_p]
     lib.exercise_followup_child.argtypes=[c.c_char_p,c.c_char_p]
@@ -222,7 +224,7 @@ def test_retained_activity_requires_one_strong_bounded_attempt(probe,tmp_path,da
         rows.append(json.dumps(row,separators=(',',':')))
     if damage=='missing_attempt': rows[2]=rows[2].replace('"attempt":3','"attempt":4')
     if damage=='duplicate_attempt': rows[1]=rows[1].replace('"attempt":2','"attempt":1')
-    if damage=='short': rows.pop()
+    if damage=='short': rows.clear()
     if damage=='too_many': rows[0]=rows[0].replace('[0.05,0.003,0.003]', '['+','.join(['0.05']*65)+']')
     if damage=='nan': rows[0]=rows[0].replace('0.05','NaN')
     if damage=='duplicate_power': rows[0]=rows[0].replace('}',',"single_pilot_power":[0.05]}')
@@ -242,6 +244,20 @@ def test_retained_activity_uses_absolute_and_local_floor_gates(probe,tmp_path,po
         for attempt in range(1,7)]
     path=tmp_path/'worker.jsonl';path.write_text('\n'.join(rows)+'\n')
     assert probe.classify_activity(os.fsencode(path))==expected
+
+
+@pytest.mark.parametrize('power,floor,expected',[
+    (.014,.002,0),(.018,.003,1),(.018,.0031,0),(.029,.0027,1),
+])
+def test_live_scout_and_retained_reviewer_share_activity_gate(probe,power,floor,expected):
+    scores=(c.c_double*3)(power,floor,floor)
+    assert probe.classify_activity_scores(scores,len(scores))==expected
+
+
+def test_retained_activity_can_end_after_first_detected_attempt(probe,tmp_path):
+    row={'kind':'candidate_order','attempt':1,'single_pilot_power':[.018,.003,.003]}
+    path=tmp_path/'worker.jsonl';path.write_text(json.dumps(row,separators=(',',':'))+'\n')
+    assert probe.classify_activity(os.fsencode(path))==1
 
 
 @pytest.mark.parametrize('rate',[30000000,60000000,2500000])

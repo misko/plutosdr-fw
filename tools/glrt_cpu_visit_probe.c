@@ -16,8 +16,6 @@
 #define FOLLOWUP_PLAN "sparse10-after-scout16"
 #define FOLLOWUP30_PLAN "sparse30-after-scout16"
 #define FOLLOWUP100_PLAN "sparse100-after-scout16"
-#define SCOUT_ACTIVITY_POWER 0.015
-#define SCOUT_ACTIVITY_FLOOR_RATIO 6.0
 #define SCOUT_ACTIVITY_HITS 1U
 
 struct visit_context {
@@ -197,7 +195,7 @@ static int visit_activity(const char *path)
     if(!file) return -1;
     while((length=getline(&line,&capacity,file))>=0) {
         static const char token[]="\"single_pilot_power\":[";
-        char *at,*end;uint32_t attempt;unsigned count=0;double peak=0,sum=0;
+        char *at,*end;uint32_t attempt;unsigned count=0;double scores[64];
         if((size_t)length>65536) goto done;
         if(!strstr(line,"\"kind\":\"candidate_order\"")) continue;
         if(status_number(line,"attempt",&attempt) || attempt!=expected_attempt++ ||
@@ -208,15 +206,15 @@ static int visit_activity(const char *path)
             if(*at<'0' || *at>'9') goto done;
             errno=0;value=strtod(at,&end);
             if(errno || end==at || !isfinite(value) || value<0 || value>1 || ++count>64) goto done;
-            sum+=value;if(value>peak) peak=value;
+            scores[count-1]=value;
             if(*end==']') { at=end+1;break; }
             if(*end!=',') goto done;
             at=end+1;
         }
         if(count<2 || (*at!=',' && *at!='}')) goto done;
-        if(peak>=SCOUT_ACTIVITY_POWER && peak>=SCOUT_ACTIVITY_FLOOR_RATIO*(sum-peak)/(count-1)) hits++;
+        if(isolated_activity(scores,count)) hits++;
     }
-    if(ferror(file) || expected_attempt!=ATTEMPTS+1) goto done;
+    if(ferror(file) || expected_attempt<2 || expected_attempt>ATTEMPTS+1) goto done;
     rc=hits>=SCOUT_ACTIVITY_HITS;
 done:
     free(line);if(fclose(file)) rc=-1;return rc;

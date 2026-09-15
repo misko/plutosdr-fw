@@ -41,6 +41,8 @@
 #define DEFAULT_NATIVE_JOURNAL_BYTES (8U*1024U*1024U)
 #define SPARSE30_NATIVE_JOURNAL_BYTES (16U*1024U*1024U)
 #define SPARSE100_NATIVE_JOURNAL_BYTES (64U*1024U*1024U)
+#define SCOUT_ACTIVITY_POWER 0.015
+#define SCOUT_ACTIVITY_FLOOR_RATIO 6.0
 #define SCAN80_RESOLVER_POWER_FLOOR 0.03
 #define SCAN80_WEAK_FALLBACK_INTERVAL 4U
 struct paired_head { uint32_t words[32]; };
@@ -137,6 +139,7 @@ struct live {
     struct paired_head paired[PAIR_LIMIT];
     uint32_t paired_queued,paired_copied,paired_episode_first;
     int selected_iq,visit_mode,restart_on_loss;
+    int stop_on_activity;
     unsigned observer_spacing,native_result_limit,native_stride;
     uint32_t observer_first_frame;
     uint32_t observer_maximum,observer_retention_limit;
@@ -405,6 +408,17 @@ static const struct glrt_cpu_coarse_peak *proposal_peaks(const struct live *s)
  * sensitivity below the evidence-derived floor. Older profiles are unchanged. */
 static int rank_fast_reject(unsigned budget,double power,unsigned attempt)
 { return budget==80 && power<SCAN80_RESOLVER_POWER_FLOOR && attempt%SCAN80_WEAK_FALLBACK_INTERVAL; }
+static int isolated_activity(const double *scores,unsigned count)
+{
+    double peak=0,sum=0;
+    if(!scores || count<2 || count>64) return 0;
+    for(unsigned n=0;n<count;n++) {
+        if(!isfinite(scores[n]) || scores[n]<0 || scores[n]>1) return 0;
+        sum+=scores[n];if(scores[n]>peak) peak=scores[n];
+    }
+    return peak>=SCOUT_ACTIVITY_POWER &&
+        peak>=SCOUT_ACTIVITY_FLOOR_RATIO*(sum-peak)/(count-1);
+}
 /* Cheap ordering only: one pilot prefix per coarse basin, with CFO searched
  * by FFT. Scan80 also checks +/-2 coarse samples. The selected proposal must
  * still pass the unchanged four-pilot resolver, history gates and deadlines. */
@@ -699,6 +713,7 @@ static void *worker_thread(void *pointer)
                 s->rank_budget==80 ? 512U : 4096U,s->rank_budget,s->rank_budget==80 ? 2U : 0U,selected_shift);
             fputs("}\n",s->journal);
             if(ferror(s->journal) || fflush(s->journal)) { result=-1;break; }
+            if(s->stop_on_activity && isolated_activity(scores,proposal_count(s))) break;
             if(rank_fast_reject(s->rank_budget,scores[selected],s->attempts)) {
                 fprintf(s->journal,"{\"kind\":\"worker_terminal\",\"attempt\":%u,\"status\":%d,"
                     "\"completed_ns\":%" PRIu64 ",\"retained_past\":0,\"supported_history\":0,"
@@ -867,6 +882,7 @@ static int live_probe_run(int argc,char **argv,int visit_mode)
     s->observer_source_span=limits.observer_source_span;
     s->observer_budget_ns=limits.observer_budget_ns;
     s->native_journal_bytes=limits.native_journal_bytes;
+    s->stop_on_activity=argc==7 && !strcmp(argv[6],"1536-selected-observer3-scan64-scout16");
     NEED(!pthread_mutex_init(&s->mutex,NULL),"mutex");mutex=1;
     NEED(!pthread_mutex_init(&s->authority_mutex,NULL),"authority_mutex");mutex=2;
     NEED(!load(argv[3],s->bank,sizeof(s->bank)) && !load(argv[4],s->refs,sizeof(s->refs)),"reference_files");
