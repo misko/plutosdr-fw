@@ -12,6 +12,8 @@
 #define SCOUT_PROFILE "1536-selected-observer3-scan64-scout16"
 #define SPARSE_PROFILE "45000-selected-observer9-scan80-local2-track10-sparse10-authority"
 #define FOLLOWUP_PLAN "sparse10-after-scout16"
+#define SCOUT_ACTIVITY_POWER 0.04
+#define SCOUT_ACTIVITY_HITS 1U
 
 struct visit_context {
     char **args;
@@ -20,6 +22,7 @@ struct visit_context {
     unsigned visit_count;
     const char *profile;
     int followup_sparse;
+    int activity_selected;
     int (*probe_main)(int,char **);
 };
 static const char *visit_profile(const struct visit_context *v)
@@ -167,14 +170,49 @@ static int visit_status(const char *path,uint32_t rate,const char *profile)
     }
     return -1;
 }
+/* A short scan64 child can retain strong activity without satisfying the full
+ * native handoff. One attempt above the corpus-derived floor selects the LO
+ * for stricter scan80/local refinement; this never claims tracking success. */
+static int visit_activity(const char *path)
+{
+    FILE *file=fopen(path,"r");char *line=NULL;size_t capacity=0;ssize_t length;
+    unsigned expected_attempt=1,hits=0;int rc=-1;
+    if(!file) return -1;
+    while((length=getline(&line,&capacity,file))>=0) {
+        static const char token[]="\"single_pilot_power\":[";
+        char *at,*end;uint32_t attempt;unsigned count=0;double peak=0;
+        if((size_t)length>65536) goto done;
+        if(!strstr(line,"\"kind\":\"candidate_order\"")) continue;
+        if(status_number(line,"attempt",&attempt) || attempt!=expected_attempt++ ||
+           !(at=strstr(line,token)) || strstr(at+sizeof(token)-1,token)) goto done;
+        at+=sizeof(token)-1;
+        for(;;) {
+            double value;
+            if(*at<'0' || *at>'9') goto done;
+            errno=0;value=strtod(at,&end);
+            if(errno || end==at || !isfinite(value) || value<0 || value>1 || ++count>64) goto done;
+            if(value>peak) peak=value;
+            if(*end==']') { at=end+1;break; }
+            if(*end!=',') goto done;
+            at=end+1;
+        }
+        if(!count || (*at!=',' && *at!='}')) goto done;
+        if(peak>=SCOUT_ACTIVITY_POWER) hits++;
+    }
+    if(ferror(file) || expected_attempt!=ATTEMPTS+1) goto done;
+    rc=hits>=SCOUT_ACTIVITY_HITS;
+done:
+    free(line);if(fclose(file)) rc=-1;return rc;
+}
 static int visit_child(void *pointer,unsigned number,uint64_t deadline)
 {
-    struct visit_context *v=pointer;char directory[PATH_MAX],out[PATH_MAX],err[PATH_MAX];
+    struct visit_context *v=pointer;char directory[PATH_MAX],out[PATH_MAX],err[PATH_MAX],worker[PATH_MAX];
     char *args[]={v->args[0],v->args[1],v->args[2],v->args[3],v->args[4],directory,
         (char *)visit_profile(v),NULL};
     int stdout_fd=-1,stderr_fd=-1,status=0,stopping=0;pid_t pid,waited;uint64_t stop_at=0,now=clock_ns(NULL);
     if(snprintf(directory,sizeof(directory),"%s/visit-%u",v->args[5],number)<=0 || mkdir(directory,0700) ||
-       snprintf(out,sizeof(out),"%s/stdout.json",directory)<=0 || snprintf(err,sizeof(err),"%s/stderr.txt",directory)<=0) return -1;
+       snprintf(out,sizeof(out),"%s/stdout.json",directory)<=0 || snprintf(err,sizeof(err),"%s/stderr.txt",directory)<=0 ||
+       snprintf(worker,sizeof(worker),"%s/worker.jsonl",directory)<=0) return -1;
     stdout_fd=open(out,O_WRONLY|O_CREAT|O_EXCL,0600);stderr_fd=open(err,O_WRONLY|O_CREAT|O_EXCL,0600);
     if(stdout_fd<0 || stderr_fd<0 || !now || now>=deadline) goto fail;
     pid=fork();
@@ -203,7 +241,16 @@ static int visit_child(void *pointer,unsigned number,uint64_t deadline)
     if(stopping || !WIFEXITED(status)) return -1;
     if(WEXITSTATUS(status)==LIVE_VISIT_CLEAN_LOSS_EXIT) return GLRT_VISIT_CLEAN_LOSS;
     if(WEXITSTATUS(status)) return -1;
-    return v->followup_sparse ? visit_status(out,v->rate,visit_profile(v)) : 0;
+    if(v->followup_sparse) {
+        int outcome=visit_status(out,v->rate,visit_profile(v));
+        if(outcome==GLRT_VISIT_DONE && !strcmp(visit_profile(v),SCOUT_PROFILE)) {
+            int activity=visit_activity(worker);
+            if(activity<0) return -1;
+            if(activity) { v->activity_selected=1;return GLRT_VISIT_SIGNAL; }
+        }
+        return outcome;
+    }
+    return 0;
 fail:
     if(stdout_fd>=0) close(stdout_fd);
     if(stderr_fd>=0) close(stderr_fd);
@@ -242,8 +289,9 @@ int main(int argc,char **argv)
         context.visit_count==2 ? "bounded_arm_two_frequency_visits" : "bounded_arm_frequency_revisits",
         context.rate,rc,context.visit_count*25165824U+(followup_started ? 737280000U : 0U));
     if(context.followup_sparse) {
-        printf(",\"followup_started\":%d,\"track_complete\":%d,\"selected_index\":",
-            followup_started,followup_started && rc==GLRT_VISIT_DONE);
+        printf(",\"followup_started\":%d,\"track_complete\":%d,\"selection\":\"%s\",\"selected_index\":",
+            followup_started,followup_started && rc==GLRT_VISIT_DONE,
+            !followup_started ? "none" : context.activity_selected ? "retained_activity" : "native_handoff");
         if(selected==UINT_MAX) printf("null"); else printf("%u",selected);
     }
     printf("}\n");

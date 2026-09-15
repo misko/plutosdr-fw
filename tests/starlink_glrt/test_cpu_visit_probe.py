@@ -14,6 +14,7 @@ pytestmark=pytest.mark.fftw
 WRAPPER=r'''
 #include "glrt_cpu_visit_probe.c"
 int inspect_idle_words(const uint32_t w[24],uint32_t rate) { return visit_idle_snapshot(w,rate); }
+int classify_activity(const char *path) { return visit_activity(path); }
 int loss_disposition(unsigned fault) {
     struct live s={0};s.done=1;s.result=GLRT_NATIVE_ACQUISITION_LOST;s.native_clean_loss=1;
     interrupted=fault==1;
@@ -49,6 +50,15 @@ static int simulated_child(int argc,char **argv) {
             "\"status\":0,\"blocks\":%u,\"attempts\":1,\"handoffs\":%u,"
             "\"native_results\":%u,\"native_completed_runs\":%u,\"worker_complete\":1}\n",
             scout ? 1536U : 45000U,handoffs,results,complete);
+        if(scout) {
+            char path[4096];snprintf(path,sizeof(path),"%s/worker.jsonl",argv[5]);FILE *f=fopen(path,"wx");
+            unsigned strong=!strcmp(argv[1],"scout_activity") ? 2U : !strcmp(argv[1],"scout_weak") ? 1U : 0U;
+            if(!f) return 8;
+            for(unsigned n=1;n<=6;n++)
+                fprintf(f,"{\"kind\":\"candidate_order\",\"attempt\":%u,\"single_pilot_power\":[%.2f]}\n",
+                    n,n<=strong ? .05 : .01);
+            if(fclose(f)) return 8;
+        }
         return 0;
     }
     printf("retained child output\n");fprintf(stderr,"retained child diagnostics\n");
@@ -125,6 +135,7 @@ def probe(tmp_path_factory):
         *(str(root/'tools'/name) for name in names),*libraries,'-lfftw3','-lm','-o',str(out/'visit.so')],check=True)
     lib=c.CDLL(str(out/'visit.so'));lib.exercise_child.argtypes=[c.c_char_p,c.c_char_p]
     lib.inspect_idle_words.argtypes=[c.POINTER(c.c_uint32),c.c_uint32]
+    lib.classify_activity.argtypes=[c.c_char_p]
     lib.invalid_plan.argtypes=[c.c_char_p,c.c_uint,c.c_int]
     lib.exercise_four_children.argtypes=[c.c_char_p]
     lib.parse_plan.argtypes=[c.c_uint,c.c_uint,c.c_char_p]
@@ -132,11 +143,13 @@ def probe(tmp_path_factory):
 
 
 @pytest.mark.parametrize('mode',['pass','fail','hang','existing','clean_loss','unknown','signal','selected','scan64',
-    'scout_signal','scout_empty','scout_partial','sparse_complete','sparse_empty','sparse_partial'])
+    'scout_signal','scout_activity','scout_weak','scout_empty','scout_partial',
+    'sparse_complete','sparse_empty','sparse_partial'])
 def test_child_is_reaped_before_return_and_evidence_is_never_overwritten(probe,tmp_path,mode):
     if mode=='existing':
         (tmp_path/'visit-0').mkdir();(tmp_path/'visit-0/stdout.json').write_text('preserved')
-    expected={'pass':0,'selected':0,'scan64':0,'clean_loss':1,'scout_signal':2,'scout_empty':0,
+    expected={'pass':0,'selected':0,'scan64':0,'clean_loss':1,'scout_signal':2,'scout_activity':2,
+        'scout_weak':2,'scout_empty':0,
         'sparse_complete':0,'sparse_empty':3}.get(mode,-1)
     assert probe.exercise_child(os.fsencode(tmp_path),mode.encode())==expected
     if mode=='existing': assert (tmp_path/'visit-0/stdout.json').read_text()=='preserved'
@@ -164,6 +177,28 @@ def test_four_selected_children_have_separate_evidence_and_are_all_reaped(probe,
     assert sorted(p.name for p in tmp_path.iterdir())==[f'visit-{n}' for n in range(4)]
     for n in range(4):
         assert (tmp_path/f'visit-{n}/stdout.json').read_text()=='retained child output\n'
+
+
+@pytest.mark.parametrize('damage,expected',[
+    ('none',1),('one_hit',1),('zero_hit',0),('missing_attempt',-1),('duplicate_attempt',-1),
+    ('short',-1),('too_many',-1),('nan',-1),('duplicate_power',-1),
+])
+def test_retained_activity_requires_one_strong_bounded_attempt(probe,tmp_path,damage,expected):
+    rows=[]
+    for attempt in range(1,7):
+        power=.05 if attempt<=2 else .01
+        if damage=='one_hit' and attempt==2: power=.039
+        if damage=='zero_hit': power=.039
+        row={'kind':'candidate_order','attempt':attempt,'single_pilot_power':[power]}
+        rows.append(json.dumps(row,separators=(',',':')))
+    if damage=='missing_attempt': rows[2]=rows[2].replace('"attempt":3','"attempt":4')
+    if damage=='duplicate_attempt': rows[1]=rows[1].replace('"attempt":2','"attempt":1')
+    if damage=='short': rows.pop()
+    if damage=='too_many': rows[0]=rows[0].replace('[0.05]', '['+','.join(['0.05']*65)+']')
+    if damage=='nan': rows[0]=rows[0].replace('0.05','NaN')
+    if damage=='duplicate_power': rows[0]=rows[0].replace('}',',"single_pilot_power":[0.05]}')
+    path=tmp_path/'worker.jsonl';path.write_text('\n'.join(rows)+'\n')
+    assert probe.classify_activity(os.fsencode(path))==expected
 
 
 @pytest.mark.parametrize('rate',[30000000,60000000,2500000])

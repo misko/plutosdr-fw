@@ -411,6 +411,13 @@ after proving 16 native measurements. The first retained child status that
 proves a handoff and completed 16-result run selects its LO; a qualified clean
 loss also proves that the scout had acquired a signal. Empty scouts continue
 to the next LO, while partial or inconsistent child summaries stop the plan.
+If scan64 retains no native handoff but any of its six attempts has normalized
+single-pilot power of at least 0.04, that retained activity also selects the LO.
+This permissive trigger does not claim signal or tracking: the subsequent
+scan80/local-2 acquisition and unchanged native gates make that decision. The
+threshold covers four of five historical scan64 handoffs when applied to the
+six attempts ending at each handoff; zero of 1,080 attempts in the first
+radio-local campaign reached native handoff directly.
 
 The parent then retunes to the selected LO and runs exactly one
 `45000-selected-observer9-scan80-local2-track10-sparse10-authority` child. A
