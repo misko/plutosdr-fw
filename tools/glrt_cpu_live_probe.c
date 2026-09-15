@@ -165,6 +165,7 @@ struct live {
     uint32_t observer_retained;
     struct glrt_tracking_trend observer_authority;
     uint32_t authority_generation,authority_applied,authority_refreshes;
+    uint64_t authority_published_ns;
     int coarse_authority;
 };
 static int cancelled(void *pointer)
@@ -234,6 +235,7 @@ static void *observer_thread(void *pointer)
                 s->observer.status=rc=GLRT_OBSERVER_INVALID;
             } else {
                 s->observer_authority=s->observer.trend;s->authority_generation++;
+                s->authority_published_ns=clock_ns(NULL);
                 if(pthread_mutex_unlock(&s->authority_mutex)) s->observer.status=rc=GLRT_OBSERVER_INVALID;
             }
         }
@@ -283,6 +285,7 @@ static int start_observer(struct live *s)
     if(s->coarse_authority) {
         if(pthread_mutex_lock(&s->authority_mutex)) return GLRT_NATIVE_IO_ERROR;
         s->observer_authority=s->observer.trend;s->authority_generation++;
+        s->authority_published_ns=clock_ns(NULL);
         if(pthread_mutex_unlock(&s->authority_mutex)) return GLRT_NATIVE_IO_ERROR;
     }
     fprintf(s->observer_journal,"{\"kind\":\"start\",\"attempt\":%u,\"episode\":%u,\"epoch\":%u,"
@@ -555,11 +558,13 @@ static int refresh_native_authority(struct live *s)
 {
     struct glrt_tracking_trend coarse,native;
     uint32_t generation,first,remaining,last;
+    uint64_t published_ns,applied_ns;
     int rc;
     if(!s->coarse_authority || !s->controller.started || s->controller.stopping ||
        s->controller.done || s->controller.next_frame>=s->controller.frames) return 0;
     if(pthread_mutex_lock(&s->authority_mutex)) return GLRT_NATIVE_IO_ERROR;
     coarse=s->observer_authority;generation=s->authority_generation;
+    published_ns=s->authority_published_ns;
     if(pthread_mutex_unlock(&s->authority_mutex)) return GLRT_NATIVE_IO_ERROR;
     if(!generation || generation==s->authority_applied) return 0;
     /* Native and observer histories advance independently. A newer native
@@ -576,10 +581,13 @@ static int refresh_native_authority(struct live *s)
     rc=glrt_tracking_controller_refresh_handoff(&s->controller,&native);
     if(rc) return rc==-1 ? 0 : rc;
     s->authority_applied=generation;s->authority_refreshes++;
+    applied_ns=clock_ns(NULL);
     fprintf(s->journal,"{\"kind\":\"coarse_authority\",\"attempt\":%u,\"native_episode\":%u,"
-        "\"epoch\":%u,\"generation\":%u,\"refresh\":%u,\"next_frame\":%u,"
+        "\"epoch\":%u,\"generation\":%u,\"refresh\":%u,\"published_ns\":%" PRIu64
+        ",\"applied_ns\":%" PRIu64 ",\"application_latency_ns\":%" PRIu64 ",\"next_frame\":%u,"
         "\"last_seen\":%u,\"last_supported\":%u}\n",s->attempts,s->restarts,s->epoch,
-        generation,s->authority_refreshes,first,coarse.history.last_seen,coarse.history.last_supported);
+        generation,s->authority_refreshes,published_ns,applied_ns,applied_ns-published_ns,
+        first,coarse.history.last_seen,coarse.history.last_supported);
     return ferror(s->journal) || fflush(s->journal) ? GLRT_NATIVE_RETENTION_ERROR : 0;
 }
 static int align_native_frame(const struct live *s,uint32_t *frame)

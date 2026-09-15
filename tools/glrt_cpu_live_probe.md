@@ -40,6 +40,10 @@ source renews the selected horizon, the controller drains and reports clean
 acquisition loss. The journal reviewer reconstructs the causal authority
 horizon from the cadence record, initial history, accepted native estimates and authority records;
 removing or altering an authority record invalidates later descriptors.
+Every applied coarse-authority row also records its publication time,
+application time and their monotonic latency. This separates observer compute
+delay from controller polling delay in physical evidence without changing
+which history may authorize a descriptor.
 The target is 7500 FPGA results, representing ten seconds at the 750-Hz pilot
 cadence. ARM sysfs retention drains results more slowly than signal time, so
 the long profiles give the controller a separate 120-second wall deadline.

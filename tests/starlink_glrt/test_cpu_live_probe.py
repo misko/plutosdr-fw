@@ -932,6 +932,11 @@ def test_advancing_capture_worker_and_native_feedback(live_api, controller, pilo
         if mode=='coarse_authority':
             authority=[r for r in rows if r['kind']=='coarse_authority']
             assert authority and pair_terminal['authority_refreshes']==len(authority)
+            assert all(r['published_ns']<=r['applied_ns'] and
+                       r['application_latency_ns']==r['applied_ns']-r['published_ns']
+                       for r in authority)
+            assert [r['published_ns'] for r in authority]==sorted(
+                r['published_ns'] for r in authority)
         assert reviewed['handoff'].rate == rate
         assert not radio.pending and not radio.queue and not radio.valid
         first = next(row for row in rows if row["kind"] == "scan")
