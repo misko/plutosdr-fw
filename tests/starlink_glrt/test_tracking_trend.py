@@ -18,6 +18,11 @@ class TrackingTrend(c.Structure):
     _fields_ = [("history", Trend), ("rate", c.c_uint32)]
 
 
+class SearchPrior(c.Structure):
+    _fields_ = [("predicted_start",c.c_uint64),("frame",c.c_uint32),("epoch",c.c_uint32),
+                ("cfo_hz",c.c_double),("period_samples",c.c_double)]
+
+
 @pytest.fixture(scope="module")
 def core(native_core):
     lib = native_core
@@ -33,6 +38,8 @@ def core(native_core):
     lib.glrt_tracking_solve.argtypes = [c.c_uint32, c.c_uint32, c.POINTER(Moments), c.POINTER(Estimate)]
     lib.glrt_tracking_trend_from_coarse.argtypes = [c.POINTER(TrackingTrend),c.c_uint32,
         c.c_uint32,c.c_uint32,c.POINTER(TrackingTrend)]
+    lib.glrt_tracking_trend_search_prior.argtypes = [c.POINTER(TrackingTrend),c.c_uint64,
+        c.c_uint32,c.POINTER(SearchPrior)]
     return lib
 
 
@@ -54,6 +61,39 @@ def predict(core, t, first, repeats=16):
     b, rate = TrackingBatch(), c.c_double()
     rc = core.glrt_tracking_trend_batch(c.byref(t), first, repeats, 99, 17, c.byref(b), c.byref(rate))
     return rc, b, rate.value
+
+
+def test_search_prior_projects_only_a_bounded_fresh_measurement_center(core):
+    trend=fresh(core,2500000);anchor=2**52+19
+    period=Fraction(10000,3)-Fraction(1,3000)
+    for frame in range(0,648,9):
+        assert observe(core,trend,frame,anchor+frame*period,-80000-4*frame)==1
+    window=anchor+1061*period-299-22
+    prior=SearchPrior()
+    assert core.glrt_tracking_trend_search_prior(c.byref(trend),round(window),5000000,c.byref(prior))==0
+    assert prior.frame==1061 and prior.epoch==pytest.approx(299,abs=1)
+    assert prior.predicted_start==round(anchor+1061*period)
+    assert prior.cfo_hz==pytest.approx(-80000-4*1061,abs=1e-6)
+    assert prior.period_samples==pytest.approx(float(period),abs=1e-9)
+    # A search prior is allowed beyond the 32-frame authority horizon; the
+    # ordinary descriptor API remains fenced at that same point.
+    assert predict(core,trend,1061,1)[0]==-1
+
+
+@pytest.mark.parametrize("damage", ["few","wrong_rate","too_far","fenced","nan","radius"])
+def test_search_prior_cannot_escape_its_evidence_or_distance_bounds(core,damage):
+    trend=fresh(core,2500000);anchor=1000000
+    for frame in range(7 if damage=="few" else 16):
+        assert observe(core,trend,frame,Fraction(anchor)+Fraction(frame*2500000,750),1000)==1
+    window=anchor+40000
+    if damage=="wrong_rate":trend.rate=5000000
+    elif damage=="too_far":window=anchor+5000001
+    elif damage=="fenced":trend.history.valid=0
+    elif damage=="nan":trend.history.observations[0].offset=float("nan")
+    maximum=5000001 if damage=="radius" else 5000000
+    out=SearchPrior(1,2,3,4,5)
+    assert core.glrt_tracking_trend_search_prior(c.byref(trend),window,maximum,c.byref(out))==-1
+    assert bytes(out)==bytes(SearchPrior())
 
 
 def test_explicit_coast_extends_only_the_bounded_prediction_window(core):

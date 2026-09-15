@@ -35,6 +35,8 @@ def api(tmp_path_factory):
     lib.glrt_cpu_coarse_select.argtypes = [C.POINTER(Workspace),POLL,C.c_void_p]
     lib.glrt_cpu_coarse_select_bounded.argtypes = [C.POINTER(Workspace),C.POINTER(Peak),C.c_uint,
                                                   C.POINTER(C.c_uint32),POLL,C.c_void_p]
+    lib.glrt_cpu_coarse_search_local.argtypes = [C.POINTER(Workspace),C.c_void_p,C.c_void_p,
+                                                 C.c_uint32,C.c_uint32,C.POINTER(Peak),POLL,C.c_void_p]
     return lib
 
 
@@ -136,6 +138,35 @@ def test_disjoint_partitions_cannot_publish_an_incomplete_scan(api):
     np.testing.assert_array_equal(np.ctypeslib.as_array(w.grid),expected)
     assert [(p.epoch,p.frequency,p.score) for p in w.peaks[:w.count]]==[
         p[:3] for p in expected_candidates(expected)]
+
+
+@pytest.mark.parametrize("center,radius", [(1700,8),(2,8),(3330,8),(91,0),(2000,32)])
+def test_local_prior_search_matches_measured_grid_neighborhood(api,center,radius):
+    iq=np.random.default_rng(99071).integers(-32768,32768,(14000,2),dtype=np.int16)
+    coefficients=bank(); expected=integer_grid(iq,coefficients)
+    epochs=[(center-radius+n)%3333 for n in range(2*radius+1)]
+    candidates=[(e,f,int(expected[f,e])) for e in epochs for f in range(11) if expected[f,e]]
+    candidates.sort(key=lambda p:(-p[2],abs(p[1]-5),p[0],p[1]))
+    w=Workspace();peak=Peak();check=POLL(lambda _:0)
+    assert api.glrt_cpu_coarse_search_local(C.byref(w),iq.ctypes.data,coefficients.ctypes.data,
+                                            center,radius,C.byref(peak),check,None)==0
+    assert (peak.epoch,peak.frequency,peak.score)==candidates[0]
+    assert w.completed_epochs==2*radius+1 and w.count==1
+    assert (w.peaks[0].epoch,w.peaks[0].frequency,w.peaks[0].score)==candidates[0]
+    grid=np.ctypeslib.as_array(w.grid)
+    np.testing.assert_array_equal(grid[:,epochs],expected[:,epochs])
+    assert not np.any(grid[:,[e for e in range(3333) if e not in set(epochs)]])
+
+
+@pytest.mark.parametrize("center,radius", [(3333,8),(0,33)])
+def test_local_prior_search_rejects_unbounded_neighborhood(api,center,radius):
+    iq=np.ones((14000,2),dtype=np.int16);coefficients=bank();w=Workspace();peak=Peak(1,2,3)
+    calls=0
+    def poll(_):
+        nonlocal calls;calls+=1;return 0
+    assert api.glrt_cpu_coarse_search_local(C.byref(w),iq.ctypes.data,coefficients.ctypes.data,
+                                            center,radius,C.byref(peak),POLL(poll),None)==-1
+    assert bytes(peak)==bytes(Peak()) and calls==0
 
 
 def test_actual_two_thread_benchmark_matches_complete_serial_grid(api,tmp_path):

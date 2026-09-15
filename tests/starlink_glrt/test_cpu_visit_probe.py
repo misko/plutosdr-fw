@@ -80,10 +80,11 @@ static int simulated_child(int argc,char **argv) {
 static int simulated_followup_child(int argc,char **argv) {
     if(argc!=7 || (strcmp(argv[6],SPARSE_PROFILE) && strcmp(argv[6],SPARSE30_PROFILE) &&
         strcmp(argv[6],SPARSE100_PROFILE) && strcmp(argv[6],SEGMENT30_PROFILE) &&
-        strcmp(argv[6],FRESH_SEGMENT30_PROFILE))) return 9;
+        strcmp(argv[6],FRESH_SEGMENT30_PROFILE) && strcmp(argv[6],PRIOR_SEGMENT30_PROFILE))) return 9;
     unsigned results=!strcmp(argv[6],SPARSE_PROFILE) ? 751U :
         !strcmp(argv[6],SPARSE100_PROFILE) ? 8335U : 2501U;
-    unsigned blocks=(!strcmp(argv[6],SEGMENT30_PROFILE) || !strcmp(argv[6],FRESH_SEGMENT30_PROFILE)) ? 7500U : 45000U;
+    unsigned blocks=(!strcmp(argv[6],SEGMENT30_PROFILE) || !strcmp(argv[6],FRESH_SEGMENT30_PROFILE) ||
+        !strcmp(argv[6],PRIOR_SEGMENT30_PROFILE)) ? 7500U : 45000U;
     unsigned finite=!strcmp(argv[1],"sparse_finite");
     printf("{\"scope\":\"bounded_live_cpu_acquisition_native_feedback\",\"rate\":0,"
         "\"status\":0,\"blocks\":%u,\"attempts\":2,\"handoffs\":%u,"
@@ -182,7 +183,8 @@ static int continuity_run_child(void *pointer,unsigned number,uint64_t deadline)
             f->visit->activity_number=number;f->visit->activity_score=score;
         }
     } else if(f->mode>=3 && (!strcmp(visit_profile(f->visit),SEGMENT30_PROFILE) ||
-        !strcmp(visit_profile(f->visit),FRESH_SEGMENT30_PROFILE)))
+        !strcmp(visit_profile(f->visit),FRESH_SEGMENT30_PROFILE) ||
+        !strcmp(visit_profile(f->visit),PRIOR_SEGMENT30_PROFILE)))
         outcome=GLRT_VISIT_CLEAN_LOSS;
     f->call++;return outcome;
 }
@@ -197,6 +199,8 @@ int exercise_continuity(int mode,unsigned out[7],unsigned numbers[16]) {
         .profile=SCOUT_PROFILE,.followup_profile=SEGMENT30_PROFILE,.followup_sparse=1,.continuity=1};
     fake.visit=&context;if(mode>=3) context.ranked_continuity=1;
     if(mode==4) { context.fresh_continuity=1;context.followup_profile=FRESH_SEGMENT30_PROFILE; }
+    if(mode==5) { context.fresh_continuity=1;context.prior_continuity=1;
+        context.followup_profile=PRIOR_SEGMENT30_PROFILE; }
     struct continuity_result result;uint64_t lo[4]={1190312500,1440312500,1690312500,1940312500};
     if(!context.journal) return -99;
     int rc=continuity_run(&context,&ports,lo,&result);fclose(context.journal);
@@ -284,7 +288,8 @@ def test_four_selected_children_have_separate_evidence_and_are_all_reaped(probe,
     b'45000-selected-observer9-scan80-local2-track30-sparse10-authority',
     b'45000-selected-observer9-scan80-local2-track100-sparse10-authority',
     b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment',
-    b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16'])
+    b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16',
+    b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16-prior8'])
 def test_sparse_followup_uses_reacquiring_probe(probe,tmp_path,profile):
     assert probe.exercise_followup_child(os.fsencode(tmp_path),profile)==0
     status=json.loads((tmp_path/'visit-4/stdout.json').read_text())
@@ -364,12 +369,13 @@ def test_retained_activity_score_is_strongest_candidate_not_array_position(probe
 @pytest.mark.parametrize('count',[1,2,3,4])
 @pytest.mark.parametrize('profile',[None,b'1536-selected-observer3-scan64',b'sparse10-after-scout16',
     b'sparse30-after-scout16',b'sparse100-after-scout16',b'continuity30-after-scout16',
-    b'continuity30-ranked-after-scout16',b'continuity30-fresh-after-scout1',b'unknown'])
+    b'continuity30-ranked-after-scout16',b'continuity30-fresh-after-scout1',
+    b'continuity30-prior-after-scout1',b'unknown'])
 def test_explicit_scan64_plan_preserves_legacy_and_rejects_invalid_arguments(probe,rate,count,profile):
     valid=rate in (30000000,60000000) and count in (2,3,4) and profile!=b'unknown'
     expected=16 if profile in (b'sparse10-after-scout16',b'sparse30-after-scout16',b'sparse100-after-scout16',
         b'continuity30-after-scout16',b'continuity30-ranked-after-scout16',
-        ) else 1 if profile==b'continuity30-fresh-after-scout1' else 64 if profile else 8
+        ) else 1 if profile in (b'continuity30-fresh-after-scout1',b'continuity30-prior-after-scout1') else 64 if profile else 8
     assert probe.parse_plan(rate,count,profile)==(expected if valid else -1)
 
 
@@ -379,6 +385,7 @@ def test_explicit_scan64_plan_preserves_legacy_and_rejects_invalid_arguments(pro
     (2,[0,6,3,3,0,6,1],list(range(6))),
     (3,[1,13,3,1,0,13,0],list(range(13))),
     (4,[1,13,3,1,0,13,0],list(range(13))),
+    (5,[1,13,3,1,0,13,0],list(range(13))),
 ])
 def test_continuity_rescans_with_contiguous_evidence_and_stops_on_complete(probe,mode,expected,numbers):
     out=(c.c_uint*7)();seen=(c.c_uint*16)()

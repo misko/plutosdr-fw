@@ -39,4 +39,11 @@ int glrt_cpu_seed_copy(struct glrt_tracking_iq_owner *, const struct glrt_cpu_ca
 int glrt_cpu_seed_resolve(const struct glrt_cpu_seed *, struct glrt_resolver_workspace *,
     const int16_t *reference, const int16_t *iq, glrt_resolver_fft, void *,
     uint64_t source_deadline, struct glrt_resolver_result *, struct glrt_tracking_bootstrap_live *);
+/* Prior-guided variant for a fresh measured local coarse peak. Radius 1..8
+ * limits timing hypotheses only; every hypothesis retains all four pilots and
+ * the complete CFO FFT. The prior itself never enters the bootstrap history. */
+int glrt_cpu_seed_resolve_local(const struct glrt_cpu_seed *, struct glrt_resolver_workspace *,
+    const int16_t *reference, const int16_t *iq, uint32_t timing_radius,
+    glrt_resolver_fft, void *, uint64_t source_deadline,
+    struct glrt_resolver_result *, struct glrt_tracking_bootstrap_live *);
 #endif

@@ -85,7 +85,8 @@ def test_dry_run_is_explicitly_non_rf_and_contains_reviewable_next_action(operat
 
 
 @pytest.mark.parametrize('profile',["sparse10-after-scout16","sparse30-after-scout16","sparse100-after-scout16",
-    "continuity30-after-scout16","continuity30-ranked-after-scout16","continuity30-fresh-after-scout1"])
+    "continuity30-after-scout16","continuity30-ranked-after-scout16","continuity30-fresh-after-scout1",
+    "continuity30-prior-after-scout1"])
 def test_dry_run_retains_the_selected_tracking_horizon(operator,profile):
     plan=operator.dry_run_plan((1440312500,1940312500),operator.EXPECTED,
         Path('/srv/postgres-nvme/x'),Path('/srv/bulk/leo/x'),profile)
@@ -122,6 +123,10 @@ def test_continuity_parent_retains_round_segment_and_sample_accounting(operator)
         activity_selection="strongest_one_attempt_scan")
     assert operator.decode_parent(fresh,operator.RATE,4,1,
         operator.FRESH_CONTINUITY30_PROFILE)["activity_selection"]=="strongest_one_attempt_scan"
+    prior=continuity_parent(operator,scope="bounded_arm_scout_prior_segmented_followup",
+        activity_selection="strongest_one_attempt_scan_prior_reacquire")
+    assert operator.decode_parent(prior,operator.RATE,4,1,
+        operator.PRIOR_CONTINUITY30_PROFILE)["activity_selection"]=="strongest_one_attempt_scan_prior_reacquire"
 
 
 @pytest.mark.parametrize("raw,exit_code", [

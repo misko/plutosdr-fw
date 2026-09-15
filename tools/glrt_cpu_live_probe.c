@@ -101,6 +101,9 @@ static int dwell_limits(const char *blocks,struct dwell_limits *out)
     else if(!strcmp(blocks,"7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16"))
         *out=(struct dwell_limits){7500,16,65,UINT64_C(60000000000),1,9,80,0,STABLE30_NATIVE_RESULTS,SPARSE30_NATIVE_WALL_SECONDS,1,10,
             2700,2700,UINT64_C(80000000),UINT64_C(60000000000),SPARSE30_NATIVE_JOURNAL_BYTES,GLRT_TRACKING_FORECAST_COAST};
+    else if(!strcmp(blocks,"7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16-prior8"))
+        *out=(struct dwell_limits){7500,16,65,UINT64_C(60000000000),1,9,80,0,STABLE30_NATIVE_RESULTS,SPARSE30_NATIVE_WALL_SECONDS,1,10,
+            2700,2700,UINT64_C(80000000),UINT64_C(60000000000),SPARSE30_NATIVE_JOURNAL_BYTES,GLRT_TRACKING_FORECAST_COAST};
     else if(!strcmp(blocks,"45000-selected-observer9-scan80-local2-track100-sparse10-authority"))
         *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,STABLE100_NATIVE_RESULTS,SPARSE100_NATIVE_WALL_SECONDS,1,10,
             8600,8600,UINT64_C(260000000),UINT64_C(120000000000),SPARSE100_NATIVE_JOURNAL_BYTES,GLRT_TRACKING_FORECAST_COAST};
@@ -178,6 +181,8 @@ struct live {
     uint32_t authority_generation,authority_applied,authority_refreshes;
     uint64_t authority_published_ns;
     int coarse_authority;
+    struct glrt_tracking_trend reacquire_prior;
+    int prior_reacquire,prior_pending;
 };
 static int cancelled(void *pointer)
 {
@@ -345,13 +350,19 @@ static int retain(void *pointer,enum glrt_tracking_worker_record kind,const stru
             p->starts[0],p->starts[1],p->starts[2],p->starts[3]);view(f,&p->selected);
         fputs(",\"copied\":",f);view(f,&p->copied);
     } else if(kind==GLRT_WORKER_RESOLVED) {
-        fprintf(f,",\"best_shift\":%d,\"cfo_hz\":%.17g,\"coherence\":%.17g,\"hypotheses\":[",
+        fprintf(f,",\"best_shift\":%d,\"cfo_hz\":%.17g,\"coherence\":%.17g",
             w->resolved.best.shift,w->resolved.best.cfo_hz,w->resolved.best.power_coherence);
-        for(unsigned n=0;n<17;n++) {
-            const struct glrt_resolver_peak *p=&w->resolved.hypotheses[n];
-            fprintf(f,"%s[%d,%.17g,%.17g]",n ? "," : "",p->shift,p->cfo_hz,p->power_coherence);
+        if(w->resolver_timing_radius) {
+            fprintf(f,",\"resolver_mode\":\"prior_local\",\"timing_radius\":%u",
+                w->resolver_timing_radius);
+        } else {
+            fputs(",\"hypotheses\":[",f);
+            for(unsigned n=0;n<17;n++) {
+                const struct glrt_resolver_peak *p=&w->resolved.hypotheses[n];
+                fprintf(f,"%s[%d,%.17g,%.17g]",n ? "," : "",p->shift,p->cfo_hz,p->power_coherence);
+            }
+            fputs("]",f);
         }
-        fputs("]",f);
     } else if(kind==GLRT_WORKER_PAST) {
         const struct glrt_tracking_bootstrap_trace *t=&w->trace;
         iq=w->scratch;samples=3300;
@@ -406,6 +417,14 @@ static int capture_early_final(const struct glrt_capture_snapshot *capture,unsig
 static int worker_terminal_is_clean(int result,int finite_source_complete)
 {
     return !result || (finite_source_complete && result==GLRT_WORKER_CANCELLED);
+}
+static unsigned recent_supported(const struct glrt_native_trend *h)
+{
+    unsigned n,count=0;
+    if(!h || !h->count || h->count>GLRT_NATIVE_TREND_WINDOW) return 0;
+    for(n=0;n<h->count;n++) if(h->observations[n].frame<=h->last_supported &&
+        h->last_supported-h->observations[n].frame<GLRT_NATIVE_TREND_WINDOW) count++;
+    return count;
 }
 struct partition {
     struct live *live;
@@ -717,10 +736,11 @@ static void *worker_thread(void *pointer)
     while(s->attempts<s->attempt_limit) {
         struct glrt_tracking_iq_view v;
         struct glrt_cpu_candidate candidate;
+        struct glrt_tracking_search_prior prior={0};
         struct glrt_tracking_worker_config cfg={.owner=&s->owner,.references=s->refs,.fft=fft,.fft_context=s,
             .ports={s,clock_ns,cancelled,pause_worker,retain},.wall_budget_ns=UINT64_C(3000000000),
             .maximum_seed_age=2500000,.lead_samples=12500,.bootstrap_spacing=s->observer_spacing};
-        uint64_t started=clock_ns(NULL),scan_done;int rc;
+        uint64_t started=clock_ns(NULL),scan_done;int rc,use_prior=0;
         if(cancelled(s)) break;
         s->attempts++;
         if(glrt_tracking_iq_owner_copy(&s->owner,s->epoch,0,NULL,0,&v) || v.closed || !v.valid ||
@@ -728,12 +748,28 @@ static void *worker_thread(void *pointer)
         candidate=(struct glrt_cpu_candidate){.window_start=v.end-14000,.epoch=s->epoch};
         if(glrt_tracking_iq_owner_copy(&s->owner,s->epoch,candidate.window_start,s->scan_iq,14000,&v) || v.closed)
             { result=-1;break; }
-        if(scan(s)) { result=cancelled(s) ? GLRT_WORKER_CANCELLED : -1;break; }
+        if(s->prior_pending) {
+            s->prior_pending=0;
+            if(!glrt_tracking_trend_search_prior(&s->reacquire_prior,candidate.window_start,5000000,&prior)) {
+                struct glrt_cpu_coarse_peak measured;
+                if(glrt_cpu_coarse_search_local(&s->coarse,s->scan_iq,s->bank,prior.epoch,8,
+                                                &measured,cancelled,s))
+                    { result=cancelled(s) ? GLRT_WORKER_CANCELLED : -1;break; }
+                if(measured.score) {
+                    memset(s->wide_peaks,0,sizeof(s->wide_peaks));
+                    s->wide_peaks[0]=measured;s->wide_count=1;use_prior=1;
+                }
+            }
+        }
+        if(!use_prior && scan(s)) { result=cancelled(s) ? GLRT_WORKER_CANCELLED : -1;break; }
         scan_done=clock_ns(NULL);
         if(retain_scan(s)) { result=GLRT_WORKER_RETENTION;break; }
         fprintf(s->journal,"{\"kind\":\"scan\",\"attempt\":%u,\"window_start\":%" PRIu64
             ",\"epoch\":%u,\"started_ns\":%" PRIu64 ",\"completed_ns\":%" PRIu64 ",\"source\":",
             s->attempts,candidate.window_start,s->epoch,started,scan_done);view(s->journal,&v);
+        if(use_prior) fprintf(s->journal,",\"scan_mode\":\"prior_local\",\"prior_frame\":%u,"
+            "\"prior_epoch\":%u,\"prior_cfo_hz\":%.17g,\"prior_period_samples\":%.17g,"
+            "\"local_timing_radius\":8",prior.frame,prior.epoch,prior.cfo_hz,prior.period_samples);
         if(s->selected_iq) fprintf(s->journal,",\"scan_iq_offset\":%" PRIu64 ",\"scan_iq_samples\":14000",s->scan_iq_samples-14000);
         fputs(",\"peaks\":[",s->journal);
         for(unsigned n=0;n<proposal_count(s);n++) fprintf(s->journal,"%s[%u,%u,%u]",n ? "," : "",
@@ -756,7 +792,7 @@ static void *worker_thread(void *pointer)
             fputs("}\n",s->journal);
             if(ferror(s->journal) || fflush(s->journal)) { result=-1;break; }
             if(s->stop_on_activity && isolated_activity(scores,proposal_count(s))) break;
-            if(rank_fast_reject(s->rank_budget,scores[selected],s->attempts)) {
+            if(!use_prior && rank_fast_reject(s->rank_budget,scores[selected],s->attempts)) {
                 fprintf(s->journal,"{\"kind\":\"worker_terminal\",\"attempt\":%u,\"status\":%d,"
                     "\"completed_ns\":%" PRIu64 ",\"retained_past\":0,\"supported_history\":0,"
                     "\"fft_calls\":0,\"prefiltered\":1,\"source\":",s->attempts,GLRT_WORKER_HISTORY,clock_ns(NULL));
@@ -769,6 +805,7 @@ static void *worker_thread(void *pointer)
             candidate.peak.epoch=(unsigned)((int)candidate.peak.epoch+selected_shift);
             if(candidate.peak.epoch>=3333U) candidate.peak.epoch-=3333U;
         }
+        cfg.resolver_timing_radius=use_prior ? 2U : 0U;
         if(candidate.window_start>UINT64_MAX-5000000) { result=-1;break; }
         cfg.source_deadline=candidate.window_start+5000000;
         /* A fast scanner can finish before four complete repeats exist.
@@ -782,11 +819,20 @@ static void *worker_thread(void *pointer)
         if(result || cancelled(s)) break;
         rc=glrt_tracking_worker_run_cpu(&s->worker,&cfg,&candidate);
         fprintf(s->journal,"{\"kind\":\"worker_terminal\",\"attempt\":%u,\"status\":%d,\"completed_ns\":%" PRIu64
-            ",\"retained_past\":%u,\"supported_history\":%u,\"fft_calls\":%u,\"source\":",
-            s->attempts,rc,clock_ns(NULL),s->worker.retained_past,s->worker.live.core.trend.history.count,s->worker.fft_calls);
+            ",\"retained_past\":%u,\"supported_history\":%u,\"recent_supported\":%u,"
+            "\"bootstrap_failure\":%u,\"last_seen\":%u,\"last_supported\":%u,"
+            "\"resolver_timing_radius\":%u,\"fft_calls\":%u,\"source\":",
+            s->attempts,rc,clock_ns(NULL),s->worker.retained_past,s->worker.live.core.trend.history.count,
+            recent_supported(&s->worker.live.core.trend.history),s->worker.live.core.failure,
+            s->worker.live.core.trend.history.last_seen,s->worker.live.core.trend.history.last_supported,
+            s->worker.resolver_timing_radius,s->worker.fft_calls);
         view(s->journal,&s->worker.checked_source);fputs("}\n",s->journal);
         if(ferror(s->journal) || fflush(s->journal)) { result=-1;break; }
         if(rc==GLRT_WORKER_READY) { result=run_feedback(s);break; }
+        if(rc==GLRT_WORKER_HISTORY && s->prior_reacquire && !use_prior &&
+           s->worker.live.core.trend.history.count>=8) {
+            s->reacquire_prior=s->worker.live.core.trend;s->prior_pending=1;
+        }
         if(rc==GLRT_WORKER_RETENTION || rc==GLRT_WORKER_PORT || rc==GLRT_WORKER_INVALID || rc==GLRT_WORKER_SOURCE)
             { result=rc;break; }
     }
@@ -925,6 +971,8 @@ static int live_probe_run(int argc,char **argv,int visit_mode)
     s->observer_budget_ns=limits.observer_budget_ns;
     s->native_journal_bytes=limits.native_journal_bytes;
     s->forecast_horizon=limits.forecast_horizon;
+    s->prior_reacquire=argc==7 &&
+        !strcmp(argv[6],"7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16-prior8");
     s->stop_on_activity=argc==7 && (!strcmp(argv[6],"1536-selected-observer3-scan64-scout16") ||
         !strcmp(argv[6],"1536-selected-observer3-scan64-scout1"));
     NEED(!pthread_mutex_init(&s->mutex,NULL),"mutex");mutex=1;

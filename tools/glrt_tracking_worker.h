@@ -29,7 +29,7 @@ struct glrt_tracking_worker {
     struct glrt_tracking_bootstrap_trace trace;
     struct glrt_tracking_iq_view checked_source;
     uint64_t started_ns, last_ns, deadline_ns, source_checked_ns;
-    uint32_t fft_calls, retained_past, waits;
+    uint32_t fft_calls, retained_past, waits, resolver_timing_radius;
     int status;
 };
 struct glrt_tracking_worker_ports {
@@ -53,7 +53,7 @@ struct glrt_tracking_worker_config {
     void *fft_context;
     struct glrt_tracking_worker_ports ports;
     uint64_t source_deadline, wall_budget_ns; /* explicit budget, <=5 seconds */
-    uint32_t maximum_seed_age, lead_samples, bootstrap_spacing;
+    uint32_t maximum_seed_age, lead_samples, bootstrap_spacing, resolver_timing_radius;
 };
 /* Run one real GLA1 candidate in a background worker, never the IIO capture
  * thread. The caller attests event sequence, source/profile and ROM identity.

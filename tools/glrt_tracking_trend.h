@@ -11,6 +11,11 @@ struct glrt_tracking_trend {
     struct glrt_native_trend history;
     uint32_t rate;
 };
+struct glrt_tracking_search_prior {
+    uint64_t predicted_start;
+    uint32_t frame, epoch;
+    double cfo_hz, period_samples;
+};
 #define GLRT_TRACKING_FORECAST_DEFAULT 32U
 #define GLRT_TRACKING_FORECAST_COAST 96U
 int glrt_tracking_trend_reset(struct glrt_tracking_trend *, uint32_t epoch, uint32_t rate);
@@ -42,4 +47,12 @@ int glrt_tracking_trend_handoff_valid(const struct glrt_tracking_trend *,
  * Output clears on failure; input/output may alias. */
 int glrt_tracking_trend_from_coarse(const struct glrt_tracking_trend *, uint32_t native_rate,
     uint32_t first_frame, uint32_t frames, struct glrt_tracking_trend *);
+/* Project a measured coarse trend into one fresh 14,000-sample search window.
+ * This deliberately does not use the authority forecast horizon: its output
+ * can only center a new measured coarse search and full-pilot resolver. It
+ * cannot be converted to a descriptor or submitted to hardware. The caller
+ * supplies a strict maximum distance from the measured anchor. */
+int glrt_tracking_trend_search_prior(const struct glrt_tracking_trend *,
+    uint64_t window_start, uint32_t maximum_anchor_advance,
+    struct glrt_tracking_search_prior *);
 #endif

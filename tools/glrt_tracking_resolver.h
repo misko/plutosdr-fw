@@ -38,4 +38,17 @@ int glrt_tracking_resolve_2500000(
     const int16_t *observations, size_t observation_samples,
     const size_t *starts, size_t frames,
     glrt_resolver_fft fft, void *fft_context, struct glrt_resolver_result *result);
+
+/* Search-only reacquisition primitive. The caller supplies a fresh timing
+ * prediction as the center of starts and an explicit local radius. Every
+ * tested timing still averages the same four complete pilots and performs the
+ * same full-band CFO FFT as the unrestricted resolver. This function neither
+ * validates the prior nor creates a tracking handoff; subsequent measured
+ * history and live admission gates remain mandatory. */
+int glrt_tracking_resolve_2500000_local(
+    struct glrt_resolver_workspace *workspace,
+    const int16_t *reference, size_t reference_samples,
+    const int16_t *observations, size_t observation_samples,
+    const size_t *starts, size_t frames, uint32_t timing_radius,
+    glrt_resolver_fft fft, void *fft_context, struct glrt_resolver_peak *best);
 #endif

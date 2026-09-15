@@ -3,19 +3,22 @@
 #include <math.h>
 #include <string.h>
 
-int glrt_tracking_resolve_2500000(
+static int resolve(
     struct glrt_resolver_workspace *w,
     const int16_t *reference, size_t reference_samples,
     const int16_t *observations, size_t observation_samples,
     const size_t *starts, size_t frames,
-    glrt_resolver_fft fft, void *context, struct glrt_resolver_result *result)
+    int32_t first_shift, int32_t last_shift, glrt_resolver_fft fft, void *context,
+    struct glrt_resolver_result *result, struct glrt_resolver_peak *best)
 {
     struct glrt_resolver_result pending = {0};
     double reference_energy = 0;
-    size_t frame, n, hypothesis;
-    if (!result) return -1;
-    memset(result, 0, sizeof(*result));
+    size_t frame, n;
+    int32_t shift;
+    if (result) memset(result, 0, sizeof(*result));
+    if (best) memset(best, 0, sizeof(*best));
     if (!w || !reference || !observations || !starts || !fft ||
+        (!result == !best) || first_shift < -8 || last_shift > 8 || first_shift > last_shift ||
         reference_samples != GLRT_RESOLVER_SAMPLES || frames != GLRT_RESOLVER_FRAMES ||
         observation_samples < GLRT_RESOLVER_SAMPLES+16U || observation_samples > SIZE_MAX/4U)
         return -1;
@@ -28,14 +31,13 @@ int glrt_tracking_resolve_2500000(
     }
     if (reference_energy == 0) return -1;
     pending.best.power_coherence = -1;
-    for (hypothesis = 0; hypothesis < GLRT_RESOLVER_SHIFTS; hypothesis++) {
+    for (shift = first_shift; shift <= last_shift; shift++) {
         size_t peak = 0;
         double left, center, right, curvature, fraction, signed_peak;
-        struct glrt_resolver_peak *candidate = &pending.hypotheses[hypothesis];
-        candidate->shift = (int32_t)hypothesis-8;
+        struct glrt_resolver_peak candidate={.shift=shift};
         memset(w->power, 0, sizeof(w->power));
         for (frame = 0; frame < frames; frame++) {
-            size_t start = starts[frame]-8U+hypothesis;
+            size_t start = (size_t)((int64_t)starts[frame]+shift);
             double observed_energy = 0, denominator, reciprocal;
             memset(w->bins, 0, sizeof(w->bins));
             for (n = 0; n < reference_samples; n++) {
@@ -63,10 +65,40 @@ int glrt_tracking_resolve_2500000(
         fraction = curvature < 0 ? .5*(left-right)/curvature : 0;
         if (!isfinite(fraction) || fabs(fraction) > .500000001) return -1;
         signed_peak = peak < GLRT_RESOLVER_FFT/2U ? (double)peak : (double)peak-GLRT_RESOLVER_FFT;
-        candidate->cfo_hz = (signed_peak+fraction)*2500000.0/GLRT_RESOLVER_FFT;
-        candidate->power_coherence = center;
-        if (center > pending.best.power_coherence) pending.best = *candidate;
+        candidate.cfo_hz = (signed_peak+fraction)*2500000.0/GLRT_RESOLVER_FFT;
+        candidate.power_coherence = center;
+        if (result) pending.hypotheses[shift+8]=candidate;
+        if (center > pending.best.power_coherence) pending.best = candidate;
     }
-    *result = pending;
+    if (result) *result = pending;
+    else *best = pending.best;
     return 0;
+}
+
+int glrt_tracking_resolve_2500000(
+    struct glrt_resolver_workspace *w,
+    const int16_t *reference, size_t reference_samples,
+    const int16_t *observations, size_t observation_samples,
+    const size_t *starts, size_t frames,
+    glrt_resolver_fft fft, void *context, struct glrt_resolver_result *result)
+{
+    if(!result) return -1;
+    memset(result,0,sizeof(*result));
+    return resolve(w,reference,reference_samples,observations,observation_samples,
+                   starts,frames,-8,8,fft,context,result,NULL);
+}
+
+int glrt_tracking_resolve_2500000_local(
+    struct glrt_resolver_workspace *w,
+    const int16_t *reference, size_t reference_samples,
+    const int16_t *observations, size_t observation_samples,
+    const size_t *starts, size_t frames, uint32_t timing_radius,
+    glrt_resolver_fft fft, void *context, struct glrt_resolver_peak *best)
+{
+    if(!best) return -1;
+    memset(best,0,sizeof(*best));
+    if(timing_radius>8) return -1;
+    return resolve(w,reference,reference_samples,observations,observation_samples,
+                   starts,frames,-(int32_t)timing_radius,(int32_t)timing_radius,
+                   fft,context,NULL,best);
 }

@@ -205,3 +205,39 @@ int glrt_cpu_coarse_search(struct glrt_cpu_coarse_workspace *w, const int16_t *i
                            &w->completed_epochs,poll,context)) return -1;
     return glrt_cpu_coarse_select(w,poll,context);
 }
+
+int glrt_cpu_coarse_search_local(struct glrt_cpu_coarse_workspace *w,const int16_t *iq,
+    const int16_t c[12][11][11][2],uint32_t center,uint32_t radius,
+    struct glrt_cpu_coarse_peak *out,int (*poll)(void *),void *context)
+{
+    struct glrt_cpu_coarse_peak best={0};
+    uint32_t first,last,done,total=0;
+    unsigned f,e;
+    int have=0;
+    if(out) memset(out,0,sizeof(*out));
+    if(!w || !iq || !c || !out || !poll || center>=GLRT_CPU_COARSE_EPOCHS || radius>32)
+        return -1;
+    memset(w,0,sizeof(*w));
+    first=(center+GLRT_CPU_COARSE_EPOCHS-radius)%GLRT_CPU_COARSE_EPOCHS;
+    last=(center+radius)%GLRT_CPU_COARSE_EPOCHS;
+    if(first<=last) {
+        if(glrt_cpu_coarse_grid(w->grid,iq,c,first,last+1,&done,poll,context)) return -1;
+        total=done;
+    } else {
+        if(glrt_cpu_coarse_grid(w->grid,iq,c,first,GLRT_CPU_COARSE_EPOCHS,&done,poll,context)) return -1;
+        total=done;
+        if(glrt_cpu_coarse_grid(w->grid,iq,c,0,last+1,&done,poll,context)) return -1;
+        total+=done;
+    }
+    if(total!=2*radius+1 || poll(context)) return -1;
+    for(e=0;e<2*radius+1;e++) {
+        uint32_t epoch=(first+e)%GLRT_CPU_COARSE_EPOCHS;
+        for(f=0;f<11;f++) {
+            struct glrt_cpu_coarse_peak candidate={epoch,f,w->grid[f][epoch]};
+            if(candidate.score && (!have || better(&candidate,&best))) { best=candidate;have=1; }
+        }
+    }
+    if(!have) return 0;
+    w->completed_epochs=total;w->peaks[0]=best;w->count=1;*out=best;
+    return 0;
+}

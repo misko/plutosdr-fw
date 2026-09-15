@@ -85,6 +85,11 @@ def test_ranked_review_requires_full_scan_and_selects_strongest_activity():
     fresh_parent={**parent,"scope":"bounded_arm_scout_fresh_segmented_followup",
                   "activity_selection":"strongest_one_attempt_scan"}
     assert review_continuity(fresh,fresh_parent,serial=SERIAL,los=LOS)["activity_selection"]=="strongest_one_attempt_scan"
+    prior=fresh.replace("continuity30-fresh-after-scout1","continuity30-prior-after-scout1")
+    prior_parent={**parent,"scope":"bounded_arm_scout_prior_segmented_followup",
+                  "activity_selection":"strongest_one_attempt_scan_prior_reacquire"}
+    assert review_continuity(prior,prior_parent,serial=SERIAL,los=LOS)["activity_selection"]==(
+        "strongest_one_attempt_scan_prior_reacquire")
 
 
 def test_review_accepts_parent_mapping_of_arbitrary_child_failure():

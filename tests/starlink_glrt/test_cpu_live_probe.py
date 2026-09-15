@@ -92,6 +92,8 @@ int live_set_dwell(struct test_live *t,const char *blocks,uint64_t out[4])
         t->live.observer_budget_ns=limits.observer_budget_ns;
         t->live.native_journal_bytes=limits.native_journal_bytes;
         t->live.forecast_horizon=limits.forecast_horizon;
+        t->live.prior_reacquire=!strcmp(blocks,
+            "7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16-prior8");
         if(limits.rank_budget>8 && !t->live.ranking_fft) {
             t->live.ranking_fft=fftw_plan_dft_1d(limits.rank_budget==80 ? 512 : 4096,
                 t->fft,t->fft,FFTW_FORWARD,FFTW_ESTIMATE|FFTW_UNALIGNED);
@@ -194,6 +196,17 @@ int live_observer_seed_start(struct test_live *t)
 }
 int live_observer_join(struct test_live *t) { return join_observer(&t->live); }
 void live_observer_spacing(struct test_live *t,unsigned spacing) { t->live.observer_spacing=spacing; }
+void live_prior_seed(struct test_live *t,uint64_t anchor)
+{
+    struct live *s=&t->live;struct glrt_native_estimate e={0};
+    e.coherence=e.linearized_coherence=.9;
+    if(glrt_tracking_trend_reset(&s->reacquire_prior,3,2500000)) abort();
+    for(unsigned frame=0;frame<=63;frame+=9) {
+        uint64_t start=anchor+((uint64_t)frame*2500000+375)/750;
+        if(glrt_tracking_trend_observe(&s->reacquire_prior,3,frame,start,0,&e)!=1) abort();
+    }
+    s->prior_reacquire=1;s->prior_pending=1;
+}
 void live_coarse_authority(struct test_live *t,unsigned results)
 { t->live.coarse_authority=1;t->live.native_result_limit=results;t->live.native_seconds=12; }
 void live_deadline(struct test_live *t,uint64_t nanoseconds) { t->live.deadline_ns=clock_ns(NULL)+nanoseconds; }
@@ -343,6 +356,7 @@ def live_api(tmp_path_factory):
     lib.live_observer_seed_start.argtypes = [c.c_void_p]
     lib.live_observer_join.argtypes = [c.c_void_p]
     lib.live_observer_spacing.argtypes = [c.c_void_p,c.c_uint]
+    lib.live_prior_seed.argtypes = [c.c_void_p,c.c_uint64]
     lib.live_coarse_authority.argtypes = [c.c_void_p,c.c_uint]
     lib.live_rebase.argtypes = [c.c_void_p,c.c_void_p]
     lib.live_totals.argtypes = [c.c_void_p,c.c_void_p]
@@ -391,6 +405,7 @@ def live_api(tmp_path_factory):
     (b'1536-selected-observer3-scan64-scout16', [1536,6,25,12000000000]),
     (b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment', [7500,64,65,60000000000]),
     (b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16', [7500,16,65,60000000000]),
+    (b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16-prior8', [7500,16,65,60000000000]),
     (b'1536-selected-observer3-scan64-scout1', [1536,1,25,12000000000]),
     (b'1536-selected-observer3-scan80-local2', [1536,6,25,12000000000]),
 ])
@@ -400,6 +415,55 @@ def test_dwell_profiles_have_finite_capture_and_worker_limits(live_api, blocks, 
     assert lib.live_set_dwell(None, blocks, out) == 0
     assert list(out) == expected
     assert out[0]*16384/2500000 < 300
+
+
+def test_prior_guided_fresh_scan_remeasures_local_peak_and_rebuilds_handoff(
+    live_api,controller,pilot_moments,tmp_path
+):
+    lib,refs=live_api;rate=30000000
+    radio=Radio(controller,pilot_moments,tracking_rate=rate)
+    radio.origin=radio.latest=1000000*(rate//2500000);initial=time.monotonic()
+    def read(context,name,output,size):
+        latest=radio.origin+int((time.monotonic()-initial)*rate)
+        radio.advance(max(0,latest-radio.latest));return radio.read(context,name,output,size)
+    ports=Ports(None,Read(read),Write(radio.write),Retain(radio.retain),Clock(lambda _:radio.time))
+    coefficients=bank();handle=lib.live_new(refs.ctypes.data,coefficients.ctypes.data,
+                                            os.fsencode(tmp_path),c.byref(ports),rate)
+    limits=(c.c_uint64*4)()
+    assert lib.live_set_dwell(handle,b'1536-selected-observer3-scan80-local2',limits)==0
+    lib.live_select_windows(handle,os.fsencode(tmp_path),3,0)
+    # Frame 72 of this measured prior is the first synthetic pilot at 1,000,022.
+    lib.live_prior_seed(handle,760022)
+    iq=np.zeros((4_000_000,2),dtype=np.int16)
+    for frame in range(1100):
+        start=22+(frame*10000+1)//3
+        if start+3300<=len(iq):iq[start:start+3300]=refs[0,:,:2]
+    count=16384
+    assert lib.live_publish(handle,iq.ctypes.data,count)==0
+    initial=time.monotonic()-count/2500000;lib.live_start(handle)
+    try:
+        while not lib.live_done(handle):
+            elapsed=time.monotonic()-initial
+            assert elapsed<6
+            if count+16384<=len(iq) and (count+16384)/2500000<=elapsed:
+                block=np.ascontiguousarray(iq[count:count+16384])
+                assert lib.live_publish(handle,block.ctypes.data,len(block))==0
+                count+=len(block)
+            else:time.sleep(.001)
+    finally:
+        out=(c.c_uint64*5)();lib.live_finish(handle,out)
+    assert not radio.errors and c.c_int64(out[0]).value==0
+    assert list(out)[1:]==[1,1,1500,1500]
+    rows=[json.loads(s) for s in (tmp_path/'worker.jsonl').read_text().splitlines()]
+    scan=next(r for r in rows if r['kind']=='scan')
+    rank=next(r for r in rows if r['kind']=='candidate_order')
+    resolved=next(r for r in rows if r['kind']==2)
+    terminal=next(r for r in rows if r['kind']=='worker_terminal')
+    assert scan['scan_mode']=='prior_local' and scan['local_timing_radius']==8
+    assert len(scan['peaks'])==len(rank['single_pilot_power'])==1
+    assert resolved['resolver_mode']=='prior_local' and resolved['timing_radius']==2
+    assert terminal['resolver_timing_radius']==2 and terminal['fft_calls']==20
+    assert terminal['supported_history']>=8 and terminal['bootstrap_failure']==0
 
 
 @pytest.mark.parametrize('profile,expected', [
@@ -557,6 +621,7 @@ def test_observer_authority_and_retention_are_bounded_per_profile(live_api,profi
     (b'1536-selected-observer3-scan64',0),(b'1536-selected-observer3-scan64-scout16',0),
     (b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment',0),
     (b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16',0),
+    (b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16-prior8',0),
     (b'1536-selected-observer3-scan64-scout1',0),
     (b'1536-selected-observer3-scan80-local2',0),(b'unknown',-1)])
 def test_only_long_profiles_restart_after_clean_native_loss(live_api,profile,expected):

@@ -15,11 +15,15 @@ def review_continuity(text, parent, *, serial, los):
         raise ValueError("visit journal plan or terminal differs")
     plan=plans[0];count=len(los)
     policy=parent.get("activity_selection","first_qualified")
-    ranked=policy in ("strongest_complete_scan","strongest_one_attempt_scan")
-    fresh=policy=="strongest_one_attempt_scan"
-    profile=("continuity30-fresh-after-scout1" if fresh else
+    prior=policy=="strongest_one_attempt_scan_prior_reacquire"
+    ranked=policy in ("strongest_complete_scan","strongest_one_attempt_scan",
+                      "strongest_one_attempt_scan_prior_reacquire")
+    fresh=policy in ("strongest_one_attempt_scan","strongest_one_attempt_scan_prior_reacquire")
+    profile=("continuity30-prior-after-scout1" if prior else
+             "continuity30-fresh-after-scout1" if fresh else
              "continuity30-ranked-after-scout16" if ranked else "continuity30-after-scout16")
-    expected_scope=("bounded_arm_scout_fresh_segmented_followup" if fresh else
+    expected_scope=("bounded_arm_scout_prior_segmented_followup" if prior else
+                    "bounded_arm_scout_fresh_segmented_followup" if fresh else
                     "bounded_arm_scout_ranked_segmented_followup" if ranked else
                     "bounded_arm_scout_segmented_followup")
     if parent.get("scope")!=expected_scope:

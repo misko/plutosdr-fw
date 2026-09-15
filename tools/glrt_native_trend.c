@@ -267,3 +267,82 @@ int glrt_tracking_trend_from_coarse(const struct glrt_tracking_trend *coarse, ui
     *out=pending;
     return 0;
 }
+
+int glrt_tracking_trend_search_prior(const struct glrt_tracking_trend *t,
+    uint64_t window_start,uint32_t maximum_advance,struct glrt_tracking_search_prior *out)
+{
+    const struct glrt_native_trend *h;
+    struct glrt_tracking_search_prior pending={0};
+    double mx=0,my=0,mf=0,xx=0,xy=0,xf=0,dy,df,period,offset,cfo;
+    uint64_t target,start,numerator,nominal;
+    uint32_t frame;
+    unsigned i,n=0;
+    int64_t whole;
+    if(out) memset(out,0,sizeof(*out));
+    if(!t || !out || t->rate!=2500000 || !maximum_advance || maximum_advance>5000000 ||
+       window_start>UINT64_MAX-22) return -1;
+    h=&t->history;
+    if(h->valid!=1 || h->initialized!=1 || h->seen!=1 || !h->epoch ||
+       h->count<8 || h->count>GLRT_NATIVE_TREND_WINDOW || h->next>=GLRT_NATIVE_TREND_WINDOW ||
+       (h->count<GLRT_NATIVE_TREND_WINDOW && h->next!=h->count) ||
+       h->last_seen<h->last_supported || h->last_supported<h->first_frame ||
+       window_start<h->anchor || window_start-h->anchor>maximum_advance) return -1;
+    for(i=0;i<h->count;i++) {
+        const struct glrt_native_observation *o=h->observations+i;
+        if(o->frame<h->first_frame || o->frame>h->last_supported ||
+           !isfinite(o->offset_samples) || !isfinite(o->cfo_hz) ||
+           fabs(o->offset_samples)>t->rate*(5.0/3+250e-9)+1 ||
+           fabs(o->cfo_hz)+250>=t->rate/2.0) return -1;
+        mx-=(double)(h->last_supported-o->frame);my+=o->offset_samples;mf+=o->cfo_hz;n++;
+    }
+    mx/=n;my/=n;mf/=n;
+    for(i=0;i<h->count;i++) {
+        const struct glrt_native_observation *o=h->observations+i;
+        double x=-(double)(h->last_supported-o->frame)-mx;
+        xx+=x*x;xy+=x*(o->offset_samples-my);xf+=x*(o->cfo_hz-mf);
+    }
+    if(!(xx>0)) return -1;
+    dy=xy/xx;df=xf/xx;period=2500000.0/750+dy;
+    if(!isfinite(period) || period<3302 || period>3375) return -1;
+    target=window_start+22;
+    frame=h->first_frame+(uint32_t)(((target-h->anchor)*750)/2500000);
+    for(;;) {
+        double x=(double)frame-h->last_supported-mx;
+        offset=my+dy*x;cfo=mf+df*x;
+        if(!isfinite(offset) || !isfinite(cfo) || fabs(offset)>2500000.0*5/3 ||
+           fabs(cfo)+250>=1250000) return -1;
+        numerator=(uint64_t)(frame-h->first_frame)*2500000;
+        nominal=numerator/750;
+        offset=round_even((offset+(double)(numerator%750)/750)*65536)/65536;
+        whole=(int64_t)floor(offset);
+        if((whole<0 && h->anchor<(uint64_t)-whole) ||
+           (whole>=0 && h->anchor>UINT64_MAX-nominal-(uint64_t)whole)) return -1;
+        start=h->anchor+nominal;
+        start=whole<0 ? start-(uint64_t)-whole : start+(uint64_t)whole;
+        if(start>=target) break;
+        if(frame==UINT32_MAX) return -1;
+        frame++;
+    }
+    while(frame>h->first_frame) {
+        uint32_t previous=frame-1;
+        double x=(double)previous-h->last_supported-mx;
+        double prior_offset=my+dy*x;
+        uint64_t prior_numerator=(uint64_t)(previous-h->first_frame)*2500000;
+        uint64_t prior_nominal=prior_numerator/750,prior_start;
+        int64_t prior_whole;
+        if(!isfinite(prior_offset)) return -1;
+        prior_offset=round_even((prior_offset+(double)(prior_numerator%750)/750)*65536)/65536;
+        prior_whole=(int64_t)floor(prior_offset);
+        if((prior_whole<0 && h->anchor<(uint64_t)-prior_whole) ||
+           (prior_whole>=0 && h->anchor>UINT64_MAX-prior_nominal-(uint64_t)prior_whole)) return -1;
+        prior_start=h->anchor+prior_nominal;
+        prior_start=prior_whole<0 ? prior_start-(uint64_t)-prior_whole : prior_start+(uint64_t)prior_whole;
+        if(prior_start<target) break;
+        frame=previous;start=prior_start;
+        cfo=mf+df*((double)frame-h->last_supported-mx);
+    }
+    if(start<target || start-target>=3333 || frame<=h->last_seen ||
+       !isfinite(cfo) || fabs(cfo)+250>=1250000) return -1;
+    pending=(struct glrt_tracking_search_prior){start,frame,(uint32_t)(start-target),cfo,period};
+    *out=pending;return 0;
+}

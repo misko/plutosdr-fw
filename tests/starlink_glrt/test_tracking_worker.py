@@ -43,6 +43,18 @@ int worker_test_cpu(struct glrt_tracking_worker *w, struct glrt_tracking_iq_owne
     assert(w->software_candidate==1 && !memcmp(&w->seed,&empty,sizeof(empty)));
     return rc;
 }
+int worker_test_cpu_local(struct glrt_tracking_worker *w, struct glrt_tracking_iq_owner *owner,
+    const struct glrt_cpu_candidate *candidate,const int16_t *refs,glrt_resolver_fft fft,
+    uint64_t (*clock)(void *),int (*cancel)(void *),int (*wait)(void *),
+    int (*retain)(void *,enum glrt_tracking_worker_record,const struct glrt_tracking_worker *),
+    void *context,uint64_t deadline,uint64_t budget,uint32_t lead)
+{
+    struct glrt_tracking_worker_config config={.owner=owner,.references=refs,.fft=fft,
+        .fft_context=context,.ports={context,clock,cancel,wait,retain},
+        .source_deadline=deadline,.wall_budget_ns=budget,.maximum_seed_age=2500000,.lead_samples=lead,
+        .resolver_timing_radius=2};
+    return glrt_tracking_worker_run_cpu(w,&config,candidate);
+}
 void worker_summary(const struct glrt_tracking_worker *w,uint64_t out[16])
 {
     out[0]=w->software_candidate ? w->cpu_seed.first : w->seed.first;
@@ -82,6 +94,7 @@ def worker(tmp_path_factory, request):
     lib.worker_test.argtypes = [c.c_void_p, c.c_void_p, c.c_void_p, c.c_void_p, t.FFT_PORT,
                                CLOCK, ACTION, ACTION, RETAIN, c.c_void_p, c.c_uint64, c.c_uint64, c.c_uint32]
     lib.worker_test_cpu.argtypes = lib.worker_test.argtypes
+    lib.worker_test_cpu_local.argtypes = lib.worker_test.argtypes
     lib.software = request.param == "cpu"
     lib.worker_summary.argtypes = [c.c_void_p, c.c_void_p]
     lib.worker_status.argtypes = [c.c_void_p]
@@ -190,7 +203,8 @@ def run(worker, mode):
             len(block), first+len(block)+lag, state['now']) == 0
         if mode == "cancelled": state['cancelled'] = True
         if mode == "source_deadline": deadline = first+state['end']+1000
-        invoke = lib.worker_test_cpu if lib.software else lib.worker_test
+        invoke = lib.worker_test_cpu_local if lib.software and mode == 'prior' else (
+            lib.worker_test_cpu if lib.software else lib.worker_test)
         rc = invoke(work, owner, c.byref(words), refs.ctypes.data, fft, clock, cancel, wait, retain,
                              None, deadline, budget, 0 if mode == "bad_lead" else 2500)
         final = summary(lib, work)
@@ -212,6 +226,15 @@ def test_owned_seed_resolves_builds_real_history_and_retains_future_proposal(wor
                         (18 if mode == "wait_resume" else 8))
     assert final[5] == (1 if mode == "wait_resume" else 0)
     assert final[6] == final[4] and final[7:10] == [1, 0, 1] and final[12] == t.RATE
+
+
+def test_prior_local_worker_preserves_history_and_handoff_gates_with_fewer_ffts(worker):
+    if not worker[0].software: pytest.skip("local prior is a CPU proposal path")
+    rc,final,state=run(worker,"prior")
+    assert rc==1 and final[3]==state['calls']==20
+    assert final[4]>=8 and final[6]==final[4] and final[7:10]==[1,0,1]
+    assert [kind for kind,_ in state['retained']][:2]==[1,2]
+    assert [kind for kind,_ in state['retained']][-1]==4
 
 
 def test_one_stale_retained_proposal_refreshes_from_the_same_causal_history(worker):

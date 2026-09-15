@@ -26,13 +26,19 @@ def resolver(tmp_path_factory):
     path = tmp_path_factory.mktemp("resolver")/"resolver.so"
     subprocess.run(["cc", "-std=c99", "-O2", "-Wall", "-Wextra", "-Werror", "-shared", "-fPIC",
                     str(root/"tools/glrt_tracking_resolver.c"), "-lm", "-o", str(path)], check=True)
-    fn = c.CDLL(str(path)).glrt_tracking_resolve_2500000
+    library = c.CDLL(str(path))
+    fn = library.glrt_tracking_resolve_2500000
     fn.argtypes = [c.c_void_p, c.c_void_p, c.c_size_t, c.c_void_p, c.c_size_t,
                    c.c_void_p, c.c_size_t, FFT_PORT, c.c_void_p, c.POINTER(Result)]
-    return fn
+    local = library.glrt_tracking_resolve_2500000_local
+    local.argtypes = [c.c_void_p, c.c_void_p, c.c_size_t, c.c_void_p, c.c_size_t,
+                      c.c_void_p, c.c_size_t, c.c_uint32, FFT_PORT, c.c_void_p,
+                      c.POINTER(Peak)]
+    return fn, local
 
 
 def call(resolver, reference, iq, starts, *, damage=None):
+    resolver = resolver[0]
     workspace = (c.c_double*(FFT*3))()
     starts = np.asarray(starts, dtype=np.uintp)
     result = Result()
@@ -126,3 +132,48 @@ def test_invalid_or_failed_resolver_clears_estimate_and_checks_bounds_before_fft
     assert rc == -1 and bytes(result) == bytes(Result())
     assert len(calls) == (3 if damage == "fft_fail" else 1 if damage in
                          ("fft_nan", "fft_inf", "fft_square_overflow") else 0)
+
+
+def test_local_prior_search_keeps_full_pilot_and_cfo_evidence(resolver):
+    full, local = resolver
+    rng = np.random.default_rng(2300417)
+    reference = rng.integers(-1200, 1201, (N, 2), dtype=np.int16)
+    iq = rng.integers(-300, 301, (13400, 2), dtype=np.int16)
+    starts = np.asarray([8, 3341, 6675, 10008], dtype=np.uintp)
+    ref = reference[:, 0]+1j*reference[:, 1]
+    for start in starts:
+        signal = 5*ref*np.exp(2j*np.pi*417321*np.arange(N)/2500000)
+        iq[start+2:start+2+N] = np.rint(np.column_stack((signal.real, signal.imag)))
+    _, unrestricted, unrestricted_calls = call((full, local), reference, iq, starts)
+    workspace = (c.c_double*(FFT*3))(); best = Peak(); calls = []
+
+    @FFT_PORT
+    def fft(context, data, count):
+        calls.append(count)
+        values = np.ctypeslib.as_array(data, shape=(count*2,)).view(np.complex128)
+        values[:] = np.fft.fft(values)
+        return 0
+
+    rc = local(workspace, reference.ctypes.data, len(reference), iq.ctypes.data, len(iq),
+               starts.ctypes.data, len(starts), 2, fft, None, c.byref(best))
+    assert rc == 0 and unrestricted_calls == [FFT]*68 and calls == [FFT]*20
+    assert (best.shift, best.cfo, best.coherence) == pytest.approx(
+        (unrestricted.best.shift, unrestricted.best.cfo, unrestricted.best.coherence),
+        rel=2e-12, abs=2e-8)
+
+
+@pytest.mark.parametrize("radius", [9, 2**32-1])
+def test_local_prior_search_rejects_unbounded_radius_before_fft(resolver, radius):
+    _, local = resolver
+    reference = np.ones((N, 2), dtype=np.int16)
+    iq = np.ones((13400, 2), dtype=np.int16)
+    starts = np.asarray([8, 3341, 6675, 10008], dtype=np.uintp)
+    workspace = (c.c_double*(FFT*3))(); best = Peak(7, 1, 1); calls=[]
+
+    @FFT_PORT
+    def fft(context, data, count):
+        calls.append(count); return 0
+
+    assert local(workspace, reference.ctypes.data, len(reference), iq.ctypes.data, len(iq),
+                 starts.ctypes.data, len(starts), radius, fft, None, c.byref(best)) == -1
+    assert bytes(best) == bytes(Peak()) and calls == []

@@ -50,13 +50,10 @@ int glrt_cpu_seed_copy(struct glrt_tracking_iq_owner *owner,const struct glrt_cp
     return 0;
 }
 
-int glrt_cpu_seed_resolve(const struct glrt_cpu_seed *p,struct glrt_resolver_workspace *workspace,
-    const int16_t *reference,const int16_t *iq,glrt_resolver_fft fft,void *context,
-    uint64_t deadline,struct glrt_resolver_result *out,struct glrt_tracking_bootstrap_live *live)
+static int resolve_ready(const struct glrt_cpu_seed *p,uint64_t deadline,
+    struct glrt_resolver_result *out,struct glrt_tracking_bootstrap_live *live)
 {
     struct glrt_cpu_seed expected;
-    uint64_t origin;
-    int64_t shift;
     unsigned n;
     if(out) memset(out,0,sizeof(*out));
     if(live) memset(live,0,sizeof(*live));
@@ -70,9 +67,14 @@ int glrt_cpu_seed_resolve(const struct glrt_cpu_seed *p,struct glrt_resolver_wor
        p->copied.source_now-p->candidate.window_start>p->maximum_age ||
        deadline<=p->copied.source_now) return -1;
     for(n=0;n<4;n++) if(p->starts[n]!=expected.starts[n]) return -1;
-    if(glrt_tracking_resolve_2500000(workspace,reference,3300,iq,GLRT_CPU_SEED_SAMPLES,
-                                    p->starts,4,fft,context,out)) return -1;
-    origin=p->start;shift=out->best.shift;
+    return 0;
+}
+
+static int initialize(const struct glrt_cpu_seed *p,uint64_t deadline,
+    struct glrt_resolver_result *out,struct glrt_tracking_bootstrap_live *live)
+{
+    uint64_t origin=p->start;
+    int64_t shift=out->best.shift;
     if((shift<0 && origin<(uint64_t)-shift) || (shift>=0 && origin>UINT64_MAX-(uint64_t)shift)) goto bad;
     origin=shift<0 ? origin-(uint64_t)-shift : origin+(uint64_t)shift;
     if(glrt_tracking_bootstrap_live_init(live,p->candidate.epoch,origin,p->fraction,
@@ -80,4 +82,26 @@ int glrt_cpu_seed_resolve(const struct glrt_cpu_seed *p,struct glrt_resolver_wor
     return 0;
 bad:
     memset(out,0,sizeof(*out));memset(live,0,sizeof(*live));return -1;
+}
+
+int glrt_cpu_seed_resolve(const struct glrt_cpu_seed *p,struct glrt_resolver_workspace *workspace,
+    const int16_t *reference,const int16_t *iq,glrt_resolver_fft fft,void *context,
+    uint64_t deadline,struct glrt_resolver_result *out,struct glrt_tracking_bootstrap_live *live)
+{
+    if(resolve_ready(p,deadline,out,live)) return -1;
+    if(glrt_tracking_resolve_2500000(workspace,reference,3300,iq,GLRT_CPU_SEED_SAMPLES,
+                                    p->starts,4,fft,context,out)) return -1;
+    return initialize(p,deadline,out,live);
+}
+
+int glrt_cpu_seed_resolve_local(const struct glrt_cpu_seed *p,struct glrt_resolver_workspace *workspace,
+    const int16_t *reference,const int16_t *iq,uint32_t radius,glrt_resolver_fft fft,void *context,
+    uint64_t deadline,struct glrt_resolver_result *out,struct glrt_tracking_bootstrap_live *live)
+{
+    struct glrt_resolver_peak best;
+    if(resolve_ready(p,deadline,out,live) || !radius || radius>8) return -1;
+    if(glrt_tracking_resolve_2500000_local(workspace,reference,3300,iq,GLRT_CPU_SEED_SAMPLES,
+                                          p->starts,4,radius,fft,context,&best)) return -1;
+    out->best=best;
+    return initialize(p,deadline,out,live);
 }

@@ -38,4 +38,11 @@ int glrt_cpu_coarse_select(struct glrt_cpu_coarse_workspace *, int (*poll)(void 
 int glrt_cpu_coarse_select_bounded(const struct glrt_cpu_coarse_workspace *,
     struct glrt_cpu_coarse_peak *, unsigned budget, uint32_t *count,
     int (*poll)(void *), void *context);
+/* Search fresh IQ only inside a bounded circular timing neighborhood supplied
+ * by a non-authoritative prior. All eleven coarse frequency rows are measured
+ * and the winning score is an actual grid value. This publishes one search
+ * proposal, never a detection or tracking decision. */
+int glrt_cpu_coarse_search_local(struct glrt_cpu_coarse_workspace *, const int16_t *,
+    const int16_t [12][11][11][2], uint32_t center_epoch, uint32_t timing_radius,
+    struct glrt_cpu_coarse_peak *, int (*poll)(void *), void *context);
 #endif

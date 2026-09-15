@@ -78,7 +78,7 @@ static int run(struct glrt_tracking_worker *w,
         !cfg->ports.cancelled || !cfg->ports.wait || !cfg->ports.retain ||
         !cfg->wall_budget_ns || cfg->wall_budget_ns>UINT64_C(5000000000) ||
         !cfg->source_deadline || !cfg->lead_samples ||
-        !cfg->maximum_seed_age || cfg->maximum_seed_age>2500000U)
+        !cfg->maximum_seed_age || cfg->maximum_seed_age>2500000U || cfg->resolver_timing_radius>8)
         return stop(w,GLRT_WORKER_INVALID);
     w->started_ns=w->last_ns=cfg->ports.clock_ns(cfg->ports.context);
     if(!w->started_ns || cfg->wall_budget_ns>UINT64_MAX-w->started_ns)
@@ -99,8 +99,12 @@ static int run(struct glrt_tracking_worker *w,
         w->reference[2*n]=cfg->references[4*n];w->reference[2*n+1]=cfg->references[4*n+1];
     }
     if(software) {
-        rc=glrt_cpu_seed_resolve(&w->cpu_seed,&w->fft_workspace,w->reference,w->seed_iq,
-            guarded_fft,&execution,cfg->source_deadline,&w->resolved,&w->live);
+        w->resolver_timing_radius=cfg->resolver_timing_radius;
+        rc=cfg->resolver_timing_radius ?
+            glrt_cpu_seed_resolve_local(&w->cpu_seed,&w->fft_workspace,w->reference,w->seed_iq,
+                cfg->resolver_timing_radius,guarded_fft,&execution,cfg->source_deadline,&w->resolved,&w->live) :
+            glrt_cpu_seed_resolve(&w->cpu_seed,&w->fft_workspace,w->reference,w->seed_iq,
+                guarded_fft,&execution,cfg->source_deadline,&w->resolved,&w->live);
         if(!rc) rc=GLRT_SEED_READY;
     } else rc=glrt_tracking_seed_resolve(&w->seed,&w->fft_workspace,w->reference,w->seed_iq,
         guarded_fft,&execution,cfg->source_deadline,&w->resolved,&w->live);
