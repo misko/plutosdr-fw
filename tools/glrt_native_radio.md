@@ -433,6 +433,17 @@ disposition after the final joined episode instead of becoming a generic child
 failure. The host retrieves the raw evidence archive before decoding the parent
 status, so even a new or invalid disposition leaves reviewable diagnostics.
 
+Native and coarse histories advance as independent causal authorities. Each
+new valid coarse generation is retained when it advances the previous coarse
+generation, even if its final supported frame is slightly behind the latest
+native result. Descriptor scheduling still prefers the native predictor. If
+stride-ten sampling leaves fewer than eight supported native points in its
+96-frame fit window, the retained denser coarse predictor can therefore cover
+the next unowned frame instead of ending the episode at that cadence alias.
+The independent journal reviewer applies the same per-source monotonic rule and
+keeps the 32-frame descriptor horizon bound over the newest support from either
+source.
+
 All scouts share a 60-second controller deadline. The follow-up has its own
 320-second deadline, and the complete radio-local process has a 400-second
 alarm. With four LOs its finite source-IQ bound is 837,943,296 samples. This

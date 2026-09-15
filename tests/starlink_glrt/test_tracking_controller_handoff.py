@@ -192,6 +192,49 @@ def test_drained_coarse_authority_renews_only_future_tracking_work(
         review(stripped,epoch=3,rate=2500000)
 
 
+def test_coarse_source_can_advance_behind_newer_native_support(
+        handoff_api,pilot_moments):
+    rate,first=30000000,600
+    radio,history,_=prepare(
+        handoff_api,pilot_moments,rate,first=first,frames=20,initialize=False)
+    rc,batch,_=trend.predict(handoff_api,history,first,1)
+    assert rc==0
+    radio.seed=batch.prediction
+    radio.origin=radio.latest=batch.prediction.start-rate//200
+    assert handoff_api.glrt_tracking_controller_init_handoff_strided(
+        radio.state,c.byref(radio.ports),c.byref(batch),c.byref(history),first,20,10,5)==0
+
+    # The first observer generation advances the initial history to 599.
+    observer_599=extend_from_prediction(handoff_api,history,batch,first,599)
+    assert radio.tick()==1
+    assert handoff_api.glrt_tracking_controller_refresh_handoff(
+        radio.state,c.byref(observer_599))==0
+
+    # Accept native frames 600 and 610, then advance the observer to 608.
+    # Its last ordinal trails native support, but it advances the independent
+    # coarse source and is valid for the next unowned frame.
+    while len([1 for kind,name,_ in radio.events if (kind,name)==('retain','estimate')])<2:
+        assert radio.tick()==1
+        radio.advance(rate//1000)
+    while len(radio.descriptors)<3:
+        assert radio.tick()==1
+        radio.advance(rate//1000)
+    observer_608=extend_from_prediction(handoff_api,observer_599,batch,first,608)
+    rc=handoff_api.glrt_tracking_controller_refresh_handoff(
+        radio.state,c.byref(observer_608))
+    assert rc==0, (len(radio.descriptors),
+                   [raw.split()[2] for kind,name,raw in radio.events
+                    if (kind,name)==('retain','estimate')],
+                   observer_608.history.last_seen,observer_608.history.last_supported)
+
+    assert radio.run()==0
+    result=review(journal(radio),epoch=3,rate=rate)
+    assert result['supported']==20
+    authorities=[raw for kind,name,raw in radio.events
+                 if (kind,name)==('retain','tracking_authority')]
+    assert len(authorities)==2
+
+
 def test_refresh_refuses_owned_work_and_retention_failure_stops_safely(
         handoff_api,pilot_moments):
     first=600

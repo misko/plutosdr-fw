@@ -79,7 +79,8 @@ def _descriptors(entries: list[JournalRecord], *, epoch: int, codec: JournalCode
     owners = {}
     next_frame, frame_limit = 0, 225000
     history = None
-    last_authorized = None
+    last_native_authorized = None
+    last_coarse_authorized = None
     pending_frame = None
     cadence = None
     head_sequence = 0
@@ -102,17 +103,18 @@ def _descriptors(entries: list[JournalRecord], *, epoch: int, codec: JournalCode
             next_frame, frame_limit = history.first, history.limit
             if cadence is not None and cadence[2:] != (next_frame, frame_limit):
                 raise ValueError("tracking cadence differs from handoff bounds")
-            last_authorized = history.last_supported
+            last_native_authorized = history.last_supported
+            last_coarse_authorized = history.last_supported
         elif record.kind == "tracking_authority":
             if history is None or codec.handoff is None:
                 raise ValueError("tracking authority lacks an initial handoff")
             refreshed = codec.handoff(record.payload, epoch=epoch)
             if refreshed.first != next_frame or refreshed.limit != frame_limit:
                 raise ValueError("tracking authority crosses owned frame bounds")
-            if refreshed.last_supported <= last_authorized:
+            if refreshed.last_supported <= last_coarse_authorized:
                 raise ValueError("tracking authority does not advance causal support")
             history = refreshed
-            last_authorized = refreshed.last_supported
+            last_coarse_authorized = refreshed.last_supported
         elif record.kind not in {"bootstrap_seed", "snapshot", "tracking_cadence"}:
             started = True
         if record.kind == "head" and history is not None:
@@ -130,7 +132,8 @@ def _descriptors(entries: list[JournalRecord], *, epoch: int, codec: JournalCode
             frame, sequence = pending_frame
             if tuple(map(int,fields[:3]))!=(epoch,sequence,frame):
                 raise ValueError("tracking estimate frame differs from head")
-            if int(fields[8])==0: last_authorized=max(last_authorized,frame)
+            if int(fields[8])==0:
+                last_native_authorized=max(last_native_authorized,frame)
             pending_frame=None
         if record.kind != "descriptor":
             continue
@@ -142,6 +145,8 @@ def _descriptors(entries: list[JournalRecord], *, epoch: int, codec: JournalCode
         if (b.epoch != epoch or b.tag in owners or first != next_frame or
                 first+b.repeats > frame_limit or (cadence is not None and b.repeats != 1)):
             raise ValueError("retained descriptor ownership is inconsistent")
+        last_authorized = (max(last_native_authorized,last_coarse_authorized)
+                           if history is not None else None)
         if history is not None and first+b.repeats-1-last_authorized > 32:
             raise ValueError("descriptor exceeds retained tracking authority")
         owners[b.tag] = first, b

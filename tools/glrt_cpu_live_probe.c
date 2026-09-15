@@ -494,9 +494,11 @@ static int refresh_native_authority(struct live *s)
     coarse=s->observer_authority;generation=s->authority_generation;
     if(pthread_mutex_unlock(&s->authority_mutex)) return GLRT_NATIVE_IO_ERROR;
     if(!generation || generation==s->authority_applied) return 0;
-    last=s->controller.trend.history.last_supported;
-    if(s->controller.authority_valid && s->controller.authority.history.last_supported>last)
-        last=s->controller.authority.history.last_supported;
+    /* Native and observer histories advance independently. A newer native
+     * ordinal can still be too sparse to fit, so compare a new observer
+     * generation only with the previously retained observer authority. */
+    last=s->controller.authority_valid ? s->controller.authority.history.last_supported :
+        s->controller.trend.history.last_supported;
     if(coarse.history.last_supported<=last) { s->authority_applied=generation;return 0; }
     first=s->controller.next_frame;remaining=s->controller.frames-first;
     /* The observer may temporarily be ahead of the descriptor frontier. Wait

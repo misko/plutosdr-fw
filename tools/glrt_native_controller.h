@@ -85,7 +85,9 @@ int glrt_tracking_controller_init_handoff_strided(struct glrt_native_controller 
  * exactly the next unowned frame. The refresh is persisted before it can affect
  * another descriptor and cannot rewrite work already owned by FPGA. Native
  * result history remains separate, so already submitted results still update
- * in their original order. */
+ * in their original order. Each source advances monotonically; a dense coarse
+ * history may remain usable when a slightly newer native history is too sparse
+ * to predict, while a valid native predictor retains scheduling priority. */
 int glrt_tracking_controller_refresh_handoff(struct glrt_native_controller *,
     const struct glrt_tracking_trend *);
 /* Explicit startup mode: a 17..64-repeat externally validated prediction is

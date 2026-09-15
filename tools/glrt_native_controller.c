@@ -211,13 +211,23 @@ int glrt_tracking_controller_refresh_handoff(struct glrt_native_controller *c,
     const struct glrt_tracking_trend *history)
 {
     struct glrt_tracking_trend retained;
+    uint32_t previous;
     int rc;
     if(!c || !history || !c->tracking || !c->started || c->stopping || c->done ||
        c->handoff_pending || c->next_frame>=c->frames ||
-       history->rate!=c->trend.rate || history->history.epoch!=c->trend.history.epoch ||
-       history->history.last_supported<=last_authorized_support(c) ||
-       c->next_frame-history->history.last_supported>32 ||
-       !glrt_tracking_trend_handoff_valid(history,c->next_frame,c->frames-c->next_frame)) return -1;
+       history->rate!=c->trend.rate || history->history.epoch!=c->trend.history.epoch)
+        return -1;
+    previous=c->authority_valid ? c->authority.history.last_supported :
+        c->trend.history.last_supported;
+    /* Advance this independent authority monotonically. It may trail a newer
+     * native point: sparse native cadence can have the greatest frame ordinal
+     * while lacking the eight recent observations needed to predict. Keep the
+     * native predictor preferred, but retain a valid denser coarse history for
+     * the exact next unowned frame when native prediction is underdetermined. */
+    if(history->history.last_supported<=previous ||
+       !glrt_tracking_trend_handoff_valid(history,c->next_frame,c->frames-c->next_frame) ||
+       c->next_frame-history->history.last_supported>32)
+        return -1;
     retained=*history;
     rc=retain_history(c,"tracking_authority",&retained);
     if(rc) { stop(c,rc);return rc; }
