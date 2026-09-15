@@ -2,7 +2,7 @@
 
 Status on 2026-09-15: the conservative candidate is deployed on `.14`; warm
 boot, a subsequent update, rollback/reinstallation, receive sampling and live
-oversize refusal passed. Physical power-cycle acceptance is awaiting the operator.
+oversize refusal passed. Physical power-cycle acceptance passed on 2026-09-15.
 This report does not grant extended production access.
 
 ## Implemented corrections
@@ -74,8 +74,24 @@ distinguish this corrected candidate from the earlier RAM-test artifact.
   erase span/FIT and verified environment. A fresh independent SD capture of
   this persistent state remains separate work.
 
-Power-off cold-boot acceptance has not yet been performed for this persistent
-candidate. The prior GLRT recovery cold boot is separate evidence.
+Power-off cold-boot acceptance passed at 14:12 UTC on 2026-09-15. The user
+confirmed removing all power, leaving SD removed and normal QSPI selection,
+waiting ten seconds and restoring power. The original 30-minute UART listener
+had expired, so this acceptance resumed at the running login prompt; an initial
+boot transcript is not claimed.
+
+UART identified the bound Winbond target and read reset cause `0x00400000`
+(power-on) and boot selection `0x00000001` (QSPI). The boot ID differed from the
+final warm-return record. The exact candidate FIT and complete reviewed writer
+footprint matched. Boot/NVM bytes and active environment settings matched the
+saved baseline with only the intended `fit_size` change. IIOD and network IIO
+context discovery passed, with buffers disabled and TX muted.
+
+The complete 32 MiB Linux readback again matched the expected candidate image
+hash `a5fb0a8432d4960d365f57ddd39ac3095314448e2003746a3f464b3976da468c`.
+The private `cold-return.json` receipt SHA-256 is `413494bc03cc793f428f8b0f0087f5469e1fd5c64826291520e230dcea56f458`.
+This completes the conservative deployment's cold-return milestone. It does not
+replace independent SD or installed-bootloader extended-path qualification.
 
 ## Verification and limits
 

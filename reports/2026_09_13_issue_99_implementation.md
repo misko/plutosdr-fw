@@ -2,7 +2,8 @@
 
 Status updated 2026-09-15: **conservative candidate deployed on `.14`; update,
 subsequent update, warm boot, rollback/reinstallation and live oversize refusal
-verified. Cold boot and extended-range qualification remain pending.**
+verified, including QSPI power-on cold return. Extended-range qualification remains
+pending.**
 
 See [the deployment evidence](2026_09_15_issue_99_deployment.md) for the corrected
 updater and current artifact hashes, and [the current plan](2026_09_15_issue_99_plan.md)
