@@ -15,6 +15,7 @@ import uuid
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import qualify_glrt_cpu_live20 as live
+from tools.review_glrt_cpu_continuity import review_continuity
 
 RATE = 30_000_000
 SERIAL = "1040005e0b100007100010000bf33a5d4d"
@@ -257,6 +258,10 @@ def main():
             (args.output / "evidence.tar").write_bytes(archive.stdout)
             parent = decode_parent(result.stdout, RATE, len(los), result.returncode,args.profile);receipt["parent"] = parent
             receipt["retained_files"] = extract_evidence(archive.stdout, args.output / "retained", parent, len(los))
+            if args.profile == CONTINUITY30_PROFILE:
+                receipt["continuity_review"] = review_continuity(
+                    (args.output / "retained/evidence/visits.txt").read_text(), parent,
+                    serial=SERIAL, los=los)
             receipt["status"] = "track_complete_review_pending" if parent["track_complete"] else "review_pending"
         finally:
             if mounted:
