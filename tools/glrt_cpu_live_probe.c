@@ -902,7 +902,7 @@ static int live_probe_run(int argc,char **argv,int visit_mode)
         NEED(wide(capture.words+4)==CHUNK*limits.blocks && wide(capture.words+6)==CHUNK*limits.blocks && !(capture.words[19]&3),"finite_source_complete");
         finite_source_complete=1;
     }
-    visit_loss=visit_mode && live_visit_clean_loss(s,worker_complete);
+    visit_loss=live_visit_clean_loss(s,worker_complete);
     rc=worker_complete && s->result && !visit_loss ? 1 : 0;
 done:
     if(s && s->started) {

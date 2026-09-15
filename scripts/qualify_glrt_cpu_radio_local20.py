@@ -24,7 +24,7 @@ SCOUT_SAMPLES = 1536 * 16384
 FOLLOWUP_SAMPLES = 45000 * 16384
 MAX_ARCHIVE_BYTES = 320 * 1024 * 1024
 EXPECTED = {
-    "probe": "3c8ce18fc343649a67c7e5f67471ec7f36d49751169a425f32e730d3b0b28905",
+    "probe": "c5d4528708e1ad4fdc7c2c7cc9712ec145a77d8289c264374908a6e7c6d756de",
     "bank": "d9f3452e45180c560a200bb76c9bfe2d7c46b17560fd46495ea74c50f50547f0",
     "references": "78b50e1aea5c350889b0798fc691491299925932e496a918cd5fbd3b9bc4faf2",
 }
@@ -215,9 +215,9 @@ def main():
                        remote + "/evidence", *map(str, los), PROFILE]
             result = run(shlex.join(command), timeout=430)
             (args.output / "stdout.json").write_bytes(result.stdout);(args.output / "stderr.txt").write_bytes(result.stderr)
-            parent = decode_parent(result.stdout, RATE, len(los), result.returncode);receipt["parent"] = parent
             archive = run("tar -C " + shlex.quote(remote) + " -cf - evidence", timeout=90);archive.check_returncode()
             (args.output / "evidence.tar").write_bytes(archive.stdout)
+            parent = decode_parent(result.stdout, RATE, len(los), result.returncode);receipt["parent"] = parent
             receipt["retained_files"] = extract_evidence(archive.stdout, args.output / "retained", parent, len(los))
             receipt["status"] = "track_complete_review_pending" if parent["track_complete"] else "review_pending"
         finally:

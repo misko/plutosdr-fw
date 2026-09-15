@@ -428,6 +428,10 @@ ten seconds of 30-MS/s source time at stride ten and the established sustainable
 clean-loss reacquisition path (at most three restarts); the short frequency
 scouts remain single-visit children. No-signal, exhausted clean-loss,
 retention, deadline and child failures remain separate terminal results.
+An exhausted reacquisition sequence retains the same explicit clean-loss
+disposition after the final joined episode instead of becoming a generic child
+failure. The host retrieves the raw evidence archive before decoding the parent
+status, so even a new or invalid disposition leaves reviewable diagnostics.
 
 All scouts share a 60-second controller deadline. The follow-up has its own
 320-second deadline, and the complete radio-local process has a 400-second
