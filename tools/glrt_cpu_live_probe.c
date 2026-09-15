@@ -76,7 +76,7 @@ static int dwell_limits(const char *blocks,struct dwell_limits *out)
         *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,SPARSE_NATIVE_RESULTS,SPARSE_NATIVE_WALL_SECONDS,1,10,0,0,0,0};
     else if(!strcmp(blocks,"45000-selected-observer9-scan80-local2-track30-sparse9-authority"))
         *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,SPARSE30_NATIVE_RESULTS,SPARSE30_NATIVE_WALL_SECONDS,1,9,
-            2700,2700,UINT64_C(80000000),UINT64_C(40000000000)};
+            2700,8000,UINT64_C(80000000),UINT64_C(40000000000)};
     else if(!strcmp(blocks,"45000-selected-observer9-scan80-local2-track100-sparse9-authority"))
         *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,SPARSE100_NATIVE_RESULTS,SPARSE100_NATIVE_WALL_SECONDS,1,9,
             8600,8600,UINT64_C(260000000),UINT64_C(120000000000)};

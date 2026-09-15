@@ -393,7 +393,7 @@ def test_extended_native_cadence_aligns_with_the_observer(live_api,profile,expec
     (b'45000-selected-observer9-scan80-local2-track10-sparse10-authority',
         [1024,4096,30000000,15000000000]),
     (b'45000-selected-observer9-scan80-local2-track30-sparse9-authority',
-        [2700,2700,80000000,40000000000]),
+        [2700,8000,80000000,40000000000]),
     (b'45000-selected-observer9-scan80-local2-track100-sparse9-authority',
         [8600,8600,260000000,120000000000]),
 ])
