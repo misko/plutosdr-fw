@@ -25,13 +25,16 @@
 #define FRESH_CONTINUITY30_PLAN "continuity30-fresh-after-scout1"
 #define PRIOR_CONTINUITY30_PLAN "continuity30-prior-after-scout1"
 #define WAIT_PRIOR_CONTINUITY30_PLAN "continuity30-prior-wait12-after-scout1"
+#define WAIT100_PLAN "sparse100-wait12-after-scout1"
 #define CONTINUITY_ROUNDS 3U
 #define WAIT_CONTINUITY_ROUNDS 12U
 #define WAIT_CONTINUITY_SEGMENTS 3U
 #define DEFAULT_PLAN_NS UINT64_C(400000000000)
 #define WAIT_PLAN_NS UINT64_C(900000000000)
+#define WAIT100_PLAN_NS UINT64_C(1200000000000)
 #define SCOUT_RF_SAMPLES 25165824U
 #define SEGMENT_RF_SAMPLES 122880000U
+#define FOLLOWUP_RF_SAMPLES 737280000U
 #define SCOUT_ACTIVITY_HITS 1U
 
 struct visit_context {
@@ -48,7 +51,9 @@ struct visit_context {
     int fresh_continuity;
     int prior_continuity;
     int wait_continuity;
+    int wait100;
     unsigned continuity_rounds,continuity_segments;
+    unsigned segment_rf_samples;
     uint64_t plan_ns;
     int activity_selected;
     unsigned activity_number;
@@ -77,28 +82,35 @@ static int visit_arguments(int argc,char **argv,struct visit_context *v,uint64_t
               !strcmp(argv[argc-1],RANKED_CONTINUITY30_PLAN) ||
               !strcmp(argv[argc-1],FRESH_CONTINUITY30_PLAN) ||
               !strcmp(argv[argc-1],PRIOR_CONTINUITY30_PLAN) ||
-              !strcmp(argv[argc-1],WAIT_PRIOR_CONTINUITY30_PLAN)) {
+              !strcmp(argv[argc-1],WAIT_PRIOR_CONTINUITY30_PLAN) ||
+              !strcmp(argv[argc-1],WAIT100_PLAN)) {
         v->profile=SCOUT_PROFILE;v->followup_sparse=1;v->followup_plan=argv[argc-1];
         v->continuity=!strcmp(v->followup_plan,CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,RANKED_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,FRESH_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN) ||
-            !strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN);
+            !strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN) ||
+            !strcmp(v->followup_plan,WAIT100_PLAN);
         v->ranked_continuity=!strcmp(v->followup_plan,RANKED_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,FRESH_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN) ||
-            !strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN);
+            !strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN) ||
+            !strcmp(v->followup_plan,WAIT100_PLAN);
         v->fresh_continuity=!strcmp(v->followup_plan,FRESH_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN) ||
-            !strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN);
+            !strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN) ||
+            !strcmp(v->followup_plan,WAIT100_PLAN);
         v->prior_continuity=!strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN);
         v->wait_continuity=!strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN);
-        v->continuity_rounds=v->wait_continuity ? WAIT_CONTINUITY_ROUNDS : CONTINUITY_ROUNDS;
-        v->continuity_segments=v->wait_continuity ? WAIT_CONTINUITY_SEGMENTS : CONTINUITY_ROUNDS;
-        v->plan_ns=v->wait_continuity ? WAIT_PLAN_NS : DEFAULT_PLAN_NS;
+        v->wait100=!strcmp(v->followup_plan,WAIT100_PLAN);
+        v->continuity_rounds=(v->wait_continuity || v->wait100) ? WAIT_CONTINUITY_ROUNDS : CONTINUITY_ROUNDS;
+        v->continuity_segments=v->wait100 ? 1U : v->wait_continuity ? WAIT_CONTINUITY_SEGMENTS : CONTINUITY_ROUNDS;
+        v->plan_ns=v->wait100 ? WAIT100_PLAN_NS : v->wait_continuity ? WAIT_PLAN_NS : DEFAULT_PLAN_NS;
+        v->segment_rf_samples=v->wait100 ? FOLLOWUP_RF_SAMPLES : SEGMENT_RF_SAMPLES;
         if(v->fresh_continuity) v->profile=QUICK_SCOUT_PROFILE;
-        v->followup_profile=v->prior_continuity ? PRIOR_SEGMENT30_PROFILE :
+        v->followup_profile=v->wait100 ? SPARSE100_PROFILE :
+            v->prior_continuity ? PRIOR_SEGMENT30_PROFILE :
             v->fresh_continuity ? FRESH_SEGMENT30_PROFILE :
             v->continuity ? SEGMENT30_PROFILE :
             !strcmp(v->followup_plan,FOLLOWUP_PLAN) ? SPARSE_PROFILE :
@@ -425,6 +437,7 @@ int main(int argc,char **argv)
     if(fprintf(context.journal,"terminal %d\n",rc)<0 || fclose(context.journal)) rc=GLRT_VISIT_RETENTION;
     alarm(0);
     printf("{\"scope\":\"%s\",\"rate\":%u,\"result\":%d,\"rf_sample_limit\":%u",
+        context.wait100 ? "bounded_arm_scout_wait100_followup" :
         context.wait_continuity ? "bounded_arm_scout_prior_wait_segmented_followup" :
         context.prior_continuity ? "bounded_arm_scout_prior_segmented_followup" :
         context.fresh_continuity ? "bounded_arm_scout_fresh_segmented_followup" :
@@ -433,14 +446,15 @@ int main(int argc,char **argv)
         context.followup_sparse ? "bounded_arm_scout_sparse_followup" :
         context.visit_count==2 ? "bounded_arm_two_frequency_visits" : "bounded_arm_frequency_revisits",
         context.rate,rc,context.continuity ?
-            (visits_executed-segments_started)*SCOUT_RF_SAMPLES+segments_started*SEGMENT_RF_SAMPLES :
-            context.visit_count*SCOUT_RF_SAMPLES+(followup_started ? 737280000U : 0U));
+            (visits_executed-segments_started)*SCOUT_RF_SAMPLES+segments_started*context.segment_rf_samples :
+            context.visit_count*SCOUT_RF_SAMPLES+(followup_started ? FOLLOWUP_RF_SAMPLES : 0U));
     if(context.continuity) {
         printf(",\"scan_rounds\":%u,\"segments_started\":%u,\"visits_executed\":%u,\"track_complete\":%d,"
             "\"selection\":\"%s\",\"selected_index\":",scan_rounds,segments_started,visits_executed,track_complete,
             !followup_started ? "none" : selected_activity ? "retained_activity" : "native_handoff");
         if(selected==UINT_MAX) printf("null"); else printf("%u",selected);
         if(context.ranked_continuity) printf(",\"activity_selection\":\"%s\"",
+            context.wait100 ? "strongest_one_attempt_scan_wait12_track100" :
             context.wait_continuity ? "strongest_one_attempt_scan_prior_reacquire_wait12" :
             context.prior_continuity ? "strongest_one_attempt_scan_prior_reacquire" :
             context.fresh_continuity ? "strongest_one_attempt_scan" : "strongest_complete_scan");

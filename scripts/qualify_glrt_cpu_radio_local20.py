@@ -25,9 +25,10 @@ RANKED_CONTINUITY30_PROFILE = "continuity30-ranked-after-scout16"
 FRESH_CONTINUITY30_PROFILE = "continuity30-fresh-after-scout1"
 PRIOR_CONTINUITY30_PROFILE = "continuity30-prior-after-scout1"
 WAIT_PRIOR_CONTINUITY30_PROFILE = "continuity30-prior-wait12-after-scout1"
+WAIT100_PROFILE = "sparse100-wait12-after-scout1"
 PROFILES = (PROFILE, "sparse30-after-scout16", "sparse100-after-scout16",
             CONTINUITY30_PROFILE, RANKED_CONTINUITY30_PROFILE, FRESH_CONTINUITY30_PROFILE,
-            PRIOR_CONTINUITY30_PROFILE, WAIT_PRIOR_CONTINUITY30_PROFILE)
+            PRIOR_CONTINUITY30_PROFILE, WAIT_PRIOR_CONTINUITY30_PROFILE, WAIT100_PROFILE)
 UPPER_EDGE_LOS = (1_190_312_500, 1_440_312_500, 1_690_312_500, 1_940_312_500)
 SCOUT_SAMPLES = 1536 * 16384
 FOLLOWUP_SAMPLES = 45000 * 16384
@@ -35,9 +36,10 @@ SEGMENT_SAMPLES = 7500 * 16384
 CONTINUITY_ROUNDS = 3
 WAIT_CONTINUITY_ROUNDS = 12
 WAIT_CONTINUITY_SEGMENTS = 3
+FOLLOWUP_RF_SAMPLES = 45000 * 16384
 MAX_ARCHIVE_BYTES = 320 * 1024 * 1024
 EXPECTED = {
-    "probe": "ca620a31ec5ea5ad98afa53b39a9cfe8e005b293ac89057bda2e872cc95c1304",
+    "probe": "a45d0d9d129395dead695d86f920549b65dbd59735a2901ecb3121e81bad8b26",
     "bank": "d9f3452e45180c560a200bb76c9bfe2d7c46b17560fd46495ea74c50f50547f0",
     "references": "78b50e1aea5c350889b0798fc691491299925932e496a918cd5fbd3b9bc4faf2",
 }
@@ -68,6 +70,8 @@ def maximum_source_seconds(count, profile=PROFILE):
     elif profile == WAIT_PRIOR_CONTINUITY30_PROFILE:
         samples = (WAIT_CONTINUITY_ROUNDS * count * SCOUT_SAMPLES +
                    WAIT_CONTINUITY_SEGMENTS * SEGMENT_SAMPLES)
+    elif profile == WAIT100_PROFILE:
+        samples = WAIT_CONTINUITY_ROUNDS * count * SCOUT_SAMPLES + FOLLOWUP_RF_SAMPLES
     else:
         samples = count * SCOUT_SAMPLES + FOLLOWUP_SAMPLES
     return samples / 2_500_000
@@ -88,22 +92,24 @@ def decode_parent(raw, rate, count, exit_code, profile=PROFILE):
         raise ValueError("ambiguous parent status")
     value = json.loads(lines[0])
     if profile in (CONTINUITY30_PROFILE,RANKED_CONTINUITY30_PROFILE,FRESH_CONTINUITY30_PROFILE,
-                   PRIOR_CONTINUITY30_PROFILE,WAIT_PRIOR_CONTINUITY30_PROFILE):
+                   PRIOR_CONTINUITY30_PROFILE,WAIT_PRIOR_CONTINUITY30_PROFILE,WAIT100_PROFILE):
         keys = {"scope", "rate", "result", "rf_sample_limit", "scan_rounds",
                 "segments_started", "visits_executed", "track_complete", "selection", "selected_index"}
         expected_scope="bounded_arm_scout_segmented_followup"
         if profile in (RANKED_CONTINUITY30_PROFILE,FRESH_CONTINUITY30_PROFILE,
-                       PRIOR_CONTINUITY30_PROFILE,WAIT_PRIOR_CONTINUITY30_PROFILE):
+                       PRIOR_CONTINUITY30_PROFILE,WAIT_PRIOR_CONTINUITY30_PROFILE,WAIT100_PROFILE):
             keys.add("activity_selection")
-            expected_scope=("bounded_arm_scout_prior_wait_segmented_followup" if profile==WAIT_PRIOR_CONTINUITY30_PROFILE else
+            expected_scope=("bounded_arm_scout_wait100_followup" if profile==WAIT100_PROFILE else
+                            "bounded_arm_scout_prior_wait_segmented_followup" if profile==WAIT_PRIOR_CONTINUITY30_PROFILE else
                             "bounded_arm_scout_prior_segmented_followup" if profile==PRIOR_CONTINUITY30_PROFILE else
                             "bounded_arm_scout_fresh_segmented_followup" if profile==FRESH_CONTINUITY30_PROFILE
                             else "bounded_arm_scout_ranked_segmented_followup")
         if set(value) != keys or value["scope"] != expected_scope or value["rate"] != rate:
             raise ValueError("parent status identity differs")
         if profile in (RANKED_CONTINUITY30_PROFILE,FRESH_CONTINUITY30_PROFILE,
-                       PRIOR_CONTINUITY30_PROFILE,WAIT_PRIOR_CONTINUITY30_PROFILE):
-            expected_policy=("strongest_one_attempt_scan_prior_reacquire_wait12" if profile==WAIT_PRIOR_CONTINUITY30_PROFILE else
+                       PRIOR_CONTINUITY30_PROFILE,WAIT_PRIOR_CONTINUITY30_PROFILE,WAIT100_PROFILE):
+            expected_policy=("strongest_one_attempt_scan_wait12_track100" if profile==WAIT100_PROFILE else
+                             "strongest_one_attempt_scan_prior_reacquire_wait12" if profile==WAIT_PRIOR_CONTINUITY30_PROFILE else
                              "strongest_one_attempt_scan_prior_reacquire" if profile==PRIOR_CONTINUITY30_PROFILE else
                              "strongest_one_attempt_scan" if profile==FRESH_CONTINUITY30_PROFILE else
                              "strongest_complete_scan")
@@ -114,11 +120,12 @@ def decode_parent(raw, rate, count, exit_code, profile=PROFILE):
             raise ValueError("parent status types differ")
         rounds=value["scan_rounds"];segments=value["segments_started"];visits=value["visits_executed"]
         scouts=visits-segments
-        maximum_rounds=WAIT_CONTINUITY_ROUNDS if profile==WAIT_PRIOR_CONTINUITY30_PROFILE else CONTINUITY_ROUNDS
-        maximum_segments=WAIT_CONTINUITY_SEGMENTS if profile==WAIT_PRIOR_CONTINUITY30_PROFILE else maximum_rounds
+        maximum_rounds=WAIT_CONTINUITY_ROUNDS if profile in (WAIT_PRIOR_CONTINUITY30_PROFILE,WAIT100_PROFILE) else CONTINUITY_ROUNDS
+        maximum_segments=1 if profile==WAIT100_PROFILE else WAIT_CONTINUITY_SEGMENTS if profile==WAIT_PRIOR_CONTINUITY30_PROFILE else maximum_rounds
         valid_counts=(1 <= rounds <= maximum_rounds and 0 <= segments <= min(rounds,maximum_segments) and
                       rounds <= scouts <= rounds*count and visits == scouts+segments)
-        expected_limit=scouts*SCOUT_SAMPLES+segments*SEGMENT_SAMPLES
+        segment_samples=FOLLOWUP_RF_SAMPLES if profile==WAIT100_PROFILE else SEGMENT_SAMPLES
+        expected_limit=scouts*SCOUT_SAMPLES+segments*segment_samples
         selected=value["selected_index"]
         valid_selection=(segments == 0 and value["selection"] == "none" and selected is None) or (
             segments > 0 and value["selection"] in ("retained_activity", "native_handoff") and
@@ -161,7 +168,8 @@ def extract_evidence(payload, destination, parent, count):
                            "bounded_arm_scout_ranked_segmented_followup",
                            "bounded_arm_scout_fresh_segmented_followup",
                            "bounded_arm_scout_prior_segmented_followup",
-                           "bounded_arm_scout_prior_wait_segmented_followup"):
+                           "bounded_arm_scout_prior_wait_segmented_followup",
+                           "bounded_arm_scout_wait100_followup"):
         expected_visits=set(range(parent["visits_executed"]))
     else:
         selected = parent["selected_index"]
@@ -288,14 +296,14 @@ def main():
             run("mkdir " + shlex.quote(remote + "/evidence")).check_returncode()
             command = [remote + "/probe", str(RATE), SERIAL, remote + "/bank", remote + "/references",
                        remote + "/evidence", *map(str, los), args.profile]
-            result = run(shlex.join(command), timeout=1000 if args.profile==WAIT_PRIOR_CONTINUITY30_PROFILE else 430)
+            result = run(shlex.join(command), timeout=1300 if args.profile==WAIT100_PROFILE else 1000 if args.profile==WAIT_PRIOR_CONTINUITY30_PROFILE else 430)
             (args.output / "stdout.json").write_bytes(result.stdout);(args.output / "stderr.txt").write_bytes(result.stderr)
             archive = run("tar -C " + shlex.quote(remote) + " -cf - evidence", timeout=90);archive.check_returncode()
             (args.output / "evidence.tar").write_bytes(archive.stdout)
             parent = decode_parent(result.stdout, RATE, len(los), result.returncode,args.profile);receipt["parent"] = parent
             receipt["retained_files"] = extract_evidence(archive.stdout, args.output / "retained", parent, len(los))
             if args.profile in (CONTINUITY30_PROFILE,RANKED_CONTINUITY30_PROFILE,FRESH_CONTINUITY30_PROFILE,
-                                PRIOR_CONTINUITY30_PROFILE,WAIT_PRIOR_CONTINUITY30_PROFILE):
+                                PRIOR_CONTINUITY30_PROFILE,WAIT_PRIOR_CONTINUITY30_PROFILE,WAIT100_PROFILE):
                 try:
                     receipt["continuity_review"] = review_continuity(
                         (args.output / "retained/evidence/visits.txt").read_text(), parent,
