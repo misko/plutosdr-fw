@@ -29,6 +29,7 @@
 #define WAIT100_PLAN "sparse100-wait12-after-scout1"
 #define WAIT40_100_PLAN "sparse100-wait40-after-scout1"
 #define WAIT40X2_100_PLAN "sparse100-wait40x2-after-scout1"
+#define WAIT40X2_CONFIRM_100_PLAN "sparse100-wait40x2-confirm2-after-scout1"
 #define CONTINUITY_ROUNDS 3U
 #define WAIT_CONTINUITY_ROUNDS 12U
 #define WAIT_CONTINUITY_SEGMENTS 3U
@@ -59,6 +60,7 @@ struct visit_context {
     int wait100;
     int wait40;
     int wait40x2;
+    int persistent100;
     unsigned continuity_rounds,continuity_segments;
     unsigned segment_rf_samples;
     double activity_floor;
@@ -93,7 +95,8 @@ static int visit_arguments(int argc,char **argv,struct visit_context *v,uint64_t
               !strcmp(argv[argc-1],WAIT_PRIOR_CONTINUITY30_PLAN) ||
               !strcmp(argv[argc-1],WAIT100_PLAN) ||
               !strcmp(argv[argc-1],WAIT40_100_PLAN) ||
-              !strcmp(argv[argc-1],WAIT40X2_100_PLAN)) {
+              !strcmp(argv[argc-1],WAIT40X2_100_PLAN) ||
+              !strcmp(argv[argc-1],WAIT40X2_CONFIRM_100_PLAN)) {
         v->profile=SCOUT_PROFILE;v->followup_sparse=1;v->followup_plan=argv[argc-1];
         v->continuity=!strcmp(v->followup_plan,CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,RANKED_CONTINUITY30_PLAN) ||
@@ -102,27 +105,33 @@ static int visit_arguments(int argc,char **argv,struct visit_context *v,uint64_t
             !strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,WAIT100_PLAN) ||
             !strcmp(v->followup_plan,WAIT40_100_PLAN) ||
-            !strcmp(v->followup_plan,WAIT40X2_100_PLAN);
+            !strcmp(v->followup_plan,WAIT40X2_100_PLAN) ||
+            !strcmp(v->followup_plan,WAIT40X2_CONFIRM_100_PLAN);
         v->ranked_continuity=!strcmp(v->followup_plan,RANKED_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,FRESH_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,WAIT100_PLAN) ||
             !strcmp(v->followup_plan,WAIT40_100_PLAN) ||
-            !strcmp(v->followup_plan,WAIT40X2_100_PLAN);
+            !strcmp(v->followup_plan,WAIT40X2_100_PLAN) ||
+            !strcmp(v->followup_plan,WAIT40X2_CONFIRM_100_PLAN);
         v->fresh_continuity=!strcmp(v->followup_plan,FRESH_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,WAIT100_PLAN) ||
             !strcmp(v->followup_plan,WAIT40_100_PLAN) ||
-            !strcmp(v->followup_plan,WAIT40X2_100_PLAN);
+            !strcmp(v->followup_plan,WAIT40X2_100_PLAN) ||
+            !strcmp(v->followup_plan,WAIT40X2_CONFIRM_100_PLAN);
         v->prior_continuity=!strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN);
         v->wait_continuity=!strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN);
         v->wait100=!strcmp(v->followup_plan,WAIT100_PLAN) || !strcmp(v->followup_plan,WAIT40_100_PLAN) ||
-            !strcmp(v->followup_plan,WAIT40X2_100_PLAN);
-        v->wait40=!strcmp(v->followup_plan,WAIT40_100_PLAN) || !strcmp(v->followup_plan,WAIT40X2_100_PLAN);
-        v->wait40x2=!strcmp(v->followup_plan,WAIT40X2_100_PLAN);
+            !strcmp(v->followup_plan,WAIT40X2_100_PLAN) || !strcmp(v->followup_plan,WAIT40X2_CONFIRM_100_PLAN);
+        v->wait40=!strcmp(v->followup_plan,WAIT40_100_PLAN) || !strcmp(v->followup_plan,WAIT40X2_100_PLAN) ||
+            !strcmp(v->followup_plan,WAIT40X2_CONFIRM_100_PLAN);
+        v->wait40x2=!strcmp(v->followup_plan,WAIT40X2_100_PLAN) ||
+            !strcmp(v->followup_plan,WAIT40X2_CONFIRM_100_PLAN);
+        v->persistent100=!strcmp(v->followup_plan,WAIT40X2_CONFIRM_100_PLAN);
         v->continuity_rounds=v->wait40 ? WAIT40_CONTINUITY_ROUNDS :
             (v->wait_continuity || v->wait100) ? WAIT_CONTINUITY_ROUNDS : CONTINUITY_ROUNDS;
         v->continuity_segments=v->wait40x2 ? 2U : v->wait100 ? 1U :
@@ -397,7 +406,7 @@ struct continuity_result {
 static int continuity_run(struct visit_context *context,const struct glrt_visit_ports *ports,
     const uint64_t *lo,struct continuity_result *result)
 {
-    int rc=GLRT_VISIT_DONE;
+    int rc=GLRT_VISIT_DONE;unsigned pending=UINT_MAX;
     *result=(struct continuity_result){.selected=UINT_MAX};
     for(unsigned round=0;round<context->continuity_rounds && !result->track_complete &&
         result->segments_started<context->continuity_segments;round++) {
@@ -411,6 +420,11 @@ static int continuity_run(struct visit_context *context,const struct glrt_visit_
         if(rc==GLRT_VISIT_DONE && context->ranked_continuity && context->activity_number!=UINT_MAX) {
             round_selected=context->activity_number-first;context->activity_selected=1;
             rc=GLRT_VISIT_SIGNAL;
+        }
+        if(context->persistent100) {
+            if(rc==GLRT_VISIT_SIGNAL && pending!=round_selected) {
+                pending=round_selected;rc=GLRT_VISIT_DONE;
+            } else if(rc==GLRT_VISIT_DONE) pending=UINT_MAX;
         }
         if(rc==GLRT_VISIT_SIGNAL) {
             result->selected=round_selected;result->segments_started++;
@@ -426,6 +440,7 @@ static int continuity_run(struct visit_context *context,const struct glrt_visit_
                fflush(context->journal)) return GLRT_VISIT_RETENTION;
             if(rc==GLRT_VISIT_DONE) { result->track_complete=1;break; }
             if(rc!=GLRT_VISIT_CLEAN_LOSS && rc!=GLRT_VISIT_NO_TRACK) break;
+            pending=UINT_MAX;
         } else if(rc!=GLRT_VISIT_DONE) break;
     }
     return rc;
@@ -486,6 +501,7 @@ int main(int argc,char **argv)
             !followup_started ? "none" : selected_activity ? "retained_activity" : "native_handoff");
         if(selected==UINT_MAX) printf("null"); else printf("%u",selected);
         if(context.ranked_continuity) printf(",\"activity_selection\":\"%s\"",
+            context.persistent100 ? "strongest_one_attempt_scan_power50_consecutive2_wait40x2_track100" :
             context.wait40x2 ? "strongest_one_attempt_scan_power50_wait40x2_track100" :
             context.wait40 ? "strongest_one_attempt_scan_power50_wait40_track100" :
             context.wait100 ? "strongest_one_attempt_scan_power50_wait12_track100" :

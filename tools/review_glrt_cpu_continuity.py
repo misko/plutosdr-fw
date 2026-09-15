@@ -15,12 +15,16 @@ def review_continuity(text, parent, *, serial, los):
         raise ValueError("visit journal plan or terminal differs")
     plan=plans[0];count=len(los)
     policy=parent.get("activity_selection","first_qualified")
-    wait40x2=policy=="strongest_one_attempt_scan_power50_wait40x2_track100"
+    persistent100=policy=="strongest_one_attempt_scan_power50_consecutive2_wait40x2_track100"
+    wait40x2=policy in ("strongest_one_attempt_scan_power50_wait40x2_track100",
+                        "strongest_one_attempt_scan_power50_consecutive2_wait40x2_track100")
     wait40=policy in ("strongest_one_attempt_scan_power50_wait40_track100",
-                      "strongest_one_attempt_scan_power50_wait40x2_track100")
+                      "strongest_one_attempt_scan_power50_wait40x2_track100",
+                      "strongest_one_attempt_scan_power50_consecutive2_wait40x2_track100")
     wait100=policy in ("strongest_one_attempt_scan_power50_wait12_track100",
                        "strongest_one_attempt_scan_power50_wait40_track100",
-                       "strongest_one_attempt_scan_power50_wait40x2_track100")
+                       "strongest_one_attempt_scan_power50_wait40x2_track100",
+                       "strongest_one_attempt_scan_power50_consecutive2_wait40x2_track100")
     wait=policy=="strongest_one_attempt_scan_prior_reacquire_wait12"
     prior=policy in ("strongest_one_attempt_scan_prior_reacquire",
                      "strongest_one_attempt_scan_prior_reacquire_wait12")
@@ -30,7 +34,8 @@ def review_continuity(text, parent, *, serial, los):
     fresh=policy in ("strongest_one_attempt_scan","strongest_one_attempt_scan_prior_reacquire",
                      "strongest_one_attempt_scan_prior_reacquire_wait12")
     fresh=fresh or wait100
-    profile=("sparse100-wait40x2-after-scout1" if wait40x2 else
+    profile=("sparse100-wait40x2-confirm2-after-scout1" if persistent100 else
+             "sparse100-wait40x2-after-scout1" if wait40x2 else
              "sparse100-wait40-after-scout1" if wait40 else
              "sparse100-wait12-after-scout1" if wait100 else
              "continuity30-prior-wait12-after-scout1" if wait else
@@ -120,6 +125,10 @@ def review_continuity(text, parent, *, serial, los):
                 raise ValueError("strongest activity selection differs")
             if wait100 and max(score for _,score in round_candidates)<0.05:
                 raise ValueError("100-second activity floor differs")
+            if persistent100:
+                current=round_first+selected;previous=current-count
+                if previous<0 or not any(number==previous and score>=0.05 for number,score in candidates):
+                    raise ValueError("100-second persistence confirmation differs")
         previous_followup=followup;previous_round=round_number
     if parent["segments_started"]:
         if parent["selected_index"]!=starts[-1][2] or parent["selection"]!=starts[-1][4]:

@@ -68,6 +68,7 @@ def test_cycle_has_reviewed_distinct_los_and_explicit_worst_case(operator):
     assert operator.maximum_source_seconds(4,operator.WAIT100_PROFILE) == pytest.approx(778.0958208)
     assert operator.maximum_source_seconds(2,operator.WAIT40_100_PROFILE) == pytest.approx(1100.218368)
     assert operator.maximum_source_seconds(2,operator.WAIT40X2_100_PROFILE) == pytest.approx(1395.130368)
+    assert operator.maximum_source_seconds(2,operator.WAIT40X2_CONFIRM_100_PROFILE) == pytest.approx(1395.130368)
     with pytest.raises(ValueError): operator.validate_los(ordered,operator.WAIT40_100_PROFILE)
     for values in ([],[1440312500],[1440312500]*2,[1709687500],list(operator.UPPER_EDGE_LOS)+[1190312500]):
         with pytest.raises(ValueError): operator.validate_los(values)
@@ -93,7 +94,7 @@ def test_dry_run_is_explicitly_non_rf_and_contains_reviewable_next_action(operat
     "continuity30-after-scout16","continuity30-ranked-after-scout16","continuity30-fresh-after-scout1",
     "continuity30-prior-after-scout1","continuity30-prior-wait12-after-scout1",
     "sparse100-wait12-after-scout1","sparse100-wait40-after-scout1",
-    "sparse100-wait40x2-after-scout1"])
+    "sparse100-wait40x2-after-scout1","sparse100-wait40x2-confirm2-after-scout1"])
 def test_dry_run_retains_the_selected_tracking_horizon(operator,profile):
     plan=operator.dry_run_plan((1440312500,1940312500),operator.EXPECTED,
         Path('/srv/postgres-nvme/x'),Path('/srv/bulk/leo/x'),profile)
@@ -155,6 +156,12 @@ def test_continuity_parent_retains_round_segment_and_sample_accounting(operator)
         activity_selection="strongest_one_attempt_scan_power50_wait40x2_track100")
     assert operator.decode_parent(wait40x2,operator.RATE,2,1,
         operator.WAIT40X2_100_PROFILE)["segments_started"]==2
+    confirm=continuity_parent(operator,rounds=2,segments=1,visits=5,result=1,
+        scope="bounded_arm_scout_wait100_followup",
+        rf_sample_limit=4*operator.SCOUT_SAMPLES+operator.FOLLOWUP_RF_SAMPLES,
+        activity_selection="strongest_one_attempt_scan_power50_consecutive2_wait40x2_track100")
+    assert operator.decode_parent(confirm,operator.RATE,2,1,
+        operator.WAIT40X2_CONFIRM_100_PROFILE)["segments_started"]==1
     for damaged in (
         continuity_parent(operator,rounds=13,segments=0,visits=52,result=0,selection="none",selected=None,
             scope="bounded_arm_scout_prior_wait_segmented_followup",

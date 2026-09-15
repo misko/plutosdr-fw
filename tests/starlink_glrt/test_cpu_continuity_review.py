@@ -127,6 +127,36 @@ def test_review_accepts_parent_mapping_of_arbitrary_child_failure():
     assert review_continuity(text,parent,serial=SERIAL,los=LOS)["status"]=="pass"
 
 
+def test_persistent_100_second_policy_requires_same_lo_in_consecutive_rounds():
+    snapshot=("GLT1SNAP 00010000 474c5431 000a2dfc 00000159 ce8315b0 00000430 "
+              "00000002 00000000 00000000 00000000 00000000 00000000 00000000 "
+              "00000000 00000000 00000000 00000000 00000000 00000000 00000000 "
+              "00000000 01c9c380 00009ab0 b04a2fab 00000001")
+    rows=[f"plan 30000000 {SERIAL} {' '.join(map(str,LOS))} "
+          "sparse100-wait40x2-confirm2-after-scout1 4 1800000000000"]
+    for number in range(9):
+        lo=LOS[number%4] if number<8 else LOS[1]
+        rows.append("snapshot "+snapshot)
+        for kind,latest in (("before_tune",100+number*20),("tuned",101+number*20),
+                            ("after_run",110+number*20)):
+            epoch=number+2 if kind=="after_run" else number+1
+            rows.append(f"visit {kind} {number} 0 {lo} 30000000 {epoch} {latest} 1 1")
+        if number in (1,5): rows.append(f"activity candidate {number} 0.07")
+        if number==7: rows.append(f"segment start 1 8 1 {LOS[1]} retained_activity")
+        if number==8: rows.append("segment terminal 1 0")
+    rows.append("terminal 0");text="\n".join(rows)+"\n"
+    parent={"scope":"bounded_arm_scout_wait100_followup","rate":30000000,"result":0,
+            "rf_sample_limit":938606592,"scan_rounds":2,"segments_started":1,
+            "visits_executed":9,"track_complete":1,"selection":"retained_activity",
+            "selected_index":1,
+            "activity_selection":"strongest_one_attempt_scan_power50_consecutive2_wait40x2_track100"}
+    assert review_continuity(text,parent,serial=SERIAL,los=LOS)["status"]=="pass"
+    for damaged in (text.replace("activity candidate 1 0.07\n",""),
+                    text.replace("activity candidate 1 0.07","activity candidate 1 0.049")):
+        with pytest.raises(ValueError,match="persistence"):
+            review_continuity(damaged,parent,serial=SERIAL,los=LOS)
+
+
 def test_review_accepts_attested_lo_rounding_within_controller_tolerance():
     text,parent=evidence()
     text="\n".join(line.replace(" 1190312500 30000000"," 1190312498 30000000")

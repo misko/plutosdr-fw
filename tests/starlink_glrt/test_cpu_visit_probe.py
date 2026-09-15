@@ -196,14 +196,15 @@ static int continuity_run_child(void *pointer,unsigned number,uint64_t deadline)
     else if(f->mode==2) outcome=(f->call%2)==0 ? GLRT_VISIT_SIGNAL : GLRT_VISIT_CLEAN_LOSS;
     else if(f->mode>=3 && (!strcmp(visit_profile(f->visit),SCOUT_PROFILE) ||
         !strcmp(visit_profile(f->visit),QUICK_SCOUT_PROFILE)) &&
-        (number<2 || (f->mode==6 && number%5<2))) {
-        double score=number ? .07 : .04;
+        (f->mode==7 ? number%4==1 : number<2 || (f->mode==6 && number%5<2))) {
+        double score=f->mode==7 ? .07 : number ? .07 : .04;
         if(f->visit->activity_number==UINT_MAX || score>f->visit->activity_score) {
             f->visit->activity_number=number;f->visit->activity_score=score;
         }
     } else if(f->mode>=3 && (!strcmp(visit_profile(f->visit),SEGMENT30_PROFILE) ||
         !strcmp(visit_profile(f->visit),FRESH_SEGMENT30_PROFILE) ||
-        !strcmp(visit_profile(f->visit),PRIOR_SEGMENT30_PROFILE)))
+        !strcmp(visit_profile(f->visit),PRIOR_SEGMENT30_PROFILE) ||
+        !strcmp(visit_profile(f->visit),PRIOR_SPARSE100_PROFILE)))
         outcome=GLRT_VISIT_CLEAN_LOSS;
     f->call++;return outcome;
 }
@@ -225,6 +226,9 @@ int exercise_continuity(int mode,unsigned out[7],unsigned numbers[16]) {
     if(mode==6) { context.fresh_continuity=1;context.prior_continuity=1;context.wait_continuity=1;
         context.followup_profile=PRIOR_SEGMENT30_PROFILE;context.continuity_rounds=WAIT_CONTINUITY_ROUNDS;
         context.continuity_segments=WAIT_CONTINUITY_SEGMENTS;context.plan_ns=WAIT_PLAN_NS; }
+    if(mode==7) { context.fresh_continuity=1;context.wait100=1;context.wait40=1;context.wait40x2=1;
+        context.persistent100=1;context.followup_profile=PRIOR_SPARSE100_PROFILE;
+        context.continuity_rounds=CONTINUITY_ROUNDS;context.continuity_segments=2; }
     struct continuity_result result;uint64_t lo[4]={1190312500,1440312500,1690312500,1940312500};
     if(!context.journal) return -99;
     int rc=continuity_run(&context,&ports,lo,&result);fclose(context.journal);
@@ -406,14 +410,15 @@ def test_retained_activity_score_is_strongest_candidate_not_array_position(probe
     b'continuity30-ranked-after-scout16',b'continuity30-fresh-after-scout1',
     b'continuity30-prior-after-scout1',b'continuity30-prior-wait12-after-scout1',
     b'sparse100-wait12-after-scout1',b'sparse100-wait40-after-scout1',
-    b'sparse100-wait40x2-after-scout1',b'unknown'])
+    b'sparse100-wait40x2-after-scout1',b'sparse100-wait40x2-confirm2-after-scout1',b'unknown'])
 def test_explicit_scan64_plan_preserves_legacy_and_rejects_invalid_arguments(probe,rate,count,profile):
     valid=rate in (30000000,60000000) and count in (2,3,4) and profile!=b'unknown'
     expected=16 if profile in (b'sparse10-after-scout16',b'sparse30-after-scout16',b'sparse100-after-scout16',
         b'continuity30-after-scout16',b'continuity30-ranked-after-scout16',
         ) else 1 if profile in (b'continuity30-fresh-after-scout1',b'continuity30-prior-after-scout1',
             b'continuity30-prior-wait12-after-scout1',b'sparse100-wait12-after-scout1',
-            b'sparse100-wait40-after-scout1',b'sparse100-wait40x2-after-scout1') else 64 if profile else 8
+            b'sparse100-wait40-after-scout1',b'sparse100-wait40x2-after-scout1',
+            b'sparse100-wait40x2-confirm2-after-scout1') else 64 if profile else 8
     assert probe.parse_plan(rate,count,profile)==(expected if valid else -1)
 
 
@@ -423,6 +428,7 @@ def test_explicit_scan64_plan_preserves_legacy_and_rejects_invalid_arguments(pro
     (b'sparse100-wait12-after-scout1',[12,1,1200,50]),
     (b'sparse100-wait40-after-scout1',[40,1,1800,50]),
     (b'sparse100-wait40x2-after-scout1',[40,2,1800,50]),
+    (b'sparse100-wait40x2-confirm2-after-scout1',[40,2,1800,50]),
 ])
 def test_continuity_plan_carries_explicit_round_segment_and_wall_bounds(probe,profile,expected):
     out=(c.c_uint*4)()
@@ -438,6 +444,7 @@ def test_continuity_plan_carries_explicit_round_segment_and_wall_bounds(probe,pr
     (4,[1,13,3,1,0,13,0],list(range(13))),
     (5,[1,13,3,1,0,13,0],list(range(13))),
     (6,[0,15,3,3,0,15,1],list(range(15))),
+    (7,[1,13,3,1,0,13,0],list(range(13))),
 ])
 def test_continuity_rescans_with_contiguous_evidence_and_stops_on_complete(probe,mode,expected,numbers):
     out=(c.c_uint*7)();seen=(c.c_uint*16)()
