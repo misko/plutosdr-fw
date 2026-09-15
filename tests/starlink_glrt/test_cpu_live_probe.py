@@ -121,6 +121,13 @@ int live_aligned_start(const char *blocks,uint32_t observer_first,uint32_t frame
     if(align_native_frame(&s,&frame)) return -1;
     *out=frame;return 0;
 }
+uint64_t live_native_horizon(const char *blocks,uint32_t last_supported)
+{
+    struct dwell_limits limits;struct live s={0};
+    if(dwell_limits(blocks,&limits)) return 0;
+    s.native_stride=limits.native_stride;
+    return native_freshness_horizon(&s,last_supported);
+}
 int live_observer_limits(const char *blocks,uint64_t out[4])
 {
     struct dwell_limits limits;
@@ -331,6 +338,8 @@ def live_api(tmp_path_factory):
     lib.live_native_journal_bytes.argtypes = [c.c_char_p]
     lib.live_native_journal_bytes.restype = c.c_uint64
     lib.live_aligned_start.argtypes = [c.c_char_p,c.c_uint32,c.c_uint32,c.POINTER(c.c_uint32)]
+    lib.live_native_horizon.argtypes = [c.c_char_p,c.c_uint32]
+    lib.live_native_horizon.restype = c.c_uint64
     lib.live_observer_limits.argtypes = [c.c_char_p,c.c_void_p]
     lib.unused_probe_main.argtypes = [c.c_int, c.POINTER(c.c_char_p)]
     lib.live_rank.argtypes = [c.c_void_p,c.c_void_p,c.c_void_p,c.c_uint,c.c_void_p,c.c_void_p]
@@ -425,6 +434,17 @@ def test_extended_native_start_uses_the_observer_frame_grid(live_api,profile,req
     lib,_=live_api;out=c.c_uint32()
     assert lib.live_aligned_start(profile,1269,requested,c.byref(out))==0
     assert out.value==expected
+
+
+@pytest.mark.parametrize('profile,last_supported,expected',[
+    (b'1536',1071,1096),
+    (b'45000-selected-observer9-scan80-local2-track10-sparse10-authority',1071,1105),
+    (b'45000-selected-observer9-scan80-local2-track30-sparse9-authority',1071,1104),
+    (b'45000-selected-observer9-scan80-local2-track100-sparse9-authority',1071,1104),
+])
+def test_native_freshness_horizon_includes_cadence_alignment_cost(live_api,profile,last_supported,expected):
+    lib,_=live_api
+    assert lib.live_native_horizon(profile,last_supported)==expected
 
 
 @pytest.mark.parametrize('profile,expected',[

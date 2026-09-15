@@ -557,6 +557,11 @@ static int align_native_frame(const struct live *s,uint32_t *frame)
     if(*frame>UINT32_MAX-advance) return -1;
     *frame+=advance;return 0;
 }
+static uint64_t native_freshness_horizon(const struct live *s,uint32_t last_supported)
+{
+    return (uint64_t)last_supported+25U+
+        (s->native_stride>1 ? s->native_stride-1U : 0U);
+}
 static int run_native_feedback(struct live *s)
 {
     struct glrt_tracking_trend native;
@@ -584,7 +589,9 @@ static int run_native_feedback(struct live *s)
     if(align_native_frame(s,&frame)) return GLRT_NATIVE_DEADLINE;
     search_step=s->native_stride==s->observer_spacing && s->observer_first_frame ?
         s->native_stride : 1U;
-    horizon=(uint64_t)native.history.last_supported+25U;
+    /* Preserve the original 25-frame freshness allowance after rounding onto
+     * the observer cadence. Alignment can advance by at most stride-1 frames. */
+    horizon=native_freshness_horizon(s,native.history.last_supported);
     for(;;) {
         uint32_t repeats=s->native_stride>1 ? 1 : 8;
         if(frame>horizon) return GLRT_NATIVE_DEADLINE;
