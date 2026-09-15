@@ -38,6 +38,9 @@
 #define SPARSE_NATIVE_WALL_SECONDS 30.0
 #define SPARSE30_NATIVE_WALL_SECONDS 60.0
 #define SPARSE100_NATIVE_WALL_SECONDS 150.0
+#define DEFAULT_NATIVE_JOURNAL_BYTES (8U*1024U*1024U)
+#define SPARSE30_NATIVE_JOURNAL_BYTES (16U*1024U*1024U)
+#define SPARSE100_NATIVE_JOURNAL_BYTES (64U*1024U*1024U)
 #define SCAN80_RESOLVER_POWER_FLOOR 0.03
 #define SCAN80_WEAK_FALLBACK_INTERVAL 4U
 struct paired_head { uint32_t words[32]; };
@@ -53,43 +56,44 @@ struct dwell_limits {
     uint32_t native_stride;
     uint32_t observer_maximum,observer_retention_limit;
     uint64_t observer_source_span,observer_budget_ns;
+    uint64_t native_journal_bytes;
 };
 static int dwell_limits(const char *blocks,struct dwell_limits *out)
 {
     if(!blocks || !strcmp(blocks,"1536"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),0,9,8,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),0,9,8,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0,0};
     else if(!strcmp(blocks,"4096"))
-        *out=(struct dwell_limits){4096,16,45,UINT64_C(30000000000),0,9,8,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0};
+        *out=(struct dwell_limits){4096,16,45,UINT64_C(30000000000),0,9,8,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0,0};
     else if(!strcmp(blocks,"45000"))
-        *out=(struct dwell_limits){45000,200,325,UINT64_C(300000000000),1,9,8,1,NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0};
+        *out=(struct dwell_limits){45000,200,325,UINT64_C(300000000000),1,9,8,1,NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0,0};
     else if(!strcmp(blocks,"45000-selected-observer3-scan64"))
-        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,64,1,NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0};
+        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,64,1,NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0,0};
     else if(!strcmp(blocks,"45000-selected-observer3-scan80-local2"))
-        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,80,1,NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0};
+        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,80,1,NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0,0};
     else if(!strcmp(blocks,"45000-selected-observer3-scan80-local2-track10"))
-        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_WALL_SECONDS,0,1,0,0,0,0};
+        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_WALL_SECONDS,0,1,0,0,0,0,0};
     else if(!strcmp(blocks,"45000-selected-observer9-scan80-local2-track10"))
-        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_WALL_SECONDS,0,1,0,0,0,0};
+        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_WALL_SECONDS,0,1,0,0,0,0,0};
     else if(!strcmp(blocks,"45000-selected-observer9-scan80-local2-track10-authority"))
-        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_WALL_SECONDS,1,1,0,0,0,0};
+        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_WALL_SECONDS,1,1,0,0,0,0,0};
     else if(!strcmp(blocks,"45000-selected-observer9-scan80-local2-track10-sparse10-authority"))
-        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,SPARSE_NATIVE_RESULTS,SPARSE_NATIVE_WALL_SECONDS,1,10,0,0,0,0};
+        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,SPARSE_NATIVE_RESULTS,SPARSE_NATIVE_WALL_SECONDS,1,10,0,0,0,0,0};
     else if(!strcmp(blocks,"45000-selected-observer9-scan80-local2-track30-sparse9-authority"))
         *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,SPARSE30_NATIVE_RESULTS,SPARSE30_NATIVE_WALL_SECONDS,1,9,
-            2700,8000,UINT64_C(80000000),UINT64_C(40000000000)};
+            2700,8000,UINT64_C(80000000),UINT64_C(40000000000),SPARSE30_NATIVE_JOURNAL_BYTES};
     else if(!strcmp(blocks,"45000-selected-observer9-scan80-local2-track100-sparse9-authority"))
         *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,SPARSE100_NATIVE_RESULTS,SPARSE100_NATIVE_WALL_SECONDS,1,9,
-            8600,8600,UINT64_C(260000000),UINT64_C(120000000000)};
+            8600,8600,UINT64_C(260000000),UINT64_C(120000000000),SPARSE100_NATIVE_JOURNAL_BYTES};
     else if(!strcmp(blocks,"1536-selected"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,9,8,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,9,8,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0,0};
     else if(!strcmp(blocks,"1536-selected-observer3"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,8,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,8,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0,0};
     else if(!strcmp(blocks,"1536-selected-observer3-scan64"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,64,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,64,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0,0};
     else if(!strcmp(blocks,"1536-selected-observer3-scan64-scout16"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,64,0,SCOUT_NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,64,0,SCOUT_NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0,0};
     else if(!strcmp(blocks,"1536-selected-observer3-scan80-local2"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,80,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,80,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0,0};
     else return -1;
     if(!out->observer_maximum) {
         out->observer_maximum=out->coarse_authority ? 1024U : 200U;
@@ -97,6 +101,7 @@ static int dwell_limits(const char *blocks,struct dwell_limits *out)
         out->observer_source_span=out->coarse_authority ? UINT64_C(30000000) : UINT64_C(7500000);
         out->observer_budget_ns=out->coarse_authority ? UINT64_C(15000000000) : UINT64_C(3000000000);
     }
+    if(!out->native_journal_bytes) out->native_journal_bytes=DEFAULT_NATIVE_JOURNAL_BYTES;
     return 0;
 }
 static volatile sig_atomic_t interrupted;
@@ -136,6 +141,7 @@ struct live {
     uint32_t observer_first_frame;
     uint32_t observer_maximum,observer_retention_limit;
     uint64_t observer_source_span,observer_budget_ns;
+    uint64_t native_journal_bytes;
     double native_seconds;
     pthread_t observer_thread;
     int observer_started,observer_stop,observer_result;
@@ -801,12 +807,13 @@ static int load(const char *path,void *out,size_t bytes)
 static int open_native_episode(struct live *s,struct glrt_native_posix *p,
     const char *device,const char *directory)
 {
-    char path[PATH_MAX];int n;
+    char path[PATH_MAX];int n;uint64_t limit;
     if(p->device!=-1 || p->journal!=-1 || s->restarts>RESTART_LIMIT) return -1;
+    limit=s->native_journal_bytes ? s->native_journal_bytes : DEFAULT_NATIVE_JOURNAL_BYTES;
     n=s->restarts ? snprintf(path,sizeof(path),"%s/native-%u.journal",directory,s->restarts) :
         snprintf(path,sizeof(path),"%s/native.journal",directory);
     return n>0 && (size_t)n<sizeof(path) ?
-        glrt_native_posix_open(p,&s->native,device,path,8U*1024U*1024U) : -1;
+        glrt_native_posix_open(p,&s->native,device,path,limit) : -1;
 }
 #define LIVE_VISIT_CLEAN_LOSS_EXIT 3
 static int live_visit_clean_loss(const struct live *s,int worker_complete)
@@ -852,6 +859,7 @@ static int live_probe_run(int argc,char **argv,int visit_mode)
     s->observer_retention_limit=limits.observer_retention_limit;
     s->observer_source_span=limits.observer_source_span;
     s->observer_budget_ns=limits.observer_budget_ns;
+    s->native_journal_bytes=limits.native_journal_bytes;
     NEED(!pthread_mutex_init(&s->mutex,NULL),"mutex");mutex=1;
     NEED(!pthread_mutex_init(&s->authority_mutex,NULL),"authority_mutex");mutex=2;
     NEED(!load(argv[3],s->bank,sizeof(s->bank)) && !load(argv[4],s->refs,sizeof(s->refs)),"reference_files");
