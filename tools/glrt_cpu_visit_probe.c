@@ -75,7 +75,8 @@ static int visit_arguments(int argc,char **argv,struct visit_context *v,uint64_t
             !strcmp(v->followup_plan,FRESH_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN);
         v->ranked_continuity=!strcmp(v->followup_plan,RANKED_CONTINUITY30_PLAN) ||
-            !strcmp(v->followup_plan,FRESH_CONTINUITY30_PLAN);
+            !strcmp(v->followup_plan,FRESH_CONTINUITY30_PLAN) ||
+            !strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN);
         v->fresh_continuity=!strcmp(v->followup_plan,FRESH_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN);
         v->prior_continuity=!strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN);
