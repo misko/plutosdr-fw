@@ -55,7 +55,7 @@ static int simulated_child(int argc,char **argv) {
             unsigned strong=!strcmp(argv[1],"scout_activity") ? 2U : !strcmp(argv[1],"scout_weak") ? 1U : 0U;
             if(!f) return 8;
             for(unsigned n=1;n<=6;n++)
-                fprintf(f,"{\"kind\":\"candidate_order\",\"attempt\":%u,\"single_pilot_power\":[%.2f]}\n",
+                fprintf(f,"{\"kind\":\"candidate_order\",\"attempt\":%u,\"single_pilot_power\":[%.3f,0.003,0.003]}\n",
                     n,n<=strong ? .05 : .01);
             if(fclose(f)) return 8;
         }
@@ -216,16 +216,30 @@ def test_retained_activity_requires_one_strong_bounded_attempt(probe,tmp_path,da
     rows=[]
     for attempt in range(1,7):
         power=.05 if attempt<=2 else .01
-        if damage=='one_hit' and attempt==2: power=.039
-        if damage=='zero_hit': power=.039
-        row={'kind':'candidate_order','attempt':attempt,'single_pilot_power':[power]}
+        if damage=='one_hit' and attempt==2: power=.014
+        if damage=='zero_hit': power=.014
+        row={'kind':'candidate_order','attempt':attempt,'single_pilot_power':[power,.003,.003]}
         rows.append(json.dumps(row,separators=(',',':')))
     if damage=='missing_attempt': rows[2]=rows[2].replace('"attempt":3','"attempt":4')
     if damage=='duplicate_attempt': rows[1]=rows[1].replace('"attempt":2','"attempt":1')
     if damage=='short': rows.pop()
-    if damage=='too_many': rows[0]=rows[0].replace('[0.05]', '['+','.join(['0.05']*65)+']')
+    if damage=='too_many': rows[0]=rows[0].replace('[0.05,0.003,0.003]', '['+','.join(['0.05']*65)+']')
     if damage=='nan': rows[0]=rows[0].replace('0.05','NaN')
     if damage=='duplicate_power': rows[0]=rows[0].replace('}',',"single_pilot_power":[0.05]}')
+    path=tmp_path/'worker.jsonl';path.write_text('\n'.join(rows)+'\n')
+    assert probe.classify_activity(os.fsencode(path))==expected
+
+
+@pytest.mark.parametrize('power,floor,expected',[
+    (.014,.002,0),
+    (.018,.003,1),
+    (.018,.0031,0),
+    (.029,.0027,1),
+])
+def test_retained_activity_uses_absolute_and_local_floor_gates(probe,tmp_path,power,floor,expected):
+    rows=[json.dumps({'kind':'candidate_order','attempt':attempt,
+        'single_pilot_power':[power,floor,floor]},separators=(',',':'))
+        for attempt in range(1,7)]
     path=tmp_path/'worker.jsonl';path.write_text('\n'.join(rows)+'\n')
     assert probe.classify_activity(os.fsencode(path))==expected
 
