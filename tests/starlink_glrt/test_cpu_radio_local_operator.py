@@ -87,6 +87,8 @@ def test_parent_distinguishes_negative_activity_loss_and_completed_track(operato
     assert operator.decode_parent(done,operator.RATE,4,0)["track_complete"]
     native = parent(operator,started=1,result=3,selection="native_handoff",selected=3)
     assert operator.decode_parent(native,operator.RATE,4,1)["result"] == 3
+    failed = parent(operator,started=1,result=-4,selection="retained_activity",selected=2)
+    assert operator.decode_parent(failed,operator.RATE,4,1)["result"] == -4
 
 
 @pytest.mark.parametrize("raw,exit_code", [

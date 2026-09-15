@@ -80,7 +80,8 @@ def decode_parent(raw, rate, count, exit_code):
     if not value["followup_started"]:
         valid = value["result"] == 0 and not value["track_complete"] and value["selection"] == "none" and value["selected_index"] is None
     else:
-        valid = (value["result"] in (0, 1, 3) and value["track_complete"] == (value["result"] == 0)
+        valid = (value["result"] in (-7, -6, -5, -4, -3, -2, -1, 0, 1, 3)
+                 and value["track_complete"] == (value["result"] == 0)
                  and value["selection"] in ("retained_activity", "native_handoff")
                  and type(value["selected_index"]) is int and 0 <= value["selected_index"] < count)
     if not valid or exit_code != (0 if value["result"] == 0 else 1):
