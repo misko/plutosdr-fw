@@ -15,7 +15,9 @@ def review_continuity(text, parent, *, serial, los):
         raise ValueError("visit journal plan or terminal differs")
     plan=plans[0];count=len(los)
     policy=parent.get("activity_selection","first_qualified")
-    wait100=policy=="strongest_one_attempt_scan_power50_wait12_track100"
+    wait40=policy=="strongest_one_attempt_scan_power50_wait40_track100"
+    wait100=policy in ("strongest_one_attempt_scan_power50_wait12_track100",
+                       "strongest_one_attempt_scan_power50_wait40_track100")
     wait=policy=="strongest_one_attempt_scan_prior_reacquire_wait12"
     prior=policy in ("strongest_one_attempt_scan_prior_reacquire",
                      "strongest_one_attempt_scan_prior_reacquire_wait12")
@@ -25,7 +27,8 @@ def review_continuity(text, parent, *, serial, los):
     fresh=policy in ("strongest_one_attempt_scan","strongest_one_attempt_scan_prior_reacquire",
                      "strongest_one_attempt_scan_prior_reacquire_wait12")
     fresh=fresh or wait100
-    profile=("sparse100-wait12-after-scout1" if wait100 else
+    profile=("sparse100-wait40-after-scout1" if wait40 else
+             "sparse100-wait12-after-scout1" if wait100 else
              "continuity30-prior-wait12-after-scout1" if wait else
              "continuity30-prior-after-scout1" if prior else
              "continuity30-fresh-after-scout1" if fresh else
@@ -39,7 +42,8 @@ def review_continuity(text, parent, *, serial, los):
     if parent.get("scope")!=expected_scope:
         raise ValueError("continuity scope differs")
     expected=["plan",str(parent["rate"]),serial,*map(str,los),profile,
-              str(count),"1200000000000" if wait100 else "900000000000" if wait else "400000000000"]
+              str(count),"1800000000000" if wait40 else "1200000000000" if wait100 else
+              "900000000000" if wait else "400000000000"]
     if plan!=expected or terminals[0] != ["terminal",str(parent["result"])]:
         raise ValueError("visit plan identity differs")
 
@@ -89,7 +93,7 @@ def review_continuity(text, parent, *, serial, los):
             raise ValueError("visit source did not advance")
     if not len(starts)==len(ends)==parent["segments_started"]:
         raise ValueError("segment count differs")
-    if parent["scan_rounds"]>(12 if wait or wait100 else 3) or parent["segments_started"]>(1 if wait100 else 3):
+    if parent["scan_rounds"]>(40 if wait40 else 12 if wait or wait100 else 3) or parent["segments_started"]>(1 if wait100 else 3):
         raise ValueError("continuity plan bound differs")
     previous_followup=-1;previous_round=-1
     for start,end in zip(starts,ends,strict=True):

@@ -387,13 +387,14 @@ def test_retained_activity_score_is_strongest_candidate_not_array_position(probe
     b'sparse30-after-scout16',b'sparse100-after-scout16',b'continuity30-after-scout16',
     b'continuity30-ranked-after-scout16',b'continuity30-fresh-after-scout1',
     b'continuity30-prior-after-scout1',b'continuity30-prior-wait12-after-scout1',
-    b'sparse100-wait12-after-scout1',b'unknown'])
+    b'sparse100-wait12-after-scout1',b'sparse100-wait40-after-scout1',b'unknown'])
 def test_explicit_scan64_plan_preserves_legacy_and_rejects_invalid_arguments(probe,rate,count,profile):
     valid=rate in (30000000,60000000) and count in (2,3,4) and profile!=b'unknown'
     expected=16 if profile in (b'sparse10-after-scout16',b'sparse30-after-scout16',b'sparse100-after-scout16',
         b'continuity30-after-scout16',b'continuity30-ranked-after-scout16',
         ) else 1 if profile in (b'continuity30-fresh-after-scout1',b'continuity30-prior-after-scout1',
-            b'continuity30-prior-wait12-after-scout1',b'sparse100-wait12-after-scout1') else 64 if profile else 8
+            b'continuity30-prior-wait12-after-scout1',b'sparse100-wait12-after-scout1',
+            b'sparse100-wait40-after-scout1') else 64 if profile else 8
     assert probe.parse_plan(rate,count,profile)==(expected if valid else -1)
 
 
@@ -401,6 +402,7 @@ def test_explicit_scan64_plan_preserves_legacy_and_rejects_invalid_arguments(pro
     (b'continuity30-prior-after-scout1',[3,3,400,0]),
     (b'continuity30-prior-wait12-after-scout1',[12,3,900,0]),
     (b'sparse100-wait12-after-scout1',[12,1,1200,50]),
+    (b'sparse100-wait40-after-scout1',[40,1,1800,50]),
 ])
 def test_continuity_plan_carries_explicit_round_segment_and_wall_bounds(probe,profile,expected):
     out=(c.c_uint*4)()

@@ -106,6 +106,12 @@ def test_ranked_review_requires_full_scan_and_selects_strongest_activity():
     with pytest.raises(ValueError):
         review_continuity(wait100.replace("candidate 1 0.07","candidate 1 0.049"),
                           wait100_parent,serial=SERIAL,los=LOS)
+    wait40=wait100.replace("sparse100-wait12-after-scout1","sparse100-wait40-after-scout1")
+    wait40=wait40.replace(" 1200000000000\n"," 1800000000000\n",1)
+    wait40_parent={**wait100_parent,
+                   "activity_selection":"strongest_one_attempt_scan_power50_wait40_track100"}
+    assert review_continuity(wait40,wait40_parent,serial=SERIAL,los=LOS)["activity_selection"]==(
+        "strongest_one_attempt_scan_power50_wait40_track100")
 
 
 def test_review_accepts_parent_mapping_of_arbitrary_child_failure():
