@@ -108,6 +108,15 @@ int live_native_limits(const char *blocks,uint64_t out[2])
 }
 int live_native_stride(const char *blocks)
 { struct dwell_limits limits;return dwell_limits(blocks,&limits) ? -1 : (int)limits.native_stride; }
+int live_aligned_start(const char *blocks,uint32_t observer_first,uint32_t frame,uint32_t *out)
+{
+    struct dwell_limits limits;struct live s={0};
+    if(dwell_limits(blocks,&limits)) return -1;
+    s.native_stride=limits.native_stride;s.observer_spacing=limits.observer_spacing;
+    s.observer_first_frame=observer_first;
+    if(align_native_frame(&s,&frame)) return -1;
+    *out=frame;return 0;
+}
 int live_observer_limits(const char *blocks,uint64_t out[4])
 {
     struct dwell_limits limits;
@@ -315,6 +324,7 @@ def live_api(tmp_path_factory):
     lib.live_restart_fault.argtypes = [c.c_void_p,c.c_uint]
     lib.live_native_limits.argtypes = [c.c_char_p,c.c_void_p]
     lib.live_native_stride.argtypes = [c.c_char_p]
+    lib.live_aligned_start.argtypes = [c.c_char_p,c.c_uint32,c.c_uint32,c.POINTER(c.c_uint32)]
     lib.live_observer_limits.argtypes = [c.c_char_p,c.c_void_p]
     lib.unused_probe_main.argtypes = [c.c_int, c.POINTER(c.c_char_p)]
     lib.live_rank.argtypes = [c.c_void_p,c.c_void_p,c.c_void_p,c.c_uint,c.c_void_p,c.c_void_p]
@@ -386,6 +396,18 @@ def test_extended_native_cadence_aligns_with_the_observer(live_api,profile,expec
     target=10 if b'track10-' in profile else 30 if b'track30-' in profile else 100
     assert (limits[0]-1)*expected/750 >= target
     assert (limits[0]-1)*expected/750 < target+.0121
+
+
+@pytest.mark.parametrize('profile,requested,expected',[
+    (b'45000-selected-observer9-scan80-local2-track30-sparse9-authority',1260,1269),
+    (b'45000-selected-observer9-scan80-local2-track30-sparse9-authority',1274,1278),
+    (b'45000-selected-observer9-scan80-local2-track100-sparse9-authority',1278,1278),
+    (b'45000-selected-observer9-scan80-local2-track10-sparse10-authority',1274,1274),
+])
+def test_extended_native_start_uses_the_observer_frame_grid(live_api,profile,requested,expected):
+    lib,_=live_api;out=c.c_uint32()
+    assert lib.live_aligned_start(profile,1269,requested,c.byref(out))==0
+    assert out.value==expected
 
 
 @pytest.mark.parametrize('profile,expected',[

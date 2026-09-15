@@ -133,6 +133,7 @@ struct live {
     uint32_t paired_queued,paired_copied,paired_episode_first;
     int selected_iq,visit_mode,restart_on_loss;
     unsigned observer_spacing,native_result_limit,native_stride;
+    uint32_t observer_first_frame;
     uint32_t observer_maximum,observer_retention_limit;
     uint64_t observer_source_span,observer_budget_ns;
     double native_seconds;
@@ -243,6 +244,7 @@ static int start_observer(struct live *s)
     if((spacing!=3 && spacing!=9) || s->observer_started || !s->observer_journal || !s->observer_iq || first>UINT32_MAX-spacing)
         return GLRT_NATIVE_RETENTION_ERROR;
     first+=spacing;
+    s->observer_first_frame=first;
     if(glrt_tracking_trend_batch(history,first,1,1,0,&batch,&slope) ||
        glrt_tracking_prediction(&batch,0,&job) || job.start>UINT64_MAX-source_span ||
        glrt_tracking_observer_init_cadence(&s->observer,history,first,spacing,maximum,job.start+source_span,now,budget))
@@ -537,12 +539,24 @@ static int refresh_native_authority(struct live *s)
         generation,s->authority_refreshes,first,coarse.history.last_seen,coarse.history.last_supported);
     return ferror(s->journal) || fflush(s->journal) ? GLRT_NATIVE_RETENTION_ERROR : 0;
 }
+static int align_native_frame(const struct live *s,uint32_t *frame)
+{
+    uint32_t offset,advance;
+    if(!s || !frame || !s->native_stride) return -1;
+    if(s->native_stride!=s->observer_spacing || !s->observer_first_frame) return 0;
+    if(*frame<s->observer_first_frame) *frame=s->observer_first_frame;
+    offset=(*frame-s->observer_first_frame)%s->native_stride;
+    if(!offset) return 0;
+    advance=s->native_stride-offset;
+    if(*frame>UINT32_MAX-advance) return -1;
+    *frame+=advance;return 0;
+}
 static int run_native_feedback(struct live *s)
 {
     struct glrt_tracking_trend native;
     struct glrt_tracking_batch batch;
     struct glrt_tracking_job job;
-    char raw[4096];uint32_t words[24];uint64_t earliest;
+    char raw[4096];uint32_t words[24],search_step;uint64_t earliest,horizon;
     double slope;int rc,n,pair_result=0;
     struct glrt_native_ports ports={s,paired_read,paired_write,paired_retain,paired_clock};
     uint32_t frame=s->worker.trace.frame;
@@ -561,12 +575,18 @@ static int run_native_feedback(struct live *s)
     /* Publication can lag the live native clock by a refill interval. Choose
      * a fresh batch from the SAME supported history and its existing horizon;
      * the controller still rereads hardware after descriptor retention. */
-    for(;frame<=native.history.last_supported+25;frame++) {
+    if(align_native_frame(s,&frame)) return GLRT_NATIVE_DEADLINE;
+    search_step=s->native_stride==s->observer_spacing && s->observer_first_frame ?
+        s->native_stride : 1U;
+    horizon=(uint64_t)native.history.last_supported+25U;
+    for(;;) {
         uint32_t repeats=s->native_stride>1 ? 1 : 8;
+        if(frame>horizon) return GLRT_NATIVE_DEADLINE;
         if(!glrt_tracking_trend_batch(&native,frame,repeats,s->attempts,0,&batch,&slope) &&
            !glrt_tracking_prediction(&batch,0,&job) && job.start>=earliest) break;
+        if(frame>UINT32_MAX-search_step) return GLRT_NATIVE_DEADLINE;
+        frame+=search_step;
     }
-    if(frame>native.history.last_supported+25) return GLRT_NATIVE_DEADLINE;
     if((s->native_stride>1 ? glrt_tracking_controller_init_handoff_strided(&s->controller,&ports,
         &batch,&native,frame,s->native_result_limit,s->native_stride,s->native_seconds) :
         glrt_tracking_controller_init_handoff(&s->controller,&ports,&batch,&native,frame,
