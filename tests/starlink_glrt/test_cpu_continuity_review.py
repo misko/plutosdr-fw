@@ -151,6 +151,11 @@ def test_persistent_100_second_policy_requires_same_lo_in_consecutive_rounds():
             "selected_index":1,
             "activity_selection":"strongest_one_attempt_scan_power50_consecutive2_wait40x2_track100"}
     assert review_continuity(text,parent,serial=SERIAL,los=LOS)["status"]=="pass"
+    wait20=text.replace("sparse100-wait40x2-confirm2-after-scout1",
+                        "sparse100-wait20x2-confirm2-after-scout1")
+    wait20_parent={**parent,
+        "activity_selection":"strongest_one_attempt_scan_power50_consecutive2_wait20x2_track100"}
+    assert review_continuity(wait20,wait20_parent,serial=SERIAL,los=LOS)["status"]=="pass"
     for damaged in (text.replace("activity candidate 1 0.07\n",""),
                     text.replace("activity candidate 1 0.07","activity candidate 1 0.049"),
                     text.replace("activity candidate 1 0.07","activity candidate 1 0.07\nactivity candidate 2 0.08")):

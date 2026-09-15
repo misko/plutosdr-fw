@@ -29,10 +29,12 @@ WAIT100_PROFILE = "sparse100-wait12-after-scout1"
 WAIT40_100_PROFILE = "sparse100-wait40-after-scout1"
 WAIT40X2_100_PROFILE = "sparse100-wait40x2-after-scout1"
 WAIT40X2_CONFIRM_100_PROFILE = "sparse100-wait40x2-confirm2-after-scout1"
+WAIT20X2_CONFIRM_100_PROFILE = "sparse100-wait20x2-confirm2-after-scout1"
 PROFILES = (PROFILE, "sparse30-after-scout16", "sparse100-after-scout16",
             CONTINUITY30_PROFILE, RANKED_CONTINUITY30_PROFILE, FRESH_CONTINUITY30_PROFILE,
             PRIOR_CONTINUITY30_PROFILE, WAIT_PRIOR_CONTINUITY30_PROFILE, WAIT100_PROFILE,
-            WAIT40_100_PROFILE, WAIT40X2_100_PROFILE, WAIT40X2_CONFIRM_100_PROFILE)
+            WAIT40_100_PROFILE, WAIT40X2_100_PROFILE, WAIT40X2_CONFIRM_100_PROFILE,
+            WAIT20X2_CONFIRM_100_PROFILE)
 UPPER_EDGE_LOS = (1_190_312_500, 1_440_312_500, 1_690_312_500, 1_940_312_500)
 SCOUT_SAMPLES = 1536 * 16384
 FOLLOWUP_SAMPLES = 45000 * 16384
@@ -44,7 +46,7 @@ WAIT40_CONTINUITY_ROUNDS = 40
 FOLLOWUP_RF_SAMPLES = 45000 * 16384
 MAX_ARCHIVE_BYTES = 320 * 1024 * 1024
 EXPECTED = {
-    "probe": "33a44e515d86a2f0bf45b64089f272f4522c25d411965c69613fa6198cc71606",
+    "probe": "31921dc650a19a0c2bc3ac4db4d6bb665f8f11c38da656f37707d06702d4ca88",
     "bank": "d9f3452e45180c560a200bb76c9bfe2d7c46b17560fd46495ea74c50f50547f0",
     "references": "78b50e1aea5c350889b0798fc691491299925932e496a918cd5fbd3b9bc4faf2",
 }
@@ -79,8 +81,9 @@ def maximum_source_seconds(count, profile=PROFILE):
         samples = WAIT_CONTINUITY_ROUNDS * count * SCOUT_SAMPLES + FOLLOWUP_RF_SAMPLES
     elif profile == WAIT40_100_PROFILE:
         samples = WAIT40_CONTINUITY_ROUNDS * count * SCOUT_SAMPLES + FOLLOWUP_RF_SAMPLES
-    elif profile in (WAIT40X2_100_PROFILE, WAIT40X2_CONFIRM_100_PROFILE):
-        samples = WAIT40_CONTINUITY_ROUNDS * count * SCOUT_SAMPLES + 2 * FOLLOWUP_RF_SAMPLES
+    elif profile in (WAIT40X2_100_PROFILE, WAIT40X2_CONFIRM_100_PROFILE, WAIT20X2_CONFIRM_100_PROFILE):
+        rounds=20 if profile==WAIT20X2_CONFIRM_100_PROFILE else WAIT40_CONTINUITY_ROUNDS
+        samples = rounds * count * SCOUT_SAMPLES + 2 * FOLLOWUP_RF_SAMPLES
     else:
         samples = count * SCOUT_SAMPLES + FOLLOWUP_SAMPLES
     return samples / 2_500_000
@@ -102,15 +105,15 @@ def decode_parent(raw, rate, count, exit_code, profile=PROFILE):
     value = json.loads(lines[0])
     if profile in (CONTINUITY30_PROFILE,RANKED_CONTINUITY30_PROFILE,FRESH_CONTINUITY30_PROFILE,
                    PRIOR_CONTINUITY30_PROFILE,WAIT_PRIOR_CONTINUITY30_PROFILE,WAIT100_PROFILE,
-                   WAIT40_100_PROFILE,WAIT40X2_100_PROFILE,WAIT40X2_CONFIRM_100_PROFILE):
+                   WAIT40_100_PROFILE,WAIT40X2_100_PROFILE,WAIT40X2_CONFIRM_100_PROFILE,WAIT20X2_CONFIRM_100_PROFILE):
         keys = {"scope", "rate", "result", "rf_sample_limit", "scan_rounds",
                 "segments_started", "visits_executed", "track_complete", "selection", "selected_index"}
         expected_scope="bounded_arm_scout_segmented_followup"
         if profile in (RANKED_CONTINUITY30_PROFILE,FRESH_CONTINUITY30_PROFILE,
                        PRIOR_CONTINUITY30_PROFILE,WAIT_PRIOR_CONTINUITY30_PROFILE,WAIT100_PROFILE,
-                       WAIT40_100_PROFILE,WAIT40X2_100_PROFILE,WAIT40X2_CONFIRM_100_PROFILE):
+                       WAIT40_100_PROFILE,WAIT40X2_100_PROFILE,WAIT40X2_CONFIRM_100_PROFILE,WAIT20X2_CONFIRM_100_PROFILE):
             keys.add("activity_selection")
-            expected_scope=("bounded_arm_scout_wait100_followup" if profile in (WAIT100_PROFILE,WAIT40_100_PROFILE,WAIT40X2_100_PROFILE,WAIT40X2_CONFIRM_100_PROFILE) else
+            expected_scope=("bounded_arm_scout_wait100_followup" if profile in (WAIT100_PROFILE,WAIT40_100_PROFILE,WAIT40X2_100_PROFILE,WAIT40X2_CONFIRM_100_PROFILE,WAIT20X2_CONFIRM_100_PROFILE) else
                             "bounded_arm_scout_prior_wait_segmented_followup" if profile==WAIT_PRIOR_CONTINUITY30_PROFILE else
                             "bounded_arm_scout_prior_segmented_followup" if profile==PRIOR_CONTINUITY30_PROFILE else
                             "bounded_arm_scout_fresh_segmented_followup" if profile==FRESH_CONTINUITY30_PROFILE
@@ -119,8 +122,9 @@ def decode_parent(raw, rate, count, exit_code, profile=PROFILE):
             raise ValueError("parent status identity differs")
         if profile in (RANKED_CONTINUITY30_PROFILE,FRESH_CONTINUITY30_PROFILE,
                        PRIOR_CONTINUITY30_PROFILE,WAIT_PRIOR_CONTINUITY30_PROFILE,WAIT100_PROFILE,
-                       WAIT40_100_PROFILE,WAIT40X2_100_PROFILE,WAIT40X2_CONFIRM_100_PROFILE):
-            expected_policy=("strongest_one_attempt_scan_power50_consecutive2_wait40x2_track100" if profile==WAIT40X2_CONFIRM_100_PROFILE else
+                       WAIT40_100_PROFILE,WAIT40X2_100_PROFILE,WAIT40X2_CONFIRM_100_PROFILE,WAIT20X2_CONFIRM_100_PROFILE):
+            expected_policy=("strongest_one_attempt_scan_power50_consecutive2_wait20x2_track100" if profile==WAIT20X2_CONFIRM_100_PROFILE else
+                             "strongest_one_attempt_scan_power50_consecutive2_wait40x2_track100" if profile==WAIT40X2_CONFIRM_100_PROFILE else
                              "strongest_one_attempt_scan_power50_wait40x2_track100" if profile==WAIT40X2_100_PROFILE else
                              "strongest_one_attempt_scan_power50_wait40_track100" if profile==WAIT40_100_PROFILE else
                              "strongest_one_attempt_scan_power50_wait12_track100" if profile==WAIT100_PROFILE else
@@ -135,13 +139,13 @@ def decode_parent(raw, rate, count, exit_code, profile=PROFILE):
             raise ValueError("parent status types differ")
         rounds=value["scan_rounds"];segments=value["segments_started"];visits=value["visits_executed"]
         scouts=visits-segments
-        maximum_rounds=(WAIT40_CONTINUITY_ROUNDS if profile in (WAIT40_100_PROFILE,WAIT40X2_100_PROFILE,WAIT40X2_CONFIRM_100_PROFILE) else
+        maximum_rounds=(20 if profile==WAIT20X2_CONFIRM_100_PROFILE else WAIT40_CONTINUITY_ROUNDS if profile in (WAIT40_100_PROFILE,WAIT40X2_100_PROFILE,WAIT40X2_CONFIRM_100_PROFILE) else
                         WAIT_CONTINUITY_ROUNDS if profile in (WAIT_PRIOR_CONTINUITY30_PROFILE,WAIT100_PROFILE)
                         else CONTINUITY_ROUNDS)
-        maximum_segments=2 if profile in (WAIT40X2_100_PROFILE,WAIT40X2_CONFIRM_100_PROFILE) else 1 if profile in (WAIT100_PROFILE,WAIT40_100_PROFILE) else WAIT_CONTINUITY_SEGMENTS if profile==WAIT_PRIOR_CONTINUITY30_PROFILE else maximum_rounds
+        maximum_segments=2 if profile in (WAIT40X2_100_PROFILE,WAIT40X2_CONFIRM_100_PROFILE,WAIT20X2_CONFIRM_100_PROFILE) else 1 if profile in (WAIT100_PROFILE,WAIT40_100_PROFILE) else WAIT_CONTINUITY_SEGMENTS if profile==WAIT_PRIOR_CONTINUITY30_PROFILE else maximum_rounds
         valid_counts=(1 <= rounds <= maximum_rounds and 0 <= segments <= min(rounds,maximum_segments) and
                       rounds <= scouts <= rounds*count and visits == scouts+segments)
-        segment_samples=FOLLOWUP_RF_SAMPLES if profile in (WAIT100_PROFILE,WAIT40_100_PROFILE,WAIT40X2_100_PROFILE,WAIT40X2_CONFIRM_100_PROFILE) else SEGMENT_SAMPLES
+        segment_samples=FOLLOWUP_RF_SAMPLES if profile in (WAIT100_PROFILE,WAIT40_100_PROFILE,WAIT40X2_100_PROFILE,WAIT40X2_CONFIRM_100_PROFILE,WAIT20X2_CONFIRM_100_PROFILE) else SEGMENT_SAMPLES
         expected_limit=scouts*SCOUT_SAMPLES+segments*segment_samples
         selected=value["selected_index"]
         valid_selection=(segments == 0 and value["selection"] == "none" and selected is None) or (
@@ -313,7 +317,7 @@ def main():
             run("mkdir " + shlex.quote(remote + "/evidence")).check_returncode()
             command = [remote + "/probe", str(RATE), SERIAL, remote + "/bank", remote + "/references",
                        remote + "/evidence", *map(str, los), args.profile]
-            result = run(shlex.join(command), timeout=1900 if args.profile in (WAIT40_100_PROFILE,WAIT40X2_100_PROFILE,WAIT40X2_CONFIRM_100_PROFILE) else 1300 if args.profile==WAIT100_PROFILE else 1000 if args.profile==WAIT_PRIOR_CONTINUITY30_PROFILE else 430)
+            result = run(shlex.join(command), timeout=1900 if args.profile in (WAIT40_100_PROFILE,WAIT40X2_100_PROFILE,WAIT40X2_CONFIRM_100_PROFILE,WAIT20X2_CONFIRM_100_PROFILE) else 1300 if args.profile==WAIT100_PROFILE else 1000 if args.profile==WAIT_PRIOR_CONTINUITY30_PROFILE else 430)
             (args.output / "stdout.json").write_bytes(result.stdout);(args.output / "stderr.txt").write_bytes(result.stderr)
             archive = run("tar -C " + shlex.quote(remote) + " -cf - evidence", timeout=90);archive.check_returncode()
             (args.output / "evidence.tar").write_bytes(archive.stdout)
@@ -321,7 +325,7 @@ def main():
             receipt["retained_files"] = extract_evidence(archive.stdout, args.output / "retained", parent, len(los))
             if args.profile in (CONTINUITY30_PROFILE,RANKED_CONTINUITY30_PROFILE,FRESH_CONTINUITY30_PROFILE,
                                 PRIOR_CONTINUITY30_PROFILE,WAIT_PRIOR_CONTINUITY30_PROFILE,WAIT100_PROFILE,
-                                WAIT40_100_PROFILE,WAIT40X2_100_PROFILE,WAIT40X2_CONFIRM_100_PROFILE):
+                                WAIT40_100_PROFILE,WAIT40X2_100_PROFILE,WAIT40X2_CONFIRM_100_PROFILE,WAIT20X2_CONFIRM_100_PROFILE):
                 try:
                     receipt["continuity_review"] = review_continuity(
                         (args.output / "retained/evidence/visits.txt").read_text(), parent,
