@@ -98,6 +98,9 @@ static int dwell_limits(const char *blocks,struct dwell_limits *out)
          * clean loss returns to the visit parent instead of retrying this LO. */
         *out=(struct dwell_limits){7500,64,65,UINT64_C(60000000000),1,9,80,0,STABLE30_NATIVE_RESULTS,SPARSE30_NATIVE_WALL_SECONDS,1,10,
             2700,2700,UINT64_C(80000000),UINT64_C(60000000000),SPARSE30_NATIVE_JOURNAL_BYTES,GLRT_TRACKING_FORECAST_COAST};
+    else if(!strcmp(blocks,"7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16"))
+        *out=(struct dwell_limits){7500,16,65,UINT64_C(60000000000),1,9,80,0,STABLE30_NATIVE_RESULTS,SPARSE30_NATIVE_WALL_SECONDS,1,10,
+            2700,2700,UINT64_C(80000000),UINT64_C(60000000000),SPARSE30_NATIVE_JOURNAL_BYTES,GLRT_TRACKING_FORECAST_COAST};
     else if(!strcmp(blocks,"45000-selected-observer9-scan80-local2-track100-sparse10-authority"))
         *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,STABLE100_NATIVE_RESULTS,SPARSE100_NATIVE_WALL_SECONDS,1,10,
             8600,8600,UINT64_C(260000000),UINT64_C(120000000000),SPARSE100_NATIVE_JOURNAL_BYTES,GLRT_TRACKING_FORECAST_COAST};
@@ -109,6 +112,8 @@ static int dwell_limits(const char *blocks,struct dwell_limits *out)
         *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,64,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0,0,0};
     else if(!strcmp(blocks,"1536-selected-observer3-scan64-scout16"))
         *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,64,0,SCOUT_NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0,0,0};
+    else if(!strcmp(blocks,"1536-selected-observer3-scan64-scout1"))
+        *out=(struct dwell_limits){BLOCKS,1,25,UINT64_C(12000000000),1,3,64,0,SCOUT_NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0,0,0};
     else if(!strcmp(blocks,"1536-selected-observer3-scan80-local2"))
         *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,80,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1,0,0,0,0,0,0};
     else return -1;
@@ -920,7 +925,8 @@ static int live_probe_run(int argc,char **argv,int visit_mode)
     s->observer_budget_ns=limits.observer_budget_ns;
     s->native_journal_bytes=limits.native_journal_bytes;
     s->forecast_horizon=limits.forecast_horizon;
-    s->stop_on_activity=argc==7 && !strcmp(argv[6],"1536-selected-observer3-scan64-scout16");
+    s->stop_on_activity=argc==7 && (!strcmp(argv[6],"1536-selected-observer3-scan64-scout16") ||
+        !strcmp(argv[6],"1536-selected-observer3-scan64-scout1"));
     NEED(!pthread_mutex_init(&s->mutex,NULL),"mutex");mutex=1;
     NEED(!pthread_mutex_init(&s->authority_mutex,NULL),"authority_mutex");mutex=2;
     NEED(!load(argv[3],s->bank,sizeof(s->bank)) && !load(argv[4],s->refs,sizeof(s->refs)),"reference_files");

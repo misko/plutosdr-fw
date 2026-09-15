@@ -78,13 +78,16 @@ static int simulated_child(int argc,char **argv) {
 }
 static int simulated_followup_child(int argc,char **argv) {
     if(argc!=7 || (strcmp(argv[6],SPARSE_PROFILE) && strcmp(argv[6],SPARSE30_PROFILE) &&
-        strcmp(argv[6],SPARSE100_PROFILE) && strcmp(argv[6],SEGMENT30_PROFILE))) return 9;
+        strcmp(argv[6],SPARSE100_PROFILE) && strcmp(argv[6],SEGMENT30_PROFILE) &&
+        strcmp(argv[6],FRESH_SEGMENT30_PROFILE))) return 9;
     unsigned results=!strcmp(argv[6],SPARSE_PROFILE) ? 751U :
         !strcmp(argv[6],SPARSE100_PROFILE) ? 8335U : 2501U;
-    unsigned blocks=!strcmp(argv[6],SEGMENT30_PROFILE) ? 7500U : 45000U;
+    unsigned blocks=(!strcmp(argv[6],SEGMENT30_PROFILE) || !strcmp(argv[6],FRESH_SEGMENT30_PROFILE)) ? 7500U : 45000U;
+    unsigned finite=!strcmp(argv[1],"sparse_finite");
     printf("{\"scope\":\"bounded_live_cpu_acquisition_native_feedback\",\"rate\":0,"
-        "\"status\":0,\"blocks\":%u,\"attempts\":2,\"handoffs\":1,"
-        "\"native_results\":%u,\"native_completed_runs\":1,\"worker_complete\":1}\n",blocks,results);
+        "\"status\":0,\"blocks\":%u,\"attempts\":2,\"handoffs\":%u,"
+        "\"native_results\":%u,\"native_completed_runs\":%u,\"worker_complete\":%u}\n",
+        blocks,!finite,finite ? 0U : results,!finite,!finite);
     return 0;
 }
 int exercise_child(const char *directory,const char *mode) {
@@ -121,6 +124,13 @@ int exercise_followup_child(const char *directory,const char *profile) {
     interrupted=0;
     return visit_child(&context,4,clock_ns(NULL)+UINT64_C(2000000000));
 }
+int exercise_finite_segment(const char *directory) {
+    char *args[]={"probe","sparse_finite","serial","bank","refs",(char *)directory};
+    struct visit_context context={.args=args,.probe_main=simulated_child,
+        .followup_probe_main=simulated_followup_child,.visit_count=4,
+        .profile=SEGMENT30_PROFILE,.followup_sparse=1};
+    interrupted=0;return visit_child(&context,4,clock_ns(NULL)+UINT64_C(2000000000));
+}
 int parse_plan(unsigned rate,unsigned count,const char *profile) {
     char raw_rate[32];snprintf(raw_rate,sizeof(raw_rate),"%u",rate);
     char *args[]={"probe",raw_rate,"1040005e0b100007100010000bf33a5d4d","bank","refs","out",
@@ -131,7 +141,8 @@ int parse_plan(unsigned rate,unsigned count,const char *profile) {
     if(visit_arguments(6+(int)count+(profile!=NULL),args,&context,lo)) return -1;
     const char *selected=visit_profile(&context);
     if(context.visit_count!=count || context.rate!=rate) return -2;
-    if(context.followup_sparse) return selected && !strcmp(selected,SCOUT_PROFILE) ? 16 : -3;
+    if(context.followup_sparse) return selected && !strcmp(selected,SCOUT_PROFILE) ? 16 :
+        selected && !strcmp(selected,QUICK_SCOUT_PROFILE) ? 1 : -3;
     return selected && !strcmp(selected,"1536-selected-observer3-scan64") ? 64 : 8;
 }
 struct continuity_fake {
@@ -153,12 +164,14 @@ static int continuity_run_child(void *pointer,unsigned number,uint64_t deadline)
     if(f->mode==0) outcome=(f->call==0 || f->call==2) ? GLRT_VISIT_SIGNAL :
         f->call==1 ? GLRT_VISIT_CLEAN_LOSS : 0;
     else if(f->mode==2) outcome=(f->call%2)==0 ? GLRT_VISIT_SIGNAL : GLRT_VISIT_CLEAN_LOSS;
-    else if(f->mode==3 && !strcmp(visit_profile(f->visit),SCOUT_PROFILE) && number<2) {
+    else if(f->mode>=3 && (!strcmp(visit_profile(f->visit),SCOUT_PROFILE) ||
+        !strcmp(visit_profile(f->visit),QUICK_SCOUT_PROFILE)) && number<2) {
         double score=number ? .07 : .04;
         if(f->visit->activity_number==UINT_MAX || score>f->visit->activity_score) {
             f->visit->activity_number=number;f->visit->activity_score=score;
         }
-    } else if(f->mode==3 && !strcmp(visit_profile(f->visit),SEGMENT30_PROFILE))
+    } else if(f->mode>=3 && (!strcmp(visit_profile(f->visit),SEGMENT30_PROFILE) ||
+        !strcmp(visit_profile(f->visit),FRESH_SEGMENT30_PROFILE)))
         outcome=GLRT_VISIT_CLEAN_LOSS;
     f->call++;return outcome;
 }
@@ -171,7 +184,8 @@ int exercise_continuity(int mode,unsigned out[7],unsigned numbers[16]) {
         continuity_tune,continuity_run_child,continuity_retain};
     struct visit_context context={.journal=tmpfile(),.rate=30000000,.visit_count=4,
         .profile=SCOUT_PROFILE,.followup_profile=SEGMENT30_PROFILE,.followup_sparse=1,.continuity=1};
-    fake.visit=&context;if(mode==3) context.ranked_continuity=1;
+    fake.visit=&context;if(mode>=3) context.ranked_continuity=1;
+    if(mode==4) { context.fresh_continuity=1;context.followup_profile=FRESH_SEGMENT30_PROFILE; }
     struct continuity_result result;uint64_t lo[4]={1190312500,1440312500,1690312500,1940312500};
     if(!context.journal) return -99;
     int rc=continuity_run(&context,&ports,lo,&result);fclose(context.journal);
@@ -211,6 +225,7 @@ def probe(tmp_path_factory):
     lib.invalid_plan.argtypes=[c.c_char_p,c.c_uint,c.c_int]
     lib.exercise_four_children.argtypes=[c.c_char_p]
     lib.exercise_followup_child.argtypes=[c.c_char_p,c.c_char_p]
+    lib.exercise_finite_segment.argtypes=[c.c_char_p]
     lib.parse_plan.argtypes=[c.c_uint,c.c_uint,c.c_char_p]
     lib.exercise_continuity.argtypes=[c.c_int,c.c_void_p,c.c_void_p]
     return lib
@@ -256,12 +271,19 @@ def test_four_selected_children_have_separate_evidence_and_are_all_reaped(probe,
 @pytest.mark.parametrize('profile',[SPARSE_PROFILE := b'45000-selected-observer9-scan80-local2-track10-sparse10-authority',
     b'45000-selected-observer9-scan80-local2-track30-sparse10-authority',
     b'45000-selected-observer9-scan80-local2-track100-sparse10-authority',
-    b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment'])
+    b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment',
+    b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16'])
 def test_sparse_followup_uses_reacquiring_probe(probe,tmp_path,profile):
     assert probe.exercise_followup_child(os.fsencode(tmp_path),profile)==0
     status=json.loads((tmp_path/'visit-4/stdout.json').read_text())
     assert status['attempts']==2
     assert status['native_completed_runs']==1
+
+
+def test_finite_segment_without_handoff_is_typed_no_track(probe,tmp_path):
+    assert probe.exercise_finite_segment(os.fsencode(tmp_path))==3
+    status=json.loads((tmp_path/'visit-4/stdout.json').read_text())
+    assert not status['worker_complete'] and not status['handoffs'] and status['blocks']==7500
 
 
 @pytest.mark.parametrize('damage,expected',[
@@ -324,11 +346,12 @@ def test_retained_activity_score_is_strongest_candidate_not_array_position(probe
 @pytest.mark.parametrize('count',[1,2,3,4])
 @pytest.mark.parametrize('profile',[None,b'1536-selected-observer3-scan64',b'sparse10-after-scout16',
     b'sparse30-after-scout16',b'sparse100-after-scout16',b'continuity30-after-scout16',
-    b'continuity30-ranked-after-scout16',b'unknown'])
+    b'continuity30-ranked-after-scout16',b'continuity30-fresh-after-scout1',b'unknown'])
 def test_explicit_scan64_plan_preserves_legacy_and_rejects_invalid_arguments(probe,rate,count,profile):
     valid=rate in (30000000,60000000) and count in (2,3,4) and profile!=b'unknown'
     expected=16 if profile in (b'sparse10-after-scout16',b'sparse30-after-scout16',b'sparse100-after-scout16',
-        b'continuity30-after-scout16',b'continuity30-ranked-after-scout16') else 64 if profile else 8
+        b'continuity30-after-scout16',b'continuity30-ranked-after-scout16',
+        ) else 1 if profile==b'continuity30-fresh-after-scout1' else 64 if profile else 8
     assert probe.parse_plan(rate,count,profile)==(expected if valid else -1)
 
 
@@ -337,6 +360,7 @@ def test_explicit_scan64_plan_preserves_legacy_and_rejects_invalid_arguments(pro
     (1,[2**32-1,12,3,0,0,12,0],list(range(12))),
     (2,[0,6,3,3,0,6,1],list(range(6))),
     (3,[1,13,3,1,0,13,0],list(range(13))),
+    (4,[1,13,3,1,0,13,0],list(range(13))),
 ])
 def test_continuity_rescans_with_contiguous_evidence_and_stops_on_complete(probe,mode,expected,numbers):
     out=(c.c_uint*7)();seen=(c.c_uint*16)()

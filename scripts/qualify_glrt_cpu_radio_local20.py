@@ -22,8 +22,9 @@ SERIAL = "1040005e0b100007100010000bf33a5d4d"
 PROFILE = "sparse10-after-scout16"
 CONTINUITY30_PROFILE = "continuity30-after-scout16"
 RANKED_CONTINUITY30_PROFILE = "continuity30-ranked-after-scout16"
+FRESH_CONTINUITY30_PROFILE = "continuity30-fresh-after-scout1"
 PROFILES = (PROFILE, "sparse30-after-scout16", "sparse100-after-scout16",
-            CONTINUITY30_PROFILE, RANKED_CONTINUITY30_PROFILE)
+            CONTINUITY30_PROFILE, RANKED_CONTINUITY30_PROFILE, FRESH_CONTINUITY30_PROFILE)
 UPPER_EDGE_LOS = (1_190_312_500, 1_440_312_500, 1_690_312_500, 1_940_312_500)
 SCOUT_SAMPLES = 1536 * 16384
 FOLLOWUP_SAMPLES = 45000 * 16384
@@ -31,7 +32,7 @@ SEGMENT_SAMPLES = 7500 * 16384
 CONTINUITY_ROUNDS = 3
 MAX_ARCHIVE_BYTES = 320 * 1024 * 1024
 EXPECTED = {
-    "probe": "2d82c189356c1db36eefa936259a153072ed4fd4bcd7119c5d7e88ee90a47889",
+    "probe": "079e70f769d31a457bed789402fd8cc0fca30815693a312dc3a62709ddd412a3",
     "bank": "d9f3452e45180c560a200bb76c9bfe2d7c46b17560fd46495ea74c50f50547f0",
     "references": "78b50e1aea5c350889b0798fc691491299925932e496a918cd5fbd3b9bc4faf2",
 }
@@ -57,7 +58,7 @@ def maximum_source_seconds(count, profile=PROFILE):
     if type(count) is not int or not 2 <= count <= 4:
         raise ValueError("invalid scout count")
     samples = (CONTINUITY_ROUNDS * (count * SCOUT_SAMPLES + SEGMENT_SAMPLES)
-               if profile in (CONTINUITY30_PROFILE,RANKED_CONTINUITY30_PROFILE)
+               if profile in (CONTINUITY30_PROFILE,RANKED_CONTINUITY30_PROFILE,FRESH_CONTINUITY30_PROFILE)
                else count * SCOUT_SAMPLES + FOLLOWUP_SAMPLES)
     return samples / 2_500_000
 
@@ -76,16 +77,19 @@ def decode_parent(raw, rate, count, exit_code, profile=PROFILE):
     if len(lines) != 1:
         raise ValueError("ambiguous parent status")
     value = json.loads(lines[0])
-    if profile in (CONTINUITY30_PROFILE,RANKED_CONTINUITY30_PROFILE):
+    if profile in (CONTINUITY30_PROFILE,RANKED_CONTINUITY30_PROFILE,FRESH_CONTINUITY30_PROFILE):
         keys = {"scope", "rate", "result", "rf_sample_limit", "scan_rounds",
                 "segments_started", "visits_executed", "track_complete", "selection", "selected_index"}
         expected_scope="bounded_arm_scout_segmented_followup"
-        if profile==RANKED_CONTINUITY30_PROFILE:
-            keys.add("activity_selection");expected_scope="bounded_arm_scout_ranked_segmented_followup"
+        if profile in (RANKED_CONTINUITY30_PROFILE,FRESH_CONTINUITY30_PROFILE):
+            keys.add("activity_selection")
+            expected_scope=("bounded_arm_scout_fresh_segmented_followup" if profile==FRESH_CONTINUITY30_PROFILE
+                            else "bounded_arm_scout_ranked_segmented_followup")
         if set(value) != keys or value["scope"] != expected_scope or value["rate"] != rate:
             raise ValueError("parent status identity differs")
-        if profile==RANKED_CONTINUITY30_PROFILE and value["activity_selection"]!="strongest_complete_scan":
-            raise ValueError("activity selection policy differs")
+        if profile in (RANKED_CONTINUITY30_PROFILE,FRESH_CONTINUITY30_PROFILE):
+            expected_policy="strongest_one_attempt_scan" if profile==FRESH_CONTINUITY30_PROFILE else "strongest_complete_scan"
+            if value["activity_selection"]!=expected_policy: raise ValueError("activity selection policy differs")
         integers = ("result", "rf_sample_limit", "scan_rounds", "segments_started",
                     "visits_executed", "track_complete")
         if any(type(value[k]) is not int for k in integers):
@@ -134,7 +138,8 @@ def extract_evidence(payload, destination, parent, count):
     if not payload or len(payload) > MAX_ARCHIVE_BYTES:
         raise ValueError("evidence archive size differs")
     if parent["scope"] in ("bounded_arm_scout_segmented_followup",
-                           "bounded_arm_scout_ranked_segmented_followup"):
+                           "bounded_arm_scout_ranked_segmented_followup",
+                           "bounded_arm_scout_fresh_segmented_followup"):
         expected_visits=set(range(parent["visits_executed"]))
     else:
         selected = parent["selected_index"]
@@ -223,7 +228,7 @@ def main():
                "los": los, "profile": args.profile, "maximum_source_seconds": maximum_source_seconds(len(los),args.profile),
                "payload_sha256": hashes, "status": "started", "started_ns": time.time_ns()}
     def save(): (args.output / "operator.json").write_text(json.dumps(receipt, indent=2) + "\n")
-    save();remote = None;staged = mounted = False
+    save();remote = None;staged = mounted = False;review_error=None
     authority = live.LocalCaptureAuthority(Path("/srv/bulk/leo/control"),
         (live.RadioResource("radio_pluto_5d4d", SERIAL, "ip:" + live.ENDPOINT[1]),))
     try:
@@ -267,11 +272,16 @@ def main():
             (args.output / "evidence.tar").write_bytes(archive.stdout)
             parent = decode_parent(result.stdout, RATE, len(los), result.returncode,args.profile);receipt["parent"] = parent
             receipt["retained_files"] = extract_evidence(archive.stdout, args.output / "retained", parent, len(los))
-            if args.profile in (CONTINUITY30_PROFILE,RANKED_CONTINUITY30_PROFILE):
-                receipt["continuity_review"] = review_continuity(
-                    (args.output / "retained/evidence/visits.txt").read_text(), parent,
-                    serial=SERIAL, los=los)
-            receipt["status"] = "track_complete_review_pending" if parent["track_complete"] else "review_pending"
+            if args.profile in (CONTINUITY30_PROFILE,RANKED_CONTINUITY30_PROFILE,FRESH_CONTINUITY30_PROFILE):
+                try:
+                    receipt["continuity_review"] = review_continuity(
+                        (args.output / "retained/evidence/visits.txt").read_text(), parent,
+                        serial=SERIAL, los=los)
+                except Exception as error:
+                    review_error=f"{type(error).__name__}: {error}"
+                    receipt["continuity_review"]={"status":"failed","error":review_error}
+            receipt["status"] = ("review_failed" if review_error else
+                "track_complete_review_pending" if parent["track_complete"] else "review_pending")
         finally:
             if mounted:
                 run("umount " + shlex.quote(remote), timeout=45).check_returncode();mounted = False
@@ -288,6 +298,8 @@ def main():
         expected, name = row.split("  ", 1)
         if digest((args.raid_output / name).read_bytes()) != expected:
             raise ValueError("RAID evidence differs")
+    if review_error:
+        raise ValueError("continuity review failed after evidence publication: "+review_error)
     print(json.dumps({"status": receipt["status"], "track_complete": receipt["parent"]["track_complete"],
                       "output": str(args.output), "raid_output": str(args.raid_output)}))
 

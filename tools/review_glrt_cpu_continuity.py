@@ -14,9 +14,14 @@ def review_continuity(text, parent, *, serial, los):
     if len(plans)!=1 or len(terminals)!=1 or lines[0] != " ".join(plans[0]) or lines[-1] != " ".join(terminals[0]):
         raise ValueError("visit journal plan or terminal differs")
     plan=plans[0];count=len(los)
-    ranked=parent.get("activity_selection") == "strongest_complete_scan"
-    profile="continuity30-ranked-after-scout16" if ranked else "continuity30-after-scout16"
-    expected_scope="bounded_arm_scout_ranked_segmented_followup" if ranked else "bounded_arm_scout_segmented_followup"
+    policy=parent.get("activity_selection","first_qualified")
+    ranked=policy in ("strongest_complete_scan","strongest_one_attempt_scan")
+    fresh=policy=="strongest_one_attempt_scan"
+    profile=("continuity30-fresh-after-scout1" if fresh else
+             "continuity30-ranked-after-scout16" if ranked else "continuity30-after-scout16")
+    expected_scope=("bounded_arm_scout_fresh_segmented_followup" if fresh else
+                    "bounded_arm_scout_ranked_segmented_followup" if ranked else
+                    "bounded_arm_scout_segmented_followup")
     if parent.get("scope")!=expected_scope:
         raise ValueError("continuity scope differs")
     expected=["plan",str(parent["rate"]),serial,*map(str,los),profile,
@@ -81,7 +86,8 @@ def review_continuity(text, parent, *, serial, los):
             raise ValueError("segment scout selection differs")
         scout=grouped[round_first+selected][-1];track=grouped[followup][-1]
         expected_scout=0 if ranked and selection=="retained_activity" else 2
-        if scout[2]!=expected_scout or scout[3]!=lo or track[3]!=lo or track[2]!=end[1]:
+        mapped_track=(track[2] if track[2] in (0,1,3) else -4)
+        if scout[2]!=expected_scout or scout[3]!=lo or track[3]!=lo or mapped_track!=end[1]:
             raise ValueError("segment transition disposition differs")
         round_candidates=[row for row in candidates if round_first<=row[0]<followup]
         if ranked and selection=="retained_activity":
@@ -102,4 +108,4 @@ def review_continuity(text, parent, *, serial, los):
     return {"status":"pass","scope":"bounded_radio_local_continuity_transitions",
             "scan_rounds":parent["scan_rounds"],"segments":len(starts),
             "visits":len(grouped),"rf_sample_limit":expected_limit,
-            "activity_selection":"strongest_complete_scan" if ranked else "first_qualified"}
+            "activity_selection":policy}

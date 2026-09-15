@@ -81,3 +81,15 @@ def test_ranked_review_requires_full_scan_and_selects_strongest_activity():
     assert result["activity_selection"]=="strongest_complete_scan"
     with pytest.raises(ValueError):
         review_continuity(text.replace("candidate 1 0.07","candidate 1 0.03"),parent,serial=SERIAL,los=LOS)
+    fresh=text.replace("continuity30-ranked-after-scout16","continuity30-fresh-after-scout1")
+    fresh_parent={**parent,"scope":"bounded_arm_scout_fresh_segmented_followup",
+                  "activity_selection":"strongest_one_attempt_scan"}
+    assert review_continuity(fresh,fresh_parent,serial=SERIAL,los=LOS)["activity_selection"]=="strongest_one_attempt_scan"
+
+
+def test_review_accepts_parent_mapping_of_arbitrary_child_failure():
+    text,parent=evidence()
+    text=text.replace("visit after_run 3 0 ","visit after_run 3 -1 ")
+    text=text.replace("segment terminal 1 0","segment terminal 1 -4").replace("terminal 0\n","terminal -4\n")
+    parent.update(result=-4,track_complete=0)
+    assert review_continuity(text,parent,serial=SERIAL,los=LOS)["status"]=="pass"

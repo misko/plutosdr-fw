@@ -497,3 +497,15 @@ requires every completed scout, recomputes the strongest recorded activity,
 and rejects an inconsistent selection. Existing first-activity continuity
 evidence and all earlier single-follow-up contracts remain reviewable without
 reinterpretation.
+
+`continuity30-fresh-after-scout1` bounds the age exposed by a complete ranked
+scan. Each LO gets one scan64 attempt per round; the strongest qualifying
+activity starts scan80/local refinement immediately after the four-LO sweep.
+If refinement does not reach a native handoff in sixteen attempts, the segment
+returns `NO_TRACK` and the parent rescans instead of spending the remaining
+source budget at a stale LO. A successful handoff still receives the complete
+7,500-refill window and must independently produce all 2,251 measurements.
+The distinct `strongest_one_attempt_scan` policy and fresh-continuity parent
+scope are retained and independently reviewed. Its worst-case source bound is
+unchanged because the existing accounting already reserves a full 1,536
+refills for every scout.

@@ -390,6 +390,8 @@ def live_api(tmp_path_factory):
     (b'1536-selected-observer3-scan64', [1536,6,25,12000000000]),
     (b'1536-selected-observer3-scan64-scout16', [1536,6,25,12000000000]),
     (b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment', [7500,64,65,60000000000]),
+    (b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16', [7500,16,65,60000000000]),
+    (b'1536-selected-observer3-scan64-scout1', [1536,1,25,12000000000]),
     (b'1536-selected-observer3-scan80-local2', [1536,6,25,12000000000]),
 ])
 def test_dwell_profiles_have_finite_capture_and_worker_limits(live_api, blocks, expected):
@@ -554,6 +556,8 @@ def test_observer_authority_and_retention_are_bounded_per_profile(live_api,profi
     (b'4096',0),(b'1536-selected',0),(b'1536-selected-observer3',0),
     (b'1536-selected-observer3-scan64',0),(b'1536-selected-observer3-scan64-scout16',0),
     (b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment',0),
+    (b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16',0),
+    (b'1536-selected-observer3-scan64-scout1',0),
     (b'1536-selected-observer3-scan80-local2',0),(b'unknown',-1)])
 def test_only_long_profiles_restart_after_clean_native_loss(live_api,profile,expected):
     lib,_=live_api
