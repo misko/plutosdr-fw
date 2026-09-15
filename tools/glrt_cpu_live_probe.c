@@ -250,18 +250,28 @@ static void *observer_thread(void *pointer)
         GLRT_OBSERVER_RETENTION : rc;
     return NULL;
 }
+static unsigned passive_observer_spacing(const struct live *s)
+{
+    unsigned spacing=s->observer_spacing ? s->observer_spacing : 9;
+    /* Keep the proven acquisition bootstrap at nine frames. The long
+     * stride-ten profiles pace their passive authority at the same 13.33-ms
+     * cadence, which leaves measured ARM processing margin. */
+    if(s->native_stride==10 && s->forecast_horizon==GLRT_TRACKING_FORECAST_COAST)
+        spacing=10;
+    return spacing;
+}
 static int start_observer(struct live *s)
 {
     const struct glrt_tracking_trend *history=&s->worker.live.core.trend;
     struct glrt_tracking_batch batch;struct glrt_tracking_job job;double slope;
     uint64_t now=clock_ns(NULL);uint32_t first=history->history.last_seen;
-    unsigned spacing=s->observer_spacing ? s->observer_spacing : 9;
+    unsigned spacing=passive_observer_spacing(s);
     unsigned maximum=s->observer_maximum ? s->observer_maximum : s->coarse_authority ? 1024U : 200U;
     uint64_t source_span=s->observer_source_span ? s->observer_source_span :
         s->coarse_authority ? UINT64_C(30000000) : UINT64_C(7500000);
     uint64_t budget=s->observer_budget_ns ? s->observer_budget_ns :
         s->coarse_authority ? UINT64_C(15000000000) : UINT64_C(3000000000);
-    if((spacing!=3 && spacing!=9) || s->observer_started || !s->observer_journal || !s->observer_iq || first>UINT32_MAX-spacing)
+    if((spacing!=3 && spacing!=9 && spacing!=10) || s->observer_started || !s->observer_journal || !s->observer_iq || first>UINT32_MAX-spacing)
         return GLRT_NATIVE_RETENTION_ERROR;
     first+=spacing;
     s->observer_first_frame=first;
@@ -576,7 +586,7 @@ static int align_native_frame(const struct live *s,uint32_t *frame)
 {
     uint32_t offset,advance;
     if(!s || !frame || !s->native_stride) return -1;
-    if(s->native_stride!=s->observer_spacing || !s->observer_first_frame) return 0;
+    if(s->native_stride!=s->observer.frame_spacing || !s->observer_first_frame) return 0;
     if(*frame<s->observer_first_frame) *frame=s->observer_first_frame;
     offset=(*frame-s->observer_first_frame)%s->native_stride;
     if(!offset) return 0;
@@ -614,7 +624,7 @@ static int run_native_feedback(struct live *s)
      * a fresh batch from the SAME supported history and its existing horizon;
      * the controller still rereads hardware after descriptor retention. */
     if(align_native_frame(s,&frame)) return GLRT_NATIVE_DEADLINE;
-    search_step=s->native_stride==s->observer_spacing && s->observer_first_frame ?
+    search_step=s->native_stride==s->observer.frame_spacing && s->observer_first_frame ?
         s->native_stride : 1U;
     /* Preserve the original 25-frame freshness allowance after rounding onto
      * the observer cadence. Alignment can advance by at most stride-1 frames. */

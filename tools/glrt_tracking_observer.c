@@ -39,7 +39,7 @@ int glrt_tracking_observer_init_cadence_horizon(struct glrt_tracking_observer *s
     if(!s) return -1;
     if(history) retained=*history;
     memset(s,0,sizeof(*s));s->status=GLRT_OBSERVER_INVALID;
-    if(!history || retained.rate!=2500000 || (spacing!=3 && spacing!=9) || !maximum ||
+    if(!history || retained.rate!=2500000 || (spacing!=3 && spacing!=9 && spacing!=10) || !maximum ||
        (forecast_horizon!=GLRT_TRACKING_FORECAST_DEFAULT &&
         forecast_horizon!=GLRT_TRACKING_FORECAST_COAST) ||
        maximum>GLRT_TRACKING_OBSERVER_MAXIMUM || !now || !budget ||
@@ -94,7 +94,7 @@ int glrt_tracking_observer_step(struct glrt_tracking_observer *s,
     if(s->status!=GLRT_OBSERVER_WAIT) return s->status;
     if(s->trend.rate!=2500000 || !s->maximum_measurements ||
        s->maximum_measurements>GLRT_TRACKING_OBSERVER_MAXIMUM ||
-       (s->frame_spacing!=3 && s->frame_spacing!=9) ||
+       (s->frame_spacing!=3 && s->frame_spacing!=9 && s->frame_spacing!=10) ||
        (s->forecast_horizon!=GLRT_TRACKING_FORECAST_DEFAULT &&
         s->forecast_horizon!=GLRT_TRACKING_FORECAST_COAST))
         return finish(s,trace,GLRT_OBSERVER_INVALID);

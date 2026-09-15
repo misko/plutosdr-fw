@@ -113,17 +113,17 @@ int main(int argc,char **argv)
         assert(observer.status==GLRT_OBSERVER_INVALID);
         free(iq);free(storage);puts("PASS");return 0;
     }
-    if(!strcmp(mode,"coast_noise")) {
+    if(!strcmp(mode,"coast_noise") || !strcmp(mode,"coast10_noise")) {
         maximum=40;
         assert(!glrt_tracking_observer_init_cadence_horizon(&observer,&original,frame,
-            cadence,maximum,limit,now,budget,96));
+            !strcmp(mode,"coast10_noise") ? 10 : cadence,maximum,limit,now,budget,96));
     } else
         assert(!glrt_tracking_observer_init(&observer,&original,frame,maximum,limit,now,budget));
     assert(!memcmp(&original,&saved,sizeof(saved)));
     struct context c={&owner,&observer,mode,iq,1000,first,0,0,0};
     struct glrt_tracking_observer_ports ports={&c,clock_ns,cancelled,retain};
     assert(!glrt_tracking_iq_owner_init(&owner,storage,capacity,!strcmp(mode,"epoch") ? 4 : 3,first));
-    if(strcmp(mode,"noise") && strcmp(mode,"coast_noise"))
+    if(strcmp(mode,"noise") && strcmp(mode,"coast_noise") && strcmp(mode,"coast10_noise"))
         for(unsigned k=0;k<10;k++) for(unsigned n=0;n<3300;n++) {
             iq[2*(k*30000+n)]=refs[13200*phase+4*n];iq[2*(k*30000+n)+1]=refs[13200*phase+4*n+1];
         }
@@ -168,14 +168,15 @@ int main(int argc,char **argv)
                     assert(observer.measurements==n+1 && c.retained==n+1);
                 }
                 assert(glrt_tracking_observer_step(&observer,&owner,refs,scratch,&ports,&trace)==GLRT_OBSERVER_DONE);
-            } else if(!strcmp(mode,"noise") || !strcmp(mode,"coast_noise")) {
+            } else if(!strcmp(mode,"noise") || !strcmp(mode,"coast_noise") || !strcmp(mode,"coast10_noise")) {
                 unsigned jobs=0;
                 while((rc=glrt_tracking_observer_step(&observer,&owner,refs,scratch,&ports,&trace))==GLRT_OBSERVER_MEASURED) {
                     assert(!trace.accepted && trace.estimate.rejection);
                     assert(observer.trend.history.last_supported==63);
                     jobs++;
                 }
-                unsigned expected=!strcmp(mode,"coast_noise") ? (cadence==9 ? 10 : 30) :
+                unsigned expected=!strcmp(mode,"coast10_noise") ? 9 :
+                    !strcmp(mode,"coast_noise") ? (cadence==9 ? 10 : 30) :
                     (cadence==9 ? 3 : 8);
                 assert(rc==GLRT_OBSERVER_HISTORY && jobs==expected && c.retained==expected);
             } else {
@@ -231,13 +232,13 @@ def observer_binary(tmp_path_factory, request):
 
 @pytest.mark.parametrize("mode", [
     "positive", "large", "phase1", "phase2", "phase3", "advance_during_guard",
-    "noise", "coast_noise", "waiting", "waiting_deadline", "closed", "lost", "epoch",
+    "noise", "coast_noise", "coast10_noise", "waiting", "waiting_deadline", "closed", "lost", "epoch",
     "overwrite", "deadline", "clock_regression", "future_source_clock", "source_budget",
     "cancelled", "invalid_cancel", "retention", "close_during_retention", "cancel_during_retention",
     "clock_during_retention", "init_rate", "init_history", "init_frame", "init_far_frame",
     "init_count", "init_zero_count", "init_budget", "init_zero_budget", "init_overflow",
     "init_source", "init_long_source", "init_horizon",
-    "init_spacing0", "init_spacing1", "init_spacing2", "init_spacing6", "init_spacing10",
+    "init_spacing0", "init_spacing1", "init_spacing2", "init_spacing6",
 ])
 def test_passive_owner_measurements_and_fences(observer_binary, mode):
     binary, references = observer_binary

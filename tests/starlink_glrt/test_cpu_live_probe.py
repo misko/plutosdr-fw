@@ -116,11 +116,21 @@ uint64_t live_native_journal_bytes(const char *blocks)
 { struct dwell_limits limits;return dwell_limits(blocks,&limits) ? 0 : limits.native_journal_bytes; }
 int live_forecast_horizon(const char *blocks)
 { struct dwell_limits limits;return dwell_limits(blocks,&limits) ? -1 : (int)limits.forecast_horizon; }
+int live_passive_observer_spacing(const char *blocks)
+{
+    struct dwell_limits limits;struct live s={0};
+    if(dwell_limits(blocks,&limits)) return -1;
+    s.observer_spacing=limits.observer_spacing;s.native_stride=limits.native_stride;
+    s.forecast_horizon=limits.forecast_horizon;
+    return (int)passive_observer_spacing(&s);
+}
 int live_aligned_start(const char *blocks,uint32_t observer_first,uint32_t frame,uint32_t *out)
 {
     struct dwell_limits limits;struct live s={0};
     if(dwell_limits(blocks,&limits)) return -1;
     s.native_stride=limits.native_stride;s.observer_spacing=limits.observer_spacing;
+    s.forecast_horizon=limits.forecast_horizon;
+    s.observer.frame_spacing=passive_observer_spacing(&s);
     s.observer_first_frame=observer_first;
     if(align_native_frame(&s,&frame)) return -1;
     *out=frame;return 0;
@@ -342,6 +352,7 @@ def live_api(tmp_path_factory):
     lib.live_native_journal_bytes.argtypes = [c.c_char_p]
     lib.live_native_journal_bytes.restype = c.c_uint64
     lib.live_forecast_horizon.argtypes = [c.c_char_p]
+    lib.live_passive_observer_spacing.argtypes = [c.c_char_p]
     lib.live_aligned_start.argtypes = [c.c_char_p,c.c_uint32,c.c_uint32,c.POINTER(c.c_uint32)]
     lib.live_native_horizon.argtypes = [c.c_char_p,c.c_uint32]
     lib.live_native_horizon.restype = c.c_uint64
@@ -401,6 +412,38 @@ def test_forecast_coast_is_scoped_to_stable_stride10_profiles(live_api, profile,
     assert lib.live_forecast_horizon(profile) == expected
 
 
+@pytest.mark.parametrize('profile,expected', [
+    (b'1536', 9),
+    (b'1536-selected-observer3', 3),
+    (b'45000-selected-observer9-scan80-local2-track10-sparse10-authority', 9),
+    (b'45000-selected-observer9-scan80-local2-track30-sparse9-authority', 9),
+    (b'45000-selected-observer9-scan80-local2-track30-sparse10-authority', 10),
+    (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority', 10),
+])
+def test_long_stride10_passive_observer_has_processing_margin(live_api, profile, expected):
+    lib, _ = live_api
+    assert lib.live_passive_observer_spacing(profile) == expected
+
+
+def test_long_profile_starts_aligned_ten_frame_passive_authority(live_api, tmp_path):
+    lib, refs = live_api
+    handle = lib.live_new(refs.ctypes.data, bank().ctypes.data, os.fsencode(tmp_path),
+                          c.byref(Ports()), 30000000)
+    try:
+        profile = b'45000-selected-observer9-scan80-local2-track30-sparse10-authority'
+        assert lib.live_set_dwell(handle, profile, (c.c_uint64*4)()) == 0
+        assert lib.live_observer_seed_start(handle) == 0
+        assert lib.live_observer_join(handle) == 0
+    finally:
+        lib.live_free_unstarted(handle)
+    rows = [json.loads(line) for line in (tmp_path/'observer.jsonl').read_text().splitlines()]
+    assert rows[0]['kind'] == 'start'
+    assert rows[0]['frame_spacing'] == 10
+    assert rows[0]['forecast_horizon'] == 96
+    assert rows[0]['first_frame'] == 73
+    assert rows[-1]['kind'] == 'terminal'
+
+
 @pytest.mark.parametrize('profile,expected',[
     (b'1536',[1500,3]),
     (b'1536-selected-observer3-scan64-scout16',[16,3]),
@@ -454,8 +497,8 @@ def test_extended_native_cadence_aligns_with_the_observer(live_api,profile,expec
     (b'45000-selected-observer9-scan80-local2-track30-sparse9-authority',1260,1269),
     (b'45000-selected-observer9-scan80-local2-track30-sparse9-authority',1274,1278),
     (b'45000-selected-observer9-scan80-local2-track100-sparse9-authority',1278,1278),
-    (b'45000-selected-observer9-scan80-local2-track30-sparse10-authority',1274,1274),
-    (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority',1278,1278),
+    (b'45000-selected-observer9-scan80-local2-track30-sparse10-authority',1274,1279),
+    (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority',1278,1279),
     (b'45000-selected-observer9-scan80-local2-track10-sparse10-authority',1274,1274),
 ])
 def test_extended_native_start_uses_the_observer_frame_grid(live_api,profile,requested,expected):

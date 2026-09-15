@@ -423,10 +423,11 @@ The parent then retunes to the selected LO and runs exactly one explicit sparse
 follow-up child. The ten-second plan uses
 `45000-selected-observer9-scan80-local2-track10-sparse10-authority`. The
 30- and 100-second plans use distinct `track30-sparse10-authority` and
-`track100-sparse10-authority` profiles. They preserve the observer's nine-frame
-cadence and schedule 2,251 or 7,501 FPGA measurements ten frames apart. The
-one-frame cadence difference lets causal observer authority close a fixed
-descriptor-queue lag; the earlier stride-nine profiles remain available for
+`track100-sparse10-authority` profiles. They preserve the acquisition
+bootstrap's nine-frame cadence, then align the passive authority observer and
+2,251 or 7,501 FPGA measurements at ten-frame spacing. This gives the measured
+ARM observer 13.33 ms per result instead of 12 ms and removes a growing cadence
+mismatch; the earlier stride-nine profiles remain available for
 replay of their persisted evidence. A
 zero process result is accepted only when the retained status proves one
 completed native run with at least 751, 2,251, or 7,501 scheduled measurements.

@@ -27,7 +27,10 @@ native history takes precedence when it is available.
 
 This profile alone raises the observer bound from 200 to 1024 measurements,
 its source span from three to twelve seconds and its wall bound to fifteen
-seconds. At nine-frame spacing, 834 measurements cover ten seconds. Each
+seconds. The proven acquisition bootstrap remains at nine-frame spacing. The
+long stride-ten profiles run the passive authority observer every ten frames,
+matching the 13.33-ms FPGA cadence and leaving margin over the measured ARM
+processing time. Each
 descriptor remains within its journaled forecast horizon of retained native or coarse support.
 The established ten-second profile retains the 32-frame bound; the distinct
 30- and 100-second stride-ten profiles use a 96-frame coast, equal to the
