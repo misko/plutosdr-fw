@@ -210,6 +210,25 @@ def test_refresh_refuses_owned_work_and_retention_failure_stops_safely(
     assert sum(item.repeats for item in radio.descriptors)==23
 
 
+def test_refresh_does_not_retain_authority_beyond_prediction_horizon(
+        handoff_api,pilot_moments):
+    first=602
+    radio,history,_=prepare(handoff_api,pilot_moments,first=first,initialize=False)
+    rc,batch,_=trend.predict(handoff_api,history,first,1)
+    assert rc==0
+    assert handoff_api.glrt_tracking_controller_init_handoff_strided(
+        radio.state,c.byref(radio.ports),c.byref(batch),c.byref(history),first,20,10,5)==0
+    refreshed=extend_from_prediction(handoff_api,history,batch,first,599)
+    radio.reject=True
+    while len(radio.descriptors)<3:
+        assert radio.tick()==1; radio.advance()
+    # The three immutable jobs advance the next frontier to frame 632. The
+    # observer's newer frame 599 is 33 frames behind and cannot predict it.
+    assert handoff_api.glrt_tracking_controller_refresh_handoff(
+        radio.state,c.byref(refreshed))==-1
+    assert not any(name=='tracking_authority' for kind,name,_ in radio.events if kind=='retain')
+
+
 def test_coarse_authority_uses_its_partial_final_horizon_when_native_rejects(
         handoff_api,pilot_moments):
     first=600

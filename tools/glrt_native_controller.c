@@ -216,6 +216,7 @@ int glrt_tracking_controller_refresh_handoff(struct glrt_native_controller *c,
        c->handoff_pending || c->next_frame>=c->frames ||
        history->rate!=c->trend.rate || history->history.epoch!=c->trend.history.epoch ||
        history->history.last_supported<=last_authorized_support(c) ||
+       c->next_frame-history->history.last_supported>32 ||
        !glrt_tracking_trend_handoff_valid(history,c->next_frame,c->frames-c->next_frame)) return -1;
     retained=*history;
     rc=retain_history(c,"tracking_authority",&retained);
