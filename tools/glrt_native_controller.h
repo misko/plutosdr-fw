@@ -38,7 +38,7 @@ struct glrt_native_controller {
     int64_t bootstrap_delay_q16, bootstrap_cfo_q48;
     uint32_t frames, next_frame, next_tag, sequence, configured;
     uint32_t frame_stride, result_limit;
-    double deadline, cleanup_deadline;
+    double deadline, cleanup_deadline, authority_wait_until;
     int started, stopping, cancelled, clearing, done, failure, bootstrap_active, bootstrap_offset_valid;
     int acquisition_horizon_exhausted;
     int tracking;

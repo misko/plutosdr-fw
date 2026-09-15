@@ -232,6 +232,7 @@ int glrt_tracking_controller_refresh_handoff(struct glrt_native_controller *c,
     rc=retain_history(c,"tracking_authority",&retained);
     if(rc) { stop(c,rc);return rc; }
     c->authority=retained;c->authority_valid=1;c->acquisition_horizon_exhausted=0;
+    c->authority_wait_until=0;
     return 0;
 }
 
@@ -530,12 +531,24 @@ int glrt_native_controller_tick(struct glrt_native_controller *c)
                 predicted = 1;
             }
             if (predicted) {
+                c->authority_wait_until=0;
                 if (c->ports.retain(c->ports.context,"before_submit",raw,(size_t)n))
                     return finish_error(c,GLRT_NATIVE_RETENTION_ERROR);
                 rc = submit(c,i,&b,c->next_frame,latest);
                 c->next_tag++;
                 if (rc) stop(c,rc);
-            } else if (snapshot_drained(c,w)) stop(c,GLRT_NATIVE_ACQUISITION_LOST);
+            } else if (snapshot_drained(c,w)) {
+                /* A separately scheduled coarse observer can be one cadence
+                 * behind the sparse native frontier even while it remains
+                 * strongly supported. Give it ten 12-ms observer intervals
+                 * to publish a newer authority, without extending the fixed
+                 * 32-frame prediction horizon. The global deadline remains
+                 * authoritative and a missing refresh still reacquires. */
+                if(c->authority_valid && !c->authority_wait_until)
+                    c->authority_wait_until=now+.12;
+                else if(!c->authority_valid || now>=c->authority_wait_until)
+                    stop(c,GLRT_NATIVE_ACQUISITION_LOST);
+            }
             break;
         }
     }
