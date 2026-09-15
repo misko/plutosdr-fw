@@ -1,9 +1,16 @@
 # Firmware #99: implementation and verification evidence
 
-Status on 2026-09-13: **implemented recovery candidate; hardware deployment and
-qualification pending**. No radio was contacted, flashed, reset or rebooted by
-this task. This is not an extended-range release or a claim that issue #99 is
-closed. The implementation is isolated on `codex/issue-99-flash-safety`.
+Status updated 2026-09-15: **candidate implemented; first Winbond RAM/read and
+boundary erase/program bench milestones complete; persistent candidate and
+extended-range qualification pending**. PPU's separate hardware task restored
+radio `.14` to its recovered GLRT baseline and verified normal QSPI power-on
+return. The candidate remains isolated on `codex/issue-99-flash-safety`; no
+extended-range release or issue closure is claimed.
+
+The current ordered plan and review of PPU through `9a4dc78` are in
+[the September 15 plan](2026_09_15_issue_99_plan.md). The original September 13
+implementation evidence below remains applicable; hardware results are attributed
+to the companion PPU task, not to the offline tests in this report.
 
 ## Result and scope
 
@@ -133,31 +140,27 @@ it has no radio access. The protected main build/release route still names the
 published counter release and must be advanced as part of qualified promotion;
 this draft does not change that release or bypass its checks.
 
-## Deployment and qualification still required
+## Deployment and qualification status
 
-1. Identify the dedicated board by serial/current address and its SD/JTAG/serial
-   recovery connection. The issue's recovered former `.14` board is not presently
-   bound to this task; other connected radios belong to ongoing work.
-2. Capture board/flash identity, geometry, running writer and installed/recovery
-   bootloader hashes. Make private length-checked full backups using an
-   independently validated physical reader and demonstrate restoration first.
-3. Use the conservative PPU #113 guard to install the below-boundary bootstrap
-   with the known old writer, or boot it via a proven SD/RAM route. The incoming
-   kernel cannot repair the writer performing that initial installation.
-4. Re-attest the running kernel/updater. Test scratch sectors on both sides of
-   16 MiB with distinct patterns, program/erase/page edges, high-to-low access,
-   failures and independent full physical comparison against the backup.
-5. Qualify the rebuilt recovery and installed U-Boot separately, including the
-   actual `read_sf` command, full 30 MiB fallback, FIT verification, environment
-   saves, reset/handoff and persistent DFU only if that route is to be supported.
-6. Exercise a crossing FIT through a controlled recovery test, warm reset, full
-   power removal, services/identity checks and rollback. Repeat on a second
-   Winbond sample/revision and every flash family intended for an extended grant.
-7. Only then add a shared trusted qualification format/registry consumed by PPU
-   and the device updater, matching exact hardware, layout, running writer and
-   installed bootloader evidence. Larger persistence stays disabled otherwise.
+Completed on the dedicated `.14` Winbond target by the PPU hardware task:
 
-The companion PPU #113 task is implementing the host guard independently. Its
-current legacy-updater fingerprint does not automatically approve this new
-updater contract; integration must be reviewed before subsequent PPU updates from
-the bootstrap. Generic release-profile approval is not flash qualification.
+- Incident recovery, full physical backup, and QSPI cold-return acceptance.
+- Exact #99 candidate SD/RAM boot with normal init bypassed and RF inactive.
+- Candidate Linux full 32 MiB read matching independent SD physical capture.
+- Separate erase/program tests of 64 KiB sectors at `0x00ff0000` and
+  `0x01000000`, independent placement checks, restoration, and full independent
+  comparison with the recovered baseline.
+- Normal QSPI power-on return to the original recovered GLRT image, protected
+  regions and FIT verified, IIOD running and IIO buffers disabled.
+
+These results cover one target and separate sector operations. They do not prove
+one write call crossing the bank boundary, the persistent candidate's updater,
+the repaired U-Boot running on hardware, or a crossing FIT boot. The FRM does not
+install the rebuilt U-Boot. Production limits remain at physical 16 MiB.
+
+Remaining work follows [the current plan](2026_09_15_issue_99_plan.md): land the
+PPU BusyBox backup fix, integrate the complete candidate writer identity, complete
+bounded driver and bootloader qualification, test conservative persistent
+bootstrap and rollback, then test a crossing FIT through a reviewed bench route.
+Only matching hardware/software evidence may enable a shared extended-range
+qualification record. Generic release-profile approval is not flash qualification.
