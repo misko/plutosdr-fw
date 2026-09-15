@@ -11,6 +11,8 @@ struct glrt_tracking_trend {
     struct glrt_native_trend history;
     uint32_t rate;
 };
+#define GLRT_TRACKING_FORECAST_DEFAULT 32U
+#define GLRT_TRACKING_FORECAST_COAST 64U
 int glrt_tracking_trend_reset(struct glrt_tracking_trend *, uint32_t epoch, uint32_t rate);
 /* delay_correction_s is relative to the selected reference. Its fractional
  * delay is added exactly once; observed start remains the integer IQ index.
@@ -21,6 +23,11 @@ int glrt_tracking_trend_observe(struct glrt_tracking_trend *, uint32_t epoch,
 int glrt_tracking_trend_batch(const struct glrt_tracking_trend *,
     uint32_t first_frame, uint32_t repeats, uint32_t tag, uint32_t seed,
     struct glrt_tracking_batch *, double *cfo_rate_hz_s);
+/* Explicit bounded coast for profiles that independently attest sparse
+ * dropout tolerance. Existing callers remain fixed at 32 frames. */
+int glrt_tracking_trend_batch_horizon(const struct glrt_tracking_trend *,
+    uint32_t first_frame, uint32_t repeats, uint32_t tag, uint32_t seed,
+    uint32_t forecast_horizon, struct glrt_tracking_batch *, double *cfo_rate_hz_s);
 /* Validate an imported history's bounded storage, chronological ownership and
  * finite values before using it for a new controller run. This does not attest
  * RF support or replace the batch predictor's quality/forecast checks. */

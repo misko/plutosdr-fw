@@ -28,6 +28,9 @@ def handoff_api(controller):
     controller.glrt_tracking_controller_init_handoff_strided.argtypes=[c.c_void_p,c.POINTER(Ports),
         c.POINTER(TrackingBatch),c.POINTER(trend.TrackingTrend),c.c_uint32,c.c_uint32,
         c.c_uint32,c.c_double]
+    controller.glrt_tracking_controller_init_handoff_strided_horizon.argtypes=[c.c_void_p,
+        c.POINTER(Ports),c.POINTER(TrackingBatch),c.POINTER(trend.TrackingTrend),c.c_uint32,
+        c.c_uint32,c.c_uint32,c.c_double,c.c_uint32]
     controller.glrt_tracking_controller_refresh_handoff.argtypes=[
         c.c_void_p,c.POINTER(trend.TrackingTrend)]
     return controller
@@ -286,6 +289,29 @@ def test_coarse_authority_uses_its_partial_final_horizon_when_native_rejects(
     assert not result['supported']
     assert result['estimates'][-1]['frame']==617+32
     assert sum(item.repeats for item in radio.descriptors)==617+33-first
+
+
+def test_profile_scoped_coast_runs_to_64_frames_and_is_journal_attested(
+        handoff_api,pilot_moments):
+    rate,first=30000000,602
+    radio,history,_=prepare(handoff_api,pilot_moments,rate,first=first,frames=20,initialize=False)
+    rc,batch,_=trend.predict(handoff_api,history,first,1)
+    assert rc==0
+    radio.seed=batch.prediction
+    radio.origin=radio.latest=batch.prediction.start-rate//200
+    assert handoff_api.glrt_tracking_controller_init_handoff_strided_horizon(
+        radio.state,c.byref(radio.ports),c.byref(batch),c.byref(history),first,20,10,5,64)==0
+    radio.reject=True
+    assert radio.run()==-4
+    data=journal(radio)
+    result=review(data,epoch=3,rate=rate)
+    assert not result['supported']
+    assert result['estimates'][-1]['frame'] > history.history.last_supported+32
+    assert result['estimates'][-1]['frame'] <= history.history.last_supported+64
+    assert result['cadence']=={'stride':10,'results':20,'first':first,
+                               'end':first+200,'horizon':64}
+    with pytest.raises(ValueError,match='authority'):
+        review(data.replace(b' horizon 64\n',b' horizon 32\n',1),epoch=3,rate=rate)
 
 
 @pytest.mark.parametrize("rate", [2500000,5000000,15000000])

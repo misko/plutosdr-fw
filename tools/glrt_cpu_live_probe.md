@@ -28,10 +28,13 @@ native history takes precedence when it is available.
 This profile alone raises the observer bound from 200 to 1024 measurements,
 its source span from three to twelve seconds and its wall bound to fifteen
 seconds. At nine-frame spacing, 834 measurements cover ten seconds. Each
-descriptor remains within 32 frames of retained native or coarse support. If
-neither source renews that horizon, the controller drains and reports clean
+descriptor remains within its journaled forecast horizon of retained native or coarse support.
+The established ten-second profile retains the 32-frame bound; the distinct
+30- and 100-second stride-ten profiles use a 64-frame coast so that three
+consecutive rejected nine-frame observer measurements do not strand the next
+descriptor. If neither source renews the selected horizon, the controller drains and reports clean
 acquisition loss. The journal reviewer reconstructs the causal authority
-horizon from initial history, accepted native estimates and authority records;
+horizon from the cadence record, initial history, accepted native estimates and authority records;
 removing or altering an authority record invalidates later descriptors.
 The target is 7500 FPGA results, representing ten seconds at the 750-Hz pilot
 cadence. ARM sysfs retention drains results more slowly than signal time, so

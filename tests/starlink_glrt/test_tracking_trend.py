@@ -26,6 +26,9 @@ def core(native_core):
         c.c_uint64, c.c_uint32, c.POINTER(Estimate)]
     lib.glrt_tracking_trend_batch.argtypes = [c.POINTER(TrackingTrend), c.c_uint32, c.c_uint32,
         c.c_uint32, c.c_uint32, c.POINTER(TrackingBatch), c.POINTER(c.c_double)]
+    lib.glrt_tracking_trend_batch_horizon.argtypes = [c.POINTER(TrackingTrend), c.c_uint32,
+        c.c_uint32, c.c_uint32, c.c_uint32, c.c_uint32,
+        c.POINTER(TrackingBatch), c.POINTER(c.c_double)]
     lib.glrt_tracking_prediction.argtypes = [c.POINTER(TrackingBatch), c.c_uint, c.POINTER(Job)]
     lib.glrt_tracking_solve.argtypes = [c.c_uint32, c.c_uint32, c.POINTER(Moments), c.POINTER(Estimate)]
     lib.glrt_tracking_trend_from_coarse.argtypes = [c.POINTER(TrackingTrend),c.c_uint32,
@@ -51,6 +54,25 @@ def predict(core, t, first, repeats=16):
     b, rate = TrackingBatch(), c.c_double()
     rc = core.glrt_tracking_trend_batch(c.byref(t), first, repeats, 99, 17, c.byref(b), c.byref(rate))
     return rc, b, rate.value
+
+
+def test_explicit_coast_extends_only_the_bounded_prediction_window(core):
+    t = fresh(core, 30000000)
+    anchor = 1000000
+    for frame in range(0, 64, 9):
+        assert observe(core, t, frame, anchor+frame*40000, 1000) == 1
+    assert t.history.last_supported == 63
+    batch, rate = TrackingBatch(), c.c_double()
+    assert predict(core, t, 96, 1)[0] == -1
+    assert core.glrt_tracking_trend_batch_horizon(c.byref(t), 96, 1, 99, 17, 64,
+        c.byref(batch), c.byref(rate)) == 0
+    assert core.glrt_tracking_trend_batch_horizon(c.byref(t), 127, 1, 99, 17, 64,
+        c.byref(batch), c.byref(rate)) == 0
+    assert core.glrt_tracking_trend_batch_horizon(c.byref(t), 128, 1, 99, 17, 64,
+        c.byref(batch), c.byref(rate)) == -1
+    for invalid in (0, 31, 33, 65):
+        assert core.glrt_tracking_trend_batch_horizon(c.byref(t), 64, 1, 99, 17, invalid,
+            c.byref(batch), c.byref(rate)) == -1
 
 
 @pytest.mark.parametrize("native_rate", [30000000,60000000])

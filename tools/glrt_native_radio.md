@@ -447,9 +447,12 @@ native result. Descriptor scheduling still prefers the native predictor. If
 stride-ten sampling leaves fewer than eight supported native points in its
 96-frame fit window, the retained denser coarse predictor can therefore cover
 the next unowned frame instead of ending the episode at that cadence alias.
-The independent journal reviewer applies the same per-source monotonic rule and
-keeps the 32-frame descriptor horizon bound over the newest support from either
-source.
+The established profiles keep the 32-frame descriptor horizon. The new
+30- and 100-second stride-ten profiles alone select a 64-frame horizon, enough
+to cross three rejected nine-frame observer measurements while remaining
+finite. Their cadence record includes that value, and the independent journal
+reviewer applies it with the same per-source monotonic rule over the newest
+support from either source.
 
 All scouts share a 60-second controller deadline. The follow-up has its own
 320-second deadline, and the complete radio-local process has a 400-second

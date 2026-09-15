@@ -54,7 +54,8 @@ void *live_new(const int16_t *refs,const int16_t *bank,const char *directory,
     memcpy(s->refs,refs,sizeof(s->refs));memcpy(s->bank,bank,sizeof(s->bank));
     s->native=*ports;s->epoch=3;s->rate=rate;s->attempt_limit=ATTEMPTS;s->restart_on_loss=1;
     s->native_result_limit=NATIVE_RESULTS;s->native_seconds=NATIVE_SECONDS;s->native_stride=1;
-    s->native_journal_bytes=DEFAULT_NATIVE_JOURNAL_BYTES;t->end=1000000;
+    s->native_journal_bytes=DEFAULT_NATIVE_JOURNAL_BYTES;
+    s->forecast_horizon=GLRT_TRACKING_FORECAST_DEFAULT;t->end=1000000;
     s->fft=fftw_plan_dft_1d(GLRT_RESOLVER_FFT,t->fft,t->fft,FFTW_FORWARD,FFTW_ESTIMATE|FFTW_UNALIGNED);
     if(!s->fft || glrt_tracking_iq_owner_init(&s->owner,t->ring,RING,s->epoch,t->end)) abort();
     snprintf(path,sizeof(path),"%s/worker.jsonl",directory);s->journal=fopen(path,"wx");
@@ -90,6 +91,7 @@ int live_set_dwell(struct test_live *t,const char *blocks,uint64_t out[4])
         t->live.observer_source_span=limits.observer_source_span;
         t->live.observer_budget_ns=limits.observer_budget_ns;
         t->live.native_journal_bytes=limits.native_journal_bytes;
+        t->live.forecast_horizon=limits.forecast_horizon;
         if(limits.rank_budget>8 && !t->live.ranking_fft) {
             t->live.ranking_fft=fftw_plan_dft_1d(limits.rank_budget==80 ? 512 : 4096,
                 t->fft,t->fft,FFTW_FORWARD,FFTW_ESTIMATE|FFTW_UNALIGNED);
@@ -112,6 +114,8 @@ int live_native_stride(const char *blocks)
 { struct dwell_limits limits;return dwell_limits(blocks,&limits) ? -1 : (int)limits.native_stride; }
 uint64_t live_native_journal_bytes(const char *blocks)
 { struct dwell_limits limits;return dwell_limits(blocks,&limits) ? 0 : limits.native_journal_bytes; }
+int live_forecast_horizon(const char *blocks)
+{ struct dwell_limits limits;return dwell_limits(blocks,&limits) ? -1 : (int)limits.forecast_horizon; }
 int live_aligned_start(const char *blocks,uint32_t observer_first,uint32_t frame,uint32_t *out)
 {
     struct dwell_limits limits;struct live s={0};
@@ -337,6 +341,7 @@ def live_api(tmp_path_factory):
     lib.live_native_stride.argtypes = [c.c_char_p]
     lib.live_native_journal_bytes.argtypes = [c.c_char_p]
     lib.live_native_journal_bytes.restype = c.c_uint64
+    lib.live_forecast_horizon.argtypes = [c.c_char_p]
     lib.live_aligned_start.argtypes = [c.c_char_p,c.c_uint32,c.c_uint32,c.POINTER(c.c_uint32)]
     lib.live_native_horizon.argtypes = [c.c_char_p,c.c_uint32]
     lib.live_native_horizon.restype = c.c_uint64
@@ -381,6 +386,19 @@ def test_dwell_profiles_have_finite_capture_and_worker_limits(live_api, blocks, 
     assert lib.live_set_dwell(None, blocks, out) == 0
     assert list(out) == expected
     assert out[0]*16384/2500000 < 300
+
+
+@pytest.mark.parametrize('profile,expected', [
+    (b'1536', 32),
+    (b'45000-selected-observer9-scan80-local2-track10-sparse10-authority', 32),
+    (b'45000-selected-observer9-scan80-local2-track30-sparse9-authority', 32),
+    (b'45000-selected-observer9-scan80-local2-track100-sparse9-authority', 32),
+    (b'45000-selected-observer9-scan80-local2-track30-sparse10-authority', 64),
+    (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority', 64),
+])
+def test_forecast_coast_is_scoped_to_stable_stride10_profiles(live_api, profile, expected):
+    lib, _ = live_api
+    assert lib.live_forecast_horizon(profile) == expected
 
 
 @pytest.mark.parametrize('profile,expected',[

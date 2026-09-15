@@ -87,21 +87,23 @@ def _descriptors(entries: list[JournalRecord], *, epoch: int, codec: JournalCode
     started = False
     for record in entries:
         if record.kind == "tracking_cadence":
-            match = re.fullmatch(rb"stride ([0-9]{1,3}) results ([0-9]{1,6}) first ([0-9]{1,10}) end ([0-9]{1,10})\n",
+            match = re.fullmatch(rb"stride ([0-9]{1,3}) results ([0-9]{1,6}) first ([0-9]{1,10}) end ([0-9]{1,10})(?: horizon ([0-9]{1,3}))?\n",
                                  record.payload)
             if cadence is not None or history is not None or started or codec.handoff is None or not match:
                 raise ValueError("duplicate, late or invalid tracking cadence")
-            stride, result_limit, first, limit = map(int, match.groups())
+            stride, result_limit, first, limit = map(int, match.groups()[:4])
+            horizon = int(match.group(5) or 32)
             if not 2 <= stride <= 750 or not 1 <= result_limit <= 225000 or \
-                    limit != first+result_limit*stride or limit > 2**32-1:
+                    limit != first+result_limit*stride or limit > 2**32-1 or \
+                    horizon not in (32,64):
                 raise ValueError("invalid tracking cadence bounds")
-            cadence = stride, result_limit, first, limit
+            cadence = stride, result_limit, first, limit, horizon
         elif record.kind == "tracking_handoff":
             if history is not None or started or codec.handoff is None:
                 raise ValueError("duplicate, late or unsupported tracking handoff")
             history = codec.handoff(record.payload, epoch=epoch)
             next_frame, frame_limit = history.first, history.limit
-            if cadence is not None and cadence[2:] != (next_frame, frame_limit):
+            if cadence is not None and cadence[2:4] != (next_frame, frame_limit):
                 raise ValueError("tracking cadence differs from handoff bounds")
             last_native_authorized = history.last_supported
             last_coarse_authorized = history.last_supported
@@ -147,7 +149,8 @@ def _descriptors(entries: list[JournalRecord], *, epoch: int, codec: JournalCode
             raise ValueError("retained descriptor ownership is inconsistent")
         last_authorized = (max(last_native_authorized,last_coarse_authorized)
                            if history is not None else None)
-        if history is not None and first+b.repeats-1-last_authorized > 32:
+        horizon = cadence[4] if cadence is not None else 32
+        if history is not None and first+b.repeats-1-last_authorized > horizon:
             raise ValueError("descriptor exceeds retained tracking authority")
         owners[b.tag] = first, b
         next_frame += cadence[0] if cadence is not None else b.repeats
@@ -237,6 +240,8 @@ def _review(data: bytes, *, epoch: int, codec: JournalCodec) -> dict:
             fields = entry.payload.decode("ascii").split()
             result["cadence"] = dict(stride=int(fields[1]), results=int(fields[3]),
                                      first=int(fields[5]), end=int(fields[7]))
+            if len(fields)==10:
+                result["cadence"]["horizon"] = int(fields[9])
         if entry.kind == "tracking_handoff":
             result["handoff"] = codec.handoff(entry.payload, epoch=epoch)
     return result

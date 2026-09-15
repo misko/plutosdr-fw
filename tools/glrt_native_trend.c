@@ -80,7 +80,8 @@ static uint64_t phase(double hz, uint32_t rate)
 
 static int batch(const struct glrt_native_trend *t,
     uint32_t first, uint32_t repeats, uint32_t tag, uint32_t seed,
-    struct glrt_native_batch *out, double *cfo_rate, uint32_t rate, int tracking)
+    struct glrt_native_batch *out, double *cfo_rate, uint32_t rate, int tracking,
+    uint32_t forecast_horizon)
 {
     struct glrt_native_batch b;
     double mx=0, my=0, mf=0, xx=0, xy=0, xf=0, dy, df, target, offset, frequency, period;
@@ -92,8 +93,12 @@ static int batch(const struct glrt_native_trend *t,
     int64_t whole;
     double fraction;
     if (!t || !out || !cfo_rate || !t->valid || !t->initialized || !tag ||
-        !repeats || repeats > 32 || first <= t->last_seen || first < t->last_supported ||
-        first-t->last_supported > 32 || repeats-1 > 32-(first-t->last_supported) ||
+        !repeats || repeats > 32 ||
+        (forecast_horizon!=GLRT_TRACKING_FORECAST_DEFAULT &&
+         forecast_horizon!=GLRT_TRACKING_FORECAST_COAST) ||
+        first <= t->last_seen || first < t->last_supported ||
+        first-t->last_supported > forecast_horizon ||
+        repeats-1 > forecast_horizon-(first-t->last_supported) ||
         first-t->first_frame > MAX_FRAMES ||
         repeats-1 > MAX_FRAMES-(first-t->first_frame)) return -1;
     for (i=0; i<t->count; i++) {
@@ -160,7 +165,8 @@ int glrt_native_trend_batch(const struct glrt_native_trend *t,
     uint32_t first, uint32_t repeats, uint32_t tag, uint32_t seed,
     struct glrt_native_batch *out, double *cfo_rate)
 {
-    return batch(t,first,repeats,tag,seed,out,cfo_rate,60000000,0);
+    return batch(t,first,repeats,tag,seed,out,cfo_rate,60000000,0,
+                 GLRT_TRACKING_FORECAST_DEFAULT);
 }
 
 int glrt_tracking_trend_reset(struct glrt_tracking_trend *t, uint32_t epoch, uint32_t rate)
@@ -192,7 +198,21 @@ int glrt_tracking_trend_batch(const struct glrt_tracking_trend *t,
 {
     struct glrt_tracking_batch b;
     if (!t || !out || !glrt_tracking_profile_get(t->rate,0)) return -1;
-    if (batch(&t->history,first,repeats,tag,seed,&b.prediction,cfo_rate,t->rate,1)) return -1;
+    if (batch(&t->history,first,repeats,tag,seed,&b.prediction,cfo_rate,t->rate,1,
+              GLRT_TRACKING_FORECAST_DEFAULT)) return -1;
+    b.rate=t->rate;
+    *out=b;
+    return 0;
+}
+
+int glrt_tracking_trend_batch_horizon(const struct glrt_tracking_trend *t,
+    uint32_t first, uint32_t repeats, uint32_t tag, uint32_t seed,
+    uint32_t forecast_horizon, struct glrt_tracking_batch *out, double *cfo_rate)
+{
+    struct glrt_tracking_batch b;
+    if (!t || !out || !glrt_tracking_profile_get(t->rate,0)) return -1;
+    if (batch(&t->history,first,repeats,tag,seed,&b.prediction,cfo_rate,t->rate,1,
+              forecast_horizon)) return -1;
     b.rate=t->rate;
     *out=b;
     return 0;

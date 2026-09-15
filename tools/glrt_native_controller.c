@@ -94,6 +94,7 @@ int glrt_native_controller_init(struct glrt_native_controller *c,
     c->frames = frames;
     c->frame_stride = 1;
     c->result_limit = frames;
+    c->forecast_horizon = GLRT_TRACKING_FORECAST_DEFAULT;
     c->deadline = now+seconds;
     c->slots[0].batch = *b;
     c->next_tag = b->tag+1;
@@ -118,6 +119,7 @@ int glrt_tracking_controller_init(struct glrt_native_controller *c,
     c->frames = frames;
     c->frame_stride = 1;
     c->result_limit = frames;
+    c->forecast_horizon = GLRT_TRACKING_FORECAST_DEFAULT;
     c->deadline = now+seconds;
     c->slots[0].batch = b->prediction;
     c->next_tag = b->prediction.tag+1;
@@ -153,12 +155,23 @@ int glrt_tracking_controller_init_handoff_strided(struct glrt_native_controller 
     const struct glrt_tracking_trend *history, uint32_t first,
     uint32_t measurements, uint32_t stride, double seconds)
 {
+    return glrt_tracking_controller_init_handoff_strided_horizon(c,p,b,history,first,
+        measurements,stride,seconds,GLRT_TRACKING_FORECAST_DEFAULT);
+}
+
+int glrt_tracking_controller_init_handoff_strided_horizon(struct glrt_native_controller *c,
+    const struct glrt_native_ports *p, const struct glrt_tracking_batch *b,
+    const struct glrt_tracking_trend *history, uint32_t first,
+    uint32_t measurements, uint32_t stride, double seconds, uint32_t forecast_horizon)
+{
     struct glrt_tracking_batch predicted;
     struct glrt_tracking_trend retained;
     char expected[256],supplied[256];
     uint32_t span;
     double slope;
-    if(!measurements || measurements>225000 || stride<2 || stride>750 ||
+    if((forecast_horizon!=GLRT_TRACKING_FORECAST_DEFAULT &&
+        forecast_horizon!=GLRT_TRACKING_FORECAST_COAST) ||
+       !measurements || measurements>225000 || stride<2 || stride>750 ||
        measurements>UINT32_MAX/stride || (span=measurements*stride)>UINT32_MAX-first ||
        !glrt_tracking_batch_valid(b) || b->prediction.repeats!=1 ||
        !glrt_tracking_trend_handoff_valid(history,first,span) ||
@@ -171,6 +184,7 @@ int glrt_tracking_controller_init_handoff_strided(struct glrt_native_controller 
     if(glrt_tracking_controller_init(c,p,b,measurements,seconds)) return -1;
     c->trend=retained;c->next_frame=first;c->frames=first+span;
     c->frame_stride=stride;c->result_limit=measurements;c->handoff_pending=1;
+    c->forecast_horizon=forecast_horizon;
     return 0;
 }
 
@@ -226,7 +240,7 @@ int glrt_tracking_controller_refresh_handoff(struct glrt_native_controller *c,
      * the exact next unowned frame when native prediction is underdetermined. */
     if(history->history.last_supported<=previous ||
        !glrt_tracking_trend_handoff_valid(history,c->next_frame,c->frames-c->next_frame) ||
-       c->next_frame-history->history.last_supported>32)
+       c->next_frame-history->history.last_supported>c->forecast_horizon)
         return -1;
     retained=*history;
     rc=retain_history(c,"tracking_authority",&retained);
@@ -391,7 +405,7 @@ static int consume(struct glrt_native_controller *c)
         uint32_t frame = owner->first_frame+words[27];
         uint32_t last=last_authorized_support(c);
         int exhausted = (c->trend.history.initialized || c->authority_valid) && frame > last &&
-            frame-last == 32 && c->next_frame == frame+1 &&
+            frame-last == c->forecast_horizon && c->next_frame == frame+1 &&
             c->next_frame < c->frames &&
             (!c->bootstrap_active || c->next_frame >= c->bootstrap.repeats);
         int observed = c->tracking ? glrt_tracking_trend_observe(&c->trend,epoch,frame,
@@ -448,9 +462,13 @@ int glrt_native_controller_tick(struct glrt_native_controller *c)
         if (c->handoff_pending) {
             if(c->frame_stride>1) {
                 char cadence[128];
-                int cadence_n=snprintf(cadence,sizeof(cadence),"stride %" PRIu32 " results %" PRIu32
-                    " first %" PRIu32 " end %" PRIu32 "\n",c->frame_stride,c->result_limit,
-                    c->next_frame,c->frames);
+                int cadence_n=c->forecast_horizon==GLRT_TRACKING_FORECAST_DEFAULT ?
+                    snprintf(cadence,sizeof(cadence),"stride %" PRIu32 " results %" PRIu32
+                        " first %" PRIu32 " end %" PRIu32 "\n",c->frame_stride,c->result_limit,
+                        c->next_frame,c->frames) :
+                    snprintf(cadence,sizeof(cadence),"stride %" PRIu32 " results %" PRIu32
+                        " first %" PRIu32 " end %" PRIu32 " horizon %" PRIu32 "\n",
+                        c->frame_stride,c->result_limit,c->next_frame,c->frames,c->forecast_horizon);
                 if(cadence_n<0 || (size_t)cadence_n>=sizeof(cadence) ||
                    c->ports.retain(c->ports.context,"tracking_cadence",cadence,(size_t)cadence_n))
                     return finish_error(c,GLRT_NATIVE_RETENTION_ERROR);
@@ -498,21 +516,21 @@ int glrt_native_controller_tick(struct glrt_native_controller *c)
             int predicted;
             if (count > 16) count = 16;
             if(count>c->result_limit-c->configured) count=c->result_limit-c->configured;
-            /* Use the remaining valid native horizon even when a full batch
-             * would exceed it. No job may extend past last_supported + 32. */
+            /* Use the remaining selected forecast horizon even when a full
+             * batch would exceed it. */
             if ((c->trend.history.initialized || c->authority_valid) &&
-                c->next_frame >= authorized && c->next_frame-authorized <= 32) {
-                uint32_t remaining = 33-(c->next_frame-authorized);
+                c->next_frame >= authorized && c->next_frame-authorized <= c->forecast_horizon) {
+                uint32_t remaining = c->forecast_horizon+1-(c->next_frame-authorized);
                 if (count > remaining) count = remaining;
             }
             if (c->next_tag == UINT32_MAX) return finish_error(c,GLRT_NATIVE_PROTOCOL_ERROR);
             if (c->tracking) {
                 struct glrt_tracking_batch next;
-                predicted = !glrt_tracking_trend_batch(&c->trend,c->next_frame,count,c->next_tag,
-                    c->slots[0].batch.seed,&next,&rate);
+                predicted = !glrt_tracking_trend_batch_horizon(&c->trend,c->next_frame,count,
+                    c->next_tag,c->slots[0].batch.seed,c->forecast_horizon,&next,&rate);
                 if (!predicted && c->authority_valid)
-                    predicted = !glrt_tracking_trend_batch(&c->authority,c->next_frame,count,c->next_tag,
-                        c->slots[0].batch.seed,&next,&rate);
+                    predicted = !glrt_tracking_trend_batch_horizon(&c->authority,c->next_frame,count,
+                        c->next_tag,c->slots[0].batch.seed,c->forecast_horizon,&next,&rate);
                 if (predicted) b = next.prediction;
             } else predicted = !glrt_native_trend_batch(&c->trend.history,c->next_frame,count,c->next_tag,
                     c->slots[0].batch.seed,&b,&rate);

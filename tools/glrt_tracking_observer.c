@@ -15,12 +15,22 @@ int glrt_tracking_observer_init(struct glrt_tracking_observer *s,
     const struct glrt_tracking_trend *history, uint32_t first, uint32_t maximum,
     uint64_t source_limit, uint64_t now, uint64_t budget)
 {
-    return glrt_tracking_observer_init_cadence(s,history,first,9,maximum,source_limit,now,budget);
+    return glrt_tracking_observer_init_cadence_horizon(s,history,first,9,maximum,
+        source_limit,now,budget,GLRT_TRACKING_FORECAST_DEFAULT);
 }
 
 int glrt_tracking_observer_init_cadence(struct glrt_tracking_observer *s,
     const struct glrt_tracking_trend *history, uint32_t first, uint32_t spacing,
     uint32_t maximum, uint64_t source_limit, uint64_t now, uint64_t budget)
+{
+    return glrt_tracking_observer_init_cadence_horizon(s,history,first,spacing,maximum,
+        source_limit,now,budget,GLRT_TRACKING_FORECAST_DEFAULT);
+}
+
+int glrt_tracking_observer_init_cadence_horizon(struct glrt_tracking_observer *s,
+    const struct glrt_tracking_trend *history, uint32_t first, uint32_t spacing,
+    uint32_t maximum, uint64_t source_limit, uint64_t now, uint64_t budget,
+    uint32_t forecast_horizon)
 {
     struct glrt_tracking_trend retained;
     struct glrt_tracking_batch batch;
@@ -30,6 +40,8 @@ int glrt_tracking_observer_init_cadence(struct glrt_tracking_observer *s,
     if(history) retained=*history;
     memset(s,0,sizeof(*s));s->status=GLRT_OBSERVER_INVALID;
     if(!history || retained.rate!=2500000 || (spacing!=3 && spacing!=9) || !maximum ||
+       (forecast_horizon!=GLRT_TRACKING_FORECAST_DEFAULT &&
+        forecast_horizon!=GLRT_TRACKING_FORECAST_COAST) ||
        maximum>GLRT_TRACKING_OBSERVER_MAXIMUM || !now || !budget ||
        budget>GLRT_TRACKING_OBSERVER_MAX_BUDGET_NS || now>UINT64_MAX-budget ||
        !glrt_tracking_trend_handoff_valid(&retained,first,maximum*spacing) ||
@@ -38,7 +50,7 @@ int glrt_tracking_observer_init_cadence(struct glrt_tracking_observer *s,
        source_limit<job.start+3300 ||
        source_limit-job.start>GLRT_TRACKING_OBSERVER_MAX_SOURCE_SPAN) return -1;
     s->trend=retained;s->next_frame=first;s->maximum_measurements=maximum;
-    s->frame_spacing=spacing;
+    s->frame_spacing=spacing;s->forecast_horizon=forecast_horizon;
     s->deadline_ns=now+budget;s->last_ns=now;s->source_limit=source_limit;
     s->status=GLRT_OBSERVER_WAIT;
     return 0;
@@ -82,14 +94,17 @@ int glrt_tracking_observer_step(struct glrt_tracking_observer *s,
     if(s->status!=GLRT_OBSERVER_WAIT) return s->status;
     if(s->trend.rate!=2500000 || !s->maximum_measurements ||
        s->maximum_measurements>GLRT_TRACKING_OBSERVER_MAXIMUM ||
-       (s->frame_spacing!=3 && s->frame_spacing!=9))
+       (s->frame_spacing!=3 && s->frame_spacing!=9) ||
+       (s->forecast_horizon!=GLRT_TRACKING_FORECAST_DEFAULT &&
+        s->forecast_horizon!=GLRT_TRACKING_FORECAST_COAST))
         return finish(s,trace,GLRT_OBSERVER_INVALID);
     if(s->measurements>=s->maximum_measurements) return finish(s,trace,GLRT_OBSERVER_DONE);
     rc=guard(s,owner,ports,&checked);
     if(rc!=GLRT_OBSERVER_WAIT) return finish(s,trace,rc);
     if(!checked.observed_ns) return GLRT_OBSERVER_WAIT;
     memset(&next,0,sizeof(next));next.frame=s->next_frame;
-    if(glrt_tracking_trend_batch(&s->trend,next.frame,1,s->measurements+1,0,&batch,&slope) ||
+    if(glrt_tracking_trend_batch_horizon(&s->trend,next.frame,1,s->measurements+1,0,
+           s->forecast_horizon,&batch,&slope) ||
        glrt_tracking_prediction(&batch,0,&next.job)) return finish(s,trace,GLRT_OBSERVER_HISTORY);
     if(next.job.start>UINT64_MAX-3300) return finish(s,trace,GLRT_OBSERVER_INVALID);
     if(next.job.start+3300>s->source_limit) return finish(s,trace,GLRT_OBSERVER_DONE);
