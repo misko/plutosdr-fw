@@ -1,0 +1,251 @@
+{
+  "baseline_dfu_sha256": "435a26369018e86ee66262b79c32895dbaaacef510a1efb71c566d6409555344",
+  "baseline_fit_sha256": "a53efc46f3c65d1a15e5063374551d2daa3cb9d0df51257de53b6af80be39493",
+  "files": {
+    "kernel.config": {
+      "bytes": 116418,
+      "sha256": "ff104f862202a0f801920457cd2f0cf180690678196f274b10b4b5527eea4cc5"
+    },
+    "pluto.dfu": {
+      "bytes": 13008439,
+      "sha256": "76db6fe720fc1790ec035f408f77f7d47bc7b0e0bed2f6133363b8676ccb24cb"
+    },
+    "pluto.frm": {
+      "bytes": 13008456,
+      "sha256": "1a82a4280731fd9a3b9b634b5c0ab17ced61a1e2353c5349f87530c24ddc5eee"
+    },
+    "pluto.itb": {
+      "bytes": 13008423,
+      "sha256": "11248f8b028c5f1b09693c7c7ab9dddcbc63a2cb94ffdc4dab65ef8b5bea4562"
+    },
+    "rootfs.cpio.gz": {
+      "bytes": 7388230,
+      "sha256": "933d11fe7f4ef7e42d0a611a2188dca34d44daef9bf5d3f1915a333f01963f93"
+    },
+    "system_top.bit": {
+      "bytes": 969580,
+      "sha256": "b96891fa1bb4fe8053089dc3fa76812d3e046e624810b333808354958c26e93c"
+    },
+    "zImage": {
+      "bytes": 4575496,
+      "sha256": "29ab467616cc33c4d48c9fb92213d59fc366c90e84845eb374f9b429cf9fc658"
+    },
+    "zynq-pluto-sdr-revb.dtb": {
+      "bytes": 22605,
+      "sha256": "b1ab5370a427f642039ce2061ff38c341a6a78f9e8f0a8b7e59757b143ada640"
+    },
+    "zynq-pluto-sdr-revc.dtb": {
+      "bytes": 26752,
+      "sha256": "45055fd15fc200881464a91fbcd8deb3d0756a4e368a8be27cf67d6e5c863646"
+    },
+    "zynq-pluto-sdr.dtb": {
+      "bytes": 22529,
+      "sha256": "1bd2357dbb7e871a13824dedb6761d74c871083dbfc97c9c36c22bda929dcea8"
+    }
+  },
+  "installed_bootloader_changed": false,
+  "persistent_range": {
+    "device_trees_checked": 3,
+    "fit_bytes": 13008423,
+    "fit_sha256": "11248f8b028c5f1b09693c7c7ab9dddcbc63a2cb94ffdc4dab65ef8b5bea4562",
+    "profile": {
+      "address_limit": 16777216,
+      "erase_bytes": 65536,
+      "firmware_bytes": 31457280,
+      "firmware_node": "/amba/spi@e000d000/ps7-qspi@0/partition@qspi-linux",
+      "firmware_start": 2097152,
+      "flash_bytes": 33554432,
+      "profile": "legacy-update",
+      "schema": "plutosdr-fw.flash-layout.v1",
+      "target": "pluto"
+    },
+    "ranges": {
+      "address_limit": "16777216",
+      "erase_end": "15138816",
+      "payload_end": "15105575",
+      "payload_start": "2097152"
+    },
+    "schema": "plutosdr-fw.flash-artifact-check.v1"
+  },
+  "qualification": null,
+  "rootfs_overlay": {
+    "lib/modules": {
+      "after": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "before": null,
+      "mode": "0o40755"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1": {
+      "after": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "before": null,
+      "mode": "0o40755"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1/kernel": {
+      "after": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "before": null,
+      "mode": "0o40755"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1/kernel/net": {
+      "after": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "before": null,
+      "mode": "0o40755"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1/kernel/net/8021q": {
+      "after": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "before": null,
+      "mode": "0o40755"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1/kernel/net/8021q/8021q.ko": {
+      "after": "4cdcbc1ced2ce34e458f299669853981a186bad6bbd97eed9bf04a1061f0657d",
+      "before": null,
+      "mode": "0o100644"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1/kernel/net/ipv4": {
+      "after": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "before": null,
+      "mode": "0o40755"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1/kernel/net/ipv4/ip_tunnel.ko": {
+      "after": "e27dc8234c0f31051302de659e9a74c9e1fa7e0a3793ce3dd42cf3e4d0551a4e",
+      "before": null,
+      "mode": "0o100644"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1/kernel/net/ipv4/ipip.ko": {
+      "after": "36c8c670c54a5206d5bbff4a4d1b1d0866413a527f3c08f0f4e1617f46f5afbf",
+      "before": null,
+      "mode": "0o100644"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1/kernel/net/ipv4/tunnel4.ko": {
+      "after": "99558ab1d4f47524c63ffb6641b2125bdb8c9e195619cbf7100e474704efcde3",
+      "before": null,
+      "mode": "0o100644"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1/modules.alias": {
+      "after": "b182c4e41ab07303f514fa8ce401d421aea031d560d19672be6da14f6ce434b3",
+      "before": null,
+      "mode": "0o100644"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1/modules.alias.bin": {
+      "after": "6a76ed0ab5c8913090be5d55a1db9c9be8e1bbeaaa8654f2150ee4c72355dbe6",
+      "before": null,
+      "mode": "0o100644"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1/modules.builtin": {
+      "after": "cba4b65c78ea3b02e158eb9b72195474627a3539125c7e4624effb22b18385fd",
+      "before": null,
+      "mode": "0o100644"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1/modules.builtin.alias.bin": {
+      "after": "f0bfe99e3ce07b893e31bd1bc75cc7f6a6607f8e95ea56f33c09f3da0890f814",
+      "before": null,
+      "mode": "0o100644"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1/modules.builtin.bin": {
+      "after": "dc998a89f2de1c7704344ea68b697a652b31b1d44a7aae13ea56eaa307e99697",
+      "before": null,
+      "mode": "0o100644"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1/modules.builtin.modinfo": {
+      "after": "e61220ba496b21dedb14bf7154103c6a4b34446478fdbbf04db0d6a5e15e0f31",
+      "before": null,
+      "mode": "0o100644"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1/modules.dep": {
+      "after": "fe8b6ad91f079a64d1cdea65442dd96bc0eef92ee8d2fbdd8a0ed9efbd58bb9b",
+      "before": null,
+      "mode": "0o100644"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1/modules.dep.bin": {
+      "after": "d744ac77cf59230f6f3047ae8f6efe5b7b4374448ced3106f846fd97bd69a7b2",
+      "before": null,
+      "mode": "0o100644"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1/modules.devname": {
+      "after": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "before": null,
+      "mode": "0o100644"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1/modules.order": {
+      "after": "371f95605602f5fbd567036bf9dc045fc76aa8719a91c2067ea424b3b4a3b12b",
+      "before": null,
+      "mode": "0o100644"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1/modules.softdep": {
+      "after": "ac2de753255c506934be29e69261f1485f51ee9cf9c2bf467bcc0c4cf95f8713",
+      "before": null,
+      "mode": "0o100644"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1/modules.symbols": {
+      "after": "fb460dd5a2ab0bd193ea5ee62aa00da5fcbf795b08136b527e1b3eeea8da1266",
+      "before": null,
+      "mode": "0o100644"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1/modules.symbols.bin": {
+      "after": "f4655917b1d6b0fc17f6b6597ed2f7afbdd3ab1bdcd2f2b9a96eedd63539e943",
+      "before": null,
+      "mode": "0o100644"
+    },
+    "lib/modules/5.15.0-counter-rx-v1-flash-safety-rc1/modules.weakdep": {
+      "after": "a1fffe1059d8150b5d402b3f284f507025a8d4b5881810cb17b3fda8b8ab9304",
+      "before": null,
+      "mode": "0o100644"
+    },
+    "opt/VERSIONS": {
+      "after": "ee5229207a7e609ea1e1828490ce72d9b6427eb22d1355bd7f1add5fbb17d57f",
+      "before": "e6313dcc0e94b121d37b271d72ad621bf2b86936a926f9c4eaea8b2e44e29032",
+      "mode": "0o100644"
+    },
+    "sbin/update.sh": {
+      "after": "d489310ad2d3ea2c95011c0e29529c882e2f6364f123d7f7bdcc6c7eae4f9511",
+      "before": "89a43bbb685ac49b9e98cd47975115f55c0e5c791e85fe916ee07ec8e5d77d69",
+      "mode": "0o100755"
+    },
+    "sbin/update_frm.sh": {
+      "after": "cd172a1bda9d12117425131d6f20cfdd8b1cabc6c76ee4ac7b60147be93f5cd5",
+      "before": "d8a3693f88ca9f3f7e4f9e7b4ac4a62abb8976d610df058fc74bbd6a6ee915f0",
+      "mode": "0o100755"
+    },
+    "sbin/update_from_github.sh": {
+      "after": "8a3fbb3cee75f502f38388382e9b0f07b6db39865c537acc099f65706795b648",
+      "before": "c9c4b97a3323ef0208e7a4a786a2fd006ba30d30a69fe816e7bfeff6f9a87396",
+      "mode": "0o100755"
+    },
+    "usr/bin/fdtget": {
+      "after": "766b1f71fefebef665afd22e5d336f467be2492c41983233ff83932bf39d7333",
+      "before": null,
+      "mode": "0o100755"
+    },
+    "usr/lib/libfdt-1.6.1.so": {
+      "after": "24ef19df709e70ca617ee192b0f749d515267b8fe71dd3d7a729f3e344349dd9",
+      "before": null,
+      "mode": "0o100755"
+    },
+    "usr/lib/libfdt.so.1": {
+      "after": "c6378e82ea32b869855e9e8da6c546e061ff4a6397fa21dbc11cdd3f6be23730",
+      "before": null,
+      "mode": "0o120777"
+    },
+    "usr/sbin/dumpimage": {
+      "after": "18c22275662ef8ef84b6109c059a1ca72aa1cc5fd8e5e78bbda59ca6c0144638",
+      "before": null,
+      "mode": "0o100755"
+    },
+    "usr/sbin/pluto-flash-range": {
+      "after": "5539a2535495602e4a85452c4192a47a3d746f2e5363b8afe0f4641d6df8fecc",
+      "before": null,
+      "mode": "0o100755"
+    },
+    "usr/sbin/pluto-fw-update": {
+      "after": "577625e704f06233cfbf15aa8d28e3b47559b4db49ed62b783af457f8931b429",
+      "before": null,
+      "mode": "0o100755"
+    }
+  },
+  "schema": "plutosdr-fw.flash-safety-candidate.v1",
+  "sources": {
+    "buildroot": "857c1a81789be9b0ef6019d844f2670ca7e1a46f",
+    "linux": "2378b1c3b3f0326beff1fecdda4059e095c28648",
+    "u-boot-xlnx": "61dff5dff655a62ce3aecec749595ac4f1ca6b51"
+  },
+  "status": "unqualified-recovery-candidate",
+  "version": "v0.50-counter-rx-v1-flash-safety-rc1"
+}

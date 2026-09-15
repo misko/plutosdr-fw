@@ -23,7 +23,7 @@ fail() {
 # source locks retain their original package path unless a waiver inventory is
 # explicitly supplied by their trusted workflow.
 case "$(basename "$MANIFEST")" in
-counter-rx-v1-source.yaml | iq-direct-async-v4-source.yaml | iq-direct-async-v3-source.yaml | iq-direct-async-v2-source.yaml | iq-direct-async-ring-v1-rc1-source.yaml | iio-throughput-coverage-window-v6-rc1-source.yaml | \
+counter-rx-v1-source.yaml | flash-safety-v1-source.yaml | iq-direct-async-v4-source.yaml | iq-direct-async-v3-source.yaml | iq-direct-async-v2-source.yaml | iq-direct-async-ring-v1-rc1-source.yaml | iio-throughput-coverage-window-v6-rc1-source.yaml | \
 ddr-capacity-test-rc1-source.yaml | iio-throughput-sampler-wake-v5-rc1-source.yaml | iio-throughput-refill-sampler-v4-rc1-source.yaml | iio-throughput-sampler-poll-v3-rc1-source.yaml | iio-throughput-rw-affinity-v2-rc1-source.yaml | iio-throughput-affinity-v1-rc1-source.yaml | iio-throughput-timing-v1-rc1-source.yaml | iio-throughput-hold-v2-rc1-source.yaml | iio-throughput-hold-v1-rc1-source.yaml | ddr-ring-prefill-v1-rc1-source.yaml | ddr-ring-v1-rc2-source.yaml | ddr-ring-v1-rc1-source.yaml | ddr-burst-v2-rc3-source.yaml | ddr-burst-v2-rc2-source.yaml | ddr-burst-v2-rc1-source.yaml | ddr-burst-v1-rc5-source.yaml | ddr-burst-v1-rc4-source.yaml | ddr-burst-v1-rc3-source.yaml | \
 tandem-agc-v8-rc5-source.yaml | tandem-agc-v8-rc6-source.yaml | tandem-agc-v8-rc7-source.yaml | tandem-agc-v8-rc8-source.yaml | tandem-agc-v8-rc9-source.yaml | tandem-agc-v8-rc10-source.yaml | tandem-agc-v8-rc11-source.yaml | tandem-agc-v8-rc12-source.yaml | tandem-agc-v8-rc13-source.yaml | tandem-agc-v8-rc14-source.yaml | tandem-agc-v8-rc15-source.yaml | tandem-agc-v8-rc16-source.yaml | tandem-agc-v8-rc17-source.yaml | tandem-agc-v8-rc18-source.yaml | tandem-agc-v8-rc19-source.yaml | tandem-agc-v8-rc20-source.yaml | tandem-agc-v8-rc21-source.yaml | tandem-agc-v8-rc22-source.yaml | tandem-agc-v8-rc23-source.yaml | tandem-agc-v8-rc24-source.yaml | tandem-agc-v8-rc25-source.yaml | tandem-agc-v8-rc26-source.yaml | tandem-agc-v8-rc27-source.yaml | tandem-agc-v8-rc28-source.yaml | tandem-agc-v8-rc29-source.yaml | tandem-agc-v8-rc30-source.yaml | tandem-agc-v8-rc31-source.yaml | tandem-agc-v8-rc32-source.yaml | tandem-agc-v8-source.yaml | metadata-timeout-main-v1-source.yaml | single-rx-metadata-rc1-source.yaml | ddr-burst-v1-rc1-source.yaml | ddr-burst-v1-rc2-source.yaml)
     manifest_name="$(basename -- "$MANIFEST")"
@@ -112,6 +112,9 @@ grep -Eq 'Length:[[:space:]]+16$' "$ARTIFACT_ROOT/dfu-suffix-check.txt" ||
 # trailer: a 16-byte DFU suffix versus a 32-hex-character MD5 plus newline.
 dfu_bytes="$(stat -c %s "$dfu")"
 frm_bytes="$(stat -c %s "$frm")"
+python3 scripts/validate_flash_artifact.py --frm "$frm" \
+    --profile "${FLASH_LAYOUT_PROFILE:-manifests/pluto-legacy-flash-layout.json}" \
+    --target pluto > "$ARTIFACT_ROOT/flash-layout-verdict.json"
 [[ "$dfu_bytes" -gt 16 && "$frm_bytes" -gt 33 ]] ||
     fail "DFU/FRM is too small to contain its required trailer"
 dfu_fit_bytes="$((dfu_bytes - 16))"
@@ -364,6 +367,9 @@ iq-direct-async-v3-source.yaml:final-release)
 counter-rx-v1-source.yaml:*)
     protected_version='v0.50-plutoplus-spf-counter-rx-v1'
     ;;
+flash-safety-v1-source.yaml:candidate)
+    protected_version='v0.51-plutoplus-spf-counter-rx-v1-flash-safety-rc1'
+    ;;
 iq-direct-async-v4-source.yaml:*)
     protected_version='v0.49-plutoplus-spf-iq-direct-async-v4'
     ;;
@@ -554,6 +560,7 @@ read -r wns tns tns_failing _ whs ths ths_failing _ wpws tpws tpws_failing _ \
         packed-fpga.bit
         system-top-bit.sha256
         frm-layout.txt
+        flash-layout-verdict.json
         system_top_timing_summary_routed.rpt
         system_top_route_status.rpt
         system_top_drc_routed.rpt
