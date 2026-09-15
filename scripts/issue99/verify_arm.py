@@ -45,6 +45,11 @@ def main():
         qemu = ["qemu-arm", "-L", str(root)]
         def arm(binary, *args):
             return subprocess.check_output(qemu + [str(root / binary), *map(str, args)])
+        # Host PATH fallback in fixture tests must not hide missing firmware applets.
+        required = set("awk basename cat cmp cp cut dirname grep head md5sum mkdir "
+                       "mktemp od readlink rm rmdir sed sha256sum sort tail wc".split())
+        applets = set(arm("bin/busybox", "--list").decode().split())
+        assert required <= applets, f"missing target applets: {sorted(required - applets)}"
         assert arm("usr/bin/fdtget", "-t", "s", CANDIDATE / "pluto.itb", "/", "magic").strip() == b"ITB PlutoSDR (ADALM-PLUTO)"
         arm("usr/sbin/dumpimage", "-l", CANDIDATE / "pluto.itb")
         wrapper = Path(scratch) / "bin"

@@ -8,19 +8,19 @@
     },
     "pluto.dfu": {
       "bytes": 13008439,
-      "sha256": "8948035be0083e43a1f61c1ace071d8aab9332932ed29601a65ca20f097388b9"
+      "sha256": "76db6fe720fc1790ec035f408f77f7d47bc7b0e0bed2f6133363b8676ccb24cb"
     },
     "pluto.frm": {
       "bytes": 13008456,
-      "sha256": "daa546db4a0651a3308a6b97a701dd61e12d733f8772cbb16462eb2f5d2f48b1"
+      "sha256": "1a82a4280731fd9a3b9b634b5c0ab17ced61a1e2353c5349f87530c24ddc5eee"
     },
     "pluto.itb": {
       "bytes": 13008423,
-      "sha256": "c08feb750cc7c13729d2209f20a2515ef266ea0d04e3a79c8fd5ed4aa938d968"
+      "sha256": "11248f8b028c5f1b09693c7c7ab9dddcbc63a2cb94ffdc4dab65ef8b5bea4562"
     },
     "rootfs.cpio.gz": {
-      "bytes": 7388232,
-      "sha256": "de11d2bb8817c7f6701709b7dac1d6dc81dcfc2ddb9da408acd8c626164f5651"
+      "bytes": 7388230,
+      "sha256": "933d11fe7f4ef7e42d0a611a2188dca34d44daef9bf5d3f1915a333f01963f93"
     },
     "system_top.bit": {
       "bytes": 969580,
@@ -47,7 +47,7 @@
   "persistent_range": {
     "device_trees_checked": 3,
     "fit_bytes": 13008423,
-    "fit_sha256": "c08feb750cc7c13729d2209f20a2515ef266ea0d04e3a79c8fd5ed4aa938d968",
+    "fit_sha256": "11248f8b028c5f1b09693c7c7ab9dddcbc63a2cb94ffdc4dab65ef8b5bea4562",
     "profile": {
       "address_limit": 16777216,
       "erase_bytes": 65536,
@@ -190,7 +190,7 @@
       "mode": "0o100644"
     },
     "opt/VERSIONS": {
-      "after": "b9f1e8ff396020b4b026a54ef0015df8f2b6232e135889dda933acf452b60373",
+      "after": "ee5229207a7e609ea1e1828490ce72d9b6427eb22d1355bd7f1add5fbb17d57f",
       "before": "e6313dcc0e94b121d37b271d72ad621bf2b86936a926f9c4eaea8b2e44e29032",
       "mode": "0o100644"
     },
@@ -235,14 +235,14 @@
       "mode": "0o100755"
     },
     "usr/sbin/pluto-fw-update": {
-      "after": "eec386e970be6049d6c2df7735f13bb1dbd93de53f962b0a2fc6fdca2369706b",
+      "after": "577625e704f06233cfbf15aa8d28e3b47559b4db49ed62b783af457f8931b429",
       "before": null,
       "mode": "0o100755"
     }
   },
   "schema": "plutosdr-fw.flash-safety-candidate.v1",
   "sources": {
-    "buildroot": "bedc18df1b45b3f4079149f9903a9b243053f096",
+    "buildroot": "857c1a81789be9b0ef6019d844f2670ca7e1a46f",
     "linux": "2378b1c3b3f0326beff1fecdda4059e095c28648",
     "u-boot-xlnx": "61dff5dff655a62ce3aecec749595ac4f1ca6b51"
   },
