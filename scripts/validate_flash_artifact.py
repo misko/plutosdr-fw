@@ -17,6 +17,45 @@ def output(*args: str) -> str:
     return subprocess.check_output(args, text=True, stderr=subprocess.PIPE).strip()
 
 
+def extract_flat_dt(fit: Path, index: int, destination: Path) -> None:
+    """Extract one FIT component with current or pinned-Buildroot dumpimage."""
+    try:
+        output(
+            "dumpimage",
+            "-T",
+            "flat_dt",
+            "-p",
+            str(index),
+            "-o",
+            str(destination),
+            str(fit),
+        )
+        return
+    except subprocess.CalledProcessError as modern_error:
+        destination.unlink(missing_ok=True)
+        try:
+            # U-Boot 2017's dumpimage uses -i for the input and the final
+            # positional argument for the output. The protected source graph's
+            # Buildroot host tool still has that interface.
+            output(
+                "dumpimage",
+                "-i",
+                str(fit),
+                "-T",
+                "flat_dt",
+                "-p",
+                str(index),
+                str(destination),
+            )
+            return
+        except subprocess.CalledProcessError as legacy_error:
+            raise ValueError(
+                "dumpimage could not extract FIT component "
+                f"{index} with modern or legacy syntax "
+                f"(modern={modern_error.returncode}, legacy={legacy_error.returncode})"
+            ) from legacy_error
+
+
 def validate(path: Path, profile_path: Path, target: str, *, frm: bool) -> dict:
     profile = json.loads(profile_path.read_text())
     if profile.get("schema") != "plutosdr-fw.flash-layout.v1" or profile.get("target") != target:
@@ -53,7 +92,7 @@ def validate(path: Path, profile_path: Path, target: str, *, frm: bool) -> dict:
             if output("fdtget", "-t", "s", str(fit), f"/images/{name}", "type") != "flat_dt":
                 continue
             dtb = Path(scratch) / f"{index}.dtb"
-            output("dumpimage", "-T", "flat_dt", "-p", str(index), "-o", str(dtb), str(fit))
+            extract_flat_dt(fit, index, dtb)
             node = profile["firmware_node"]
             if output("fdtget", "-t", "s", str(dtb), node, "label") != "qspi-linux":
                 raise ValueError("packaged DT firmware partition role mismatch")

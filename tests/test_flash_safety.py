@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import re
 from pathlib import Path
@@ -94,6 +95,39 @@ def test_artifact_matches_packaged_dt(fit, tmp_path):
                              "--target", "pluto"], capture_output=True, text=True)
     assert result.returncode != 0
     assert "packaged DT" in result.stderr
+
+
+def test_artifact_validator_supports_pinned_buildroot_dumpimage(tmp_path, monkeypatch):
+    script = ROOT / "scripts/validate_flash_artifact.py"
+    spec = importlib.util.spec_from_file_location("validate_flash_artifact", script)
+    assert spec is not None and spec.loader is not None
+    validator = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(validator)
+    fit = tmp_path / "image.itb"
+    fit.write_bytes(b"fit")
+    destination = tmp_path / "board.dtb"
+    calls = []
+
+    def legacy_dumpimage(*args):
+        calls.append(args)
+        if "-i" not in args:
+            destination.write_bytes(b"partial")
+            raise subprocess.CalledProcessError(1, args)
+        assert args == (
+            "dumpimage", "-i", str(fit), "-T", "flat_dt", "-p", "2", str(destination)
+        )
+        assert not destination.exists()
+        destination.write_bytes(b"complete device tree")
+        return ""
+
+    monkeypatch.setattr(validator, "output", legacy_dumpimage)
+    validator.extract_flat_dt(fit, 2, destination)
+
+    assert destination.read_bytes() == b"complete device tree"
+    assert calls[0] == (
+        "dumpimage", "-T", "flat_dt", "-p", "2", "-o", str(destination), str(fit)
+    )
+    assert len(calls) == 2
 
 
 @pytest.fixture
