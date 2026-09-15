@@ -9,12 +9,17 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 
+#define SCOUT_PROFILE "1536-selected-observer3-scan64-scout16"
+#define SPARSE_PROFILE "45000-selected-observer9-scan80-local2-track10-sparse10-authority"
+#define FOLLOWUP_PLAN "sparse10-after-scout16"
+
 struct visit_context {
     char **args;
     FILE *journal;
     uint32_t rate;
     unsigned visit_count;
     const char *profile;
+    int followup_sparse;
     int (*probe_main)(int,char **);
 };
 static const char *visit_profile(const struct visit_context *v)
@@ -31,6 +36,8 @@ static int visit_arguments(int argc,char **argv,struct visit_context *v,uint64_t
     v->profile=NULL;
     if(!strcmp(argv[argc-1],"1536-selected-observer3-scan64")) {
         v->profile=argv[argc-1];count--;
+    } else if(!strcmp(argv[argc-1],FOLLOWUP_PLAN)) {
+        v->profile=SCOUT_PROFILE;v->followup_sparse=1;count--;
     }
     if(count<2 || count>4) return -1;
     for(int n=0;n<count;n++) {
@@ -119,6 +126,47 @@ static int visit_retain(void *pointer,const char *kind,unsigned number,int resul
     return fprintf(v->journal,"visit %s %u %d %" PRIu64 " %u %u %" PRIu64 " %d %d\n",
         kind,number,result,s->lo_hz,s->rate,s->epoch,s->native_latest,s->idle,s->fixed_rf_valid)<0 || fflush(v->journal) ? -1 : 0;
 }
+static int status_number(const char *raw,const char *key,uint32_t *out)
+{
+    char token[80],*at,*end;unsigned long value;
+    if(snprintf(token,sizeof(token),"\"%s\":",key)<=0 || !(at=strstr(raw,token)) ||
+       strstr(at+strlen(token),token)) return -1;
+    at+=strlen(token);
+    if(*at<'0' || *at>'9') return -1;
+    errno=0;value=strtoul(at,&end,10);
+    if(errno || end==at || value>UINT32_MAX || (*end!=',' && *end!='}')) return -1;
+    *out=(uint32_t)value;return 0;
+}
+/* A successful child exit is only a transport fact. Promote it to a scout
+ * signal or completed follow-up from the child's single retained status line. */
+static int visit_status(const char *path,uint32_t rate,const char *profile)
+{
+    char raw[2048],*newline;FILE *file=fopen(path,"r");size_t length;
+    uint32_t actual_rate,status,blocks,attempts,handoffs,results,completed,worker;
+    if(!file) return -1;
+    length=fread(raw,1,sizeof(raw)-1,file);
+    int invalid=ferror(file) || !feof(file) || !length;
+    if(fclose(file) || invalid) return -1;
+    raw[length]=0;newline=strchr(raw,'\n');
+    if(!newline || newline!=raw+length-1 || strchr(newline+1,'\n') ||
+       !strstr(raw,"\"scope\":\"bounded_live_cpu_acquisition_native_feedback\"")) return -1;
+    if(status_number(raw,"rate",&actual_rate) || status_number(raw,"status",&status) ||
+       status_number(raw,"blocks",&blocks) || status_number(raw,"attempts",&attempts) ||
+       status_number(raw,"handoffs",&handoffs) || status_number(raw,"native_results",&results) ||
+       status_number(raw,"native_completed_runs",&completed) ||
+       status_number(raw,"worker_complete",&worker) || actual_rate!=rate || status || !worker) return -1;
+    if(!strcmp(profile,SCOUT_PROFILE)) {
+        if(blocks>BLOCKS || attempts>ATTEMPTS || completed>1) return -1;
+        if(handoffs>=1 && completed==1 && results>=SCOUT_NATIVE_RESULTS) return GLRT_VISIT_SIGNAL;
+        return !handoffs && !completed && !results ? GLRT_VISIT_DONE : -1;
+    }
+    if(!strcmp(profile,SPARSE_PROFILE)) {
+        if(blocks>45000 || attempts>256 || completed>1) return -1;
+        if(handoffs>=1 && completed==1 && results>=SPARSE_NATIVE_RESULTS) return GLRT_VISIT_DONE;
+        return !handoffs && !completed && !results ? GLRT_VISIT_NO_TRACK : -1;
+    }
+    return -1;
+}
 static int visit_child(void *pointer,unsigned number,uint64_t deadline)
 {
     struct visit_context *v=pointer;char directory[PATH_MAX],out[PATH_MAX],err[PATH_MAX];
@@ -154,7 +202,8 @@ static int visit_child(void *pointer,unsigned number,uint64_t deadline)
     }
     if(stopping || !WIFEXITED(status)) return -1;
     if(WEXITSTATUS(status)==LIVE_VISIT_CLEAN_LOSS_EXIT) return GLRT_VISIT_CLEAN_LOSS;
-    return WEXITSTATUS(status)==0 ? 0 : -1;
+    if(WEXITSTATUS(status)) return -1;
+    return v->followup_sparse ? visit_status(out,v->rate,visit_profile(v)) : 0;
 fail:
     if(stdout_fd>=0) close(stdout_fd);
     if(stderr_fd>=0) close(stderr_fd);
@@ -164,23 +213,39 @@ int main(int argc,char **argv)
 {
     struct visit_context context={0};struct glrt_visit_ports ports;
     char path[PATH_MAX];uint64_t lo[4];struct sigaction action={0};int rc;
+    unsigned selected=UINT_MAX;int followup_started=0;
     if(visit_arguments(argc,argv,&context,lo)) return 2;
     context.probe_main=visit_probe_main;
     if(snprintf(path,sizeof(path),"%s/visits.txt",argv[5])<=0 || !(context.journal=fopen(path,"wx"))) return 2;
     action.sa_handler=signal_stop;sigemptyset(&action.sa_mask);
     if(sigaction(SIGALRM,&action,NULL) || sigaction(SIGTERM,&action,NULL) || sigaction(SIGINT,&action,NULL)) return 2;
-    alarm(60);
+    alarm(context.followup_sparse ? 400 : 60);
     ports=(struct glrt_visit_ports){&context,clock_ns,visit_cancelled,visit_inspect,visit_tune,visit_child,visit_retain};
     rc=fprintf(context.journal,"plan %u %s",context.rate,argv[2])<0 ? GLRT_VISIT_RETENTION : 0;
     for(unsigned n=0;n<context.visit_count;n++)
         if(fprintf(context.journal," %" PRIu64,lo[n])<0) rc=GLRT_VISIT_RETENTION;
-    if(fprintf(context.journal," %s %u 60000000000\n",visit_profile(&context) ? visit_profile(&context) : "1536",context.visit_count)<0 ||
+    if(fprintf(context.journal," %s %u %" PRIu64 "\n",
+       context.followup_sparse ? FOLLOWUP_PLAN : visit_profile(&context) ? visit_profile(&context) : "1536",
+       context.visit_count,context.followup_sparse ? UINT64_C(400000000000) : UINT64_C(60000000000))<0 ||
        fflush(context.journal)) rc=GLRT_VISIT_RETENTION;
-    if(!rc) rc=glrt_tracking_visit_plan_run(&ports,context.rate,lo,context.visit_count);
+    if(!rc && context.followup_sparse) {
+        rc=glrt_tracking_visit_until_signal(&ports,context.rate,lo,context.visit_count,&selected);
+        if(rc==GLRT_VISIT_SIGNAL) {
+            followup_started=1;context.profile=SPARSE_PROFILE;
+            rc=glrt_tracking_visit_followup_run(&ports,context.rate,lo[selected],context.visit_count);
+        }
+    } else if(!rc) rc=glrt_tracking_visit_plan_run(&ports,context.rate,lo,context.visit_count);
     if(fprintf(context.journal,"terminal %d\n",rc)<0 || fclose(context.journal)) rc=GLRT_VISIT_RETENTION;
     alarm(0);
-    printf("{\"scope\":\"%s\",\"rate\":%u,\"result\":%d,\"rf_sample_limit\":%u}\n",
+    printf("{\"scope\":\"%s\",\"rate\":%u,\"result\":%d,\"rf_sample_limit\":%u",
+        context.followup_sparse ? "bounded_arm_scout_sparse_followup" :
         context.visit_count==2 ? "bounded_arm_two_frequency_visits" : "bounded_arm_frequency_revisits",
-        context.rate,rc,context.visit_count*25165824U);
+        context.rate,rc,context.visit_count*25165824U+(followup_started ? 737280000U : 0U));
+    if(context.followup_sparse) {
+        printf(",\"followup_started\":%d,\"track_complete\":%d,\"selected_index\":",
+            followup_started,followup_started && rc==GLRT_VISIT_DONE);
+        if(selected==UINT_MAX) printf("null"); else printf("%u",selected);
+    }
+    printf("}\n");
     return rc ? 1 : 0;
 }

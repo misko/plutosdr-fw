@@ -1,5 +1,6 @@
 """Actual fork/wait and evidence isolation; mock child performs no IIO calls."""
 import ctypes as c
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -34,7 +35,22 @@ static int simulated_child(int argc,char **argv) {
         if(argc!=7 || strcmp(argv[6],"1536-selected-observer3-scan64")) return 9;
     } else if(!strcmp(argv[1],"selected")) {
         if(argc!=7 || strcmp(argv[6],"1536-selected")) return 9;
+    } else if(!strncmp(argv[1],"scout_",6)) {
+        if(argc!=7 || strcmp(argv[6],SCOUT_PROFILE)) return 9;
+    } else if(!strncmp(argv[1],"sparse_",7)) {
+        if(argc!=7 || strcmp(argv[6],SPARSE_PROFILE)) return 9;
     } else if(argc!=6) return 9;
+    if(!strncmp(argv[1],"scout_",6) || !strncmp(argv[1],"sparse_",7)) {
+        unsigned scout=!strncmp(argv[1],"scout_",6),signal=strstr(argv[1],"signal")!=NULL;
+        unsigned complete=strstr(argv[1],"complete")!=NULL || signal;
+        unsigned handoffs=complete,results=complete ? (scout ? 16 : 751) : 0;
+        if(strstr(argv[1],"partial")) { handoffs=1;results=8;complete=0; }
+        printf("{\"scope\":\"bounded_live_cpu_acquisition_native_feedback\",\"rate\":0,"
+            "\"status\":0,\"blocks\":%u,\"attempts\":1,\"handoffs\":%u,"
+            "\"native_results\":%u,\"native_completed_runs\":%u,\"worker_complete\":1}\n",
+            scout ? 1536U : 45000U,handoffs,results,complete);
+        return 0;
+    }
     printf("retained child output\n");fprintf(stderr,"retained child diagnostics\n");
     if(!strcmp(argv[1],"fail")) return 1;
     if(!strcmp(argv[1],"clean_loss")) return LIVE_VISIT_CLEAN_LOSS_EXIT;
@@ -51,6 +67,8 @@ int exercise_child(const char *directory,const char *mode) {
     struct visit_context context={.args=args,.probe_main=simulated_child};
     context.visit_count=!strcmp(mode,"selected") ? 4 : 2;
     if(!strcmp(mode,"scan64")) context.profile="1536-selected-observer3-scan64";
+    if(!strncmp(mode,"scout_",6)) { context.profile=SCOUT_PROFILE;context.followup_sparse=1; }
+    if(!strncmp(mode,"sparse_",7)) { context.profile=SPARSE_PROFILE;context.followup_sparse=1; }
     uint64_t budget=!strcmp(mode,"hang") ? UINT64_C(100000000) : UINT64_C(2000000000);
     interrupted=0;
     int rc=visit_child(&context,0,clock_ns(NULL)+budget),status;
@@ -80,6 +98,7 @@ int parse_plan(unsigned rate,unsigned count,const char *profile) {
     if(visit_arguments(6+(int)count+(profile!=NULL),args,&context,lo)) return -1;
     const char *selected=visit_profile(&context);
     if(context.visit_count!=count || context.rate!=rate) return -2;
+    if(context.followup_sparse) return selected && !strcmp(selected,SCOUT_PROFILE) ? 16 : -3;
     return selected && !strcmp(selected,"1536-selected-observer3-scan64") ? 64 : 8;
 }
 '''
@@ -112,12 +131,17 @@ def probe(tmp_path_factory):
     return lib
 
 
-@pytest.mark.parametrize('mode',['pass','fail','hang','existing','clean_loss','unknown','signal','selected','scan64'])
+@pytest.mark.parametrize('mode',['pass','fail','hang','existing','clean_loss','unknown','signal','selected','scan64',
+    'scout_signal','scout_empty','scout_partial','sparse_complete','sparse_empty','sparse_partial'])
 def test_child_is_reaped_before_return_and_evidence_is_never_overwritten(probe,tmp_path,mode):
     if mode=='existing':
         (tmp_path/'visit-0').mkdir();(tmp_path/'visit-0/stdout.json').write_text('preserved')
-    assert probe.exercise_child(os.fsencode(tmp_path),mode.encode())==({'pass':0,'selected':0,'scan64':0,'clean_loss':1}.get(mode,-1))
+    expected={'pass':0,'selected':0,'scan64':0,'clean_loss':1,'scout_signal':2,'scout_empty':0,
+        'sparse_complete':0,'sparse_empty':3}.get(mode,-1)
+    assert probe.exercise_child(os.fsencode(tmp_path),mode.encode())==expected
     if mode=='existing': assert (tmp_path/'visit-0/stdout.json').read_text()=='preserved'
+    elif mode.startswith(('scout_','sparse_')):
+        assert json.loads((tmp_path/'visit-0/stdout.json').read_text())['scope']=='bounded_live_cpu_acquisition_native_feedback'
     elif mode not in ('hang','signal'):
         assert (tmp_path/'visit-0/stdout.json').read_text()=='retained child output\n'
         assert (tmp_path/'visit-0/stderr.txt').read_text()=='retained child diagnostics\n'
@@ -144,10 +168,11 @@ def test_four_selected_children_have_separate_evidence_and_are_all_reaped(probe,
 
 @pytest.mark.parametrize('rate',[30000000,60000000,2500000])
 @pytest.mark.parametrize('count',[1,2,3,4])
-@pytest.mark.parametrize('profile',[None,b'1536-selected-observer3-scan64',b'unknown'])
+@pytest.mark.parametrize('profile',[None,b'1536-selected-observer3-scan64',b'sparse10-after-scout16',b'unknown'])
 def test_explicit_scan64_plan_preserves_legacy_and_rejects_invalid_arguments(probe,rate,count,profile):
     valid=rate in (30000000,60000000) and count in (2,3,4) and profile!=b'unknown'
-    assert probe.parse_plan(rate,count,profile)==((64 if profile else 8) if valid else -1)
+    expected=16 if profile==b'sparse10-after-scout16' else 64 if profile else 8
+    assert probe.parse_plan(rate,count,profile)==(expected if valid else -1)
 
 
 @pytest.mark.parametrize('rate',[30000000,60000000])

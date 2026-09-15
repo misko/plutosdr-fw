@@ -327,6 +327,7 @@ def live_api(tmp_path_factory):
     (b'1536-selected', [1536,6,25,12000000000]),
     (b'1536-selected-observer3', [1536,6,25,12000000000]),
     (b'1536-selected-observer3-scan64', [1536,6,25,12000000000]),
+    (b'1536-selected-observer3-scan64-scout16', [1536,6,25,12000000000]),
     (b'1536-selected-observer3-scan80-local2', [1536,6,25,12000000000]),
 ])
 def test_dwell_profiles_have_finite_capture_and_worker_limits(live_api, blocks, expected):
@@ -339,6 +340,7 @@ def test_dwell_profiles_have_finite_capture_and_worker_limits(live_api, blocks, 
 
 @pytest.mark.parametrize('profile,expected',[
     (b'1536',[1500,3]),
+    (b'1536-selected-observer3-scan64-scout16',[16,3]),
     (b'45000-selected-observer3-scan80-local2',[1500,3]),
     (b'45000-selected-observer3-scan80-local2-track10',[7500,120]),
     (b'45000-selected-observer9-scan80-local2-track10',[7500,120]),
@@ -359,7 +361,8 @@ def test_native_result_horizon_and_wall_deadline_are_explicit_per_profile(live_a
     (b'45000-selected-observer9-scan80-local2-track10-authority',1),
     (b'45000-selected-observer9-scan80-local2-track10-sparse10-authority',1),
     (b'4096',0),(b'1536-selected',0),(b'1536-selected-observer3',0),
-    (b'1536-selected-observer3-scan64',0),(b'1536-selected-observer3-scan80-local2',0),(b'unknown',-1)])
+    (b'1536-selected-observer3-scan64',0),(b'1536-selected-observer3-scan64-scout16',0),
+    (b'1536-selected-observer3-scan80-local2',0),(b'unknown',-1)])
 def test_only_long_profiles_restart_after_clean_native_loss(live_api,profile,expected):
     lib,_=live_api
     assert lib.live_restart_on_loss(profile)==expected

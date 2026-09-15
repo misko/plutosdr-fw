@@ -42,23 +42,29 @@ static int tune(void *p,uint64_t hz) {
     return 0;
 }
 static int run(void *p,unsigned n,uint64_t deadline) {
-    struct test *t=p;assert(n==t->runs && t->retained==3*n+2);
-    assert(deadline==UINT64_C(60000001000));t->runs++;
+    struct test *t=p;int followup=!strncmp(t->mode,"followup_",9);
+    assert(n==(followup ? 4U : t->runs) && t->retained==t->runs*3+2);
+    assert(deadline==(followup ? UINT64_C(320000001000) : UINT64_C(60000001000)));t->runs++;
     if(strcmp(t->mode,"no_epoch")) t->state.epoch++;
     if(strcmp(t->mode,"no_samples")) t->state.native_latest+=UINT64_C(300000000);
     t->now+=UINT64_C(10000000000);
     if(!strcmp(t->mode,"run_rf")) t->state.lo_hz++;
     if(!strcmp(t->mode,"deadline") || (!strcmp(t->mode,"late_deadline") && t->runs==3)) t->now=deadline;
     if(!strcmp(t->mode,"clock_regress")) t->now=999;
-    return (!strcmp(t->mode,"child_fail") || (!strcmp(t->mode,"late_failure") && t->runs==3)) ? -1 :
+    return !strcmp(t->mode,"until_signal") ? GLRT_VISIT_SIGNAL :
+        !strcmp(t->mode,"followup_no_track") ? GLRT_VISIT_NO_TRACK :
+        (!strcmp(t->mode,"child_fail") || (!strcmp(t->mode,"late_failure") && t->runs==3)) ? -1 :
         t->loss ? GLRT_VISIT_CLEAN_LOSS :
         !strcmp(t->mode,"unknown_result") ? 2 : 0;
 }
 static int retain(void *p,const char *kind,unsigned n,int result,const struct glrt_visit_state *s) {
-    struct test *t=p;(void)s;assert(n==t->retained/3);
+    struct test *t=p;(void)s;assert(n==(!strncmp(t->mode,"followup_",9) ? 4U : t->retained/3));
     const char *names[]={"before_tune","tuned","after_run"};assert(!strcmp(kind,names[t->retained%3]));
-    if(!strcmp(kind,"after_run")) assert(result==((!strcmp(t->mode,"child_fail") || (!strcmp(t->mode,"late_failure") && t->runs==3)) ? -1 :
-        t->loss ? GLRT_VISIT_CLEAN_LOSS : !strcmp(t->mode,"unknown_result") ? 2 : 0));
+    int expected=!strcmp(t->mode,"until_signal") ? GLRT_VISIT_SIGNAL :
+        !strcmp(t->mode,"followup_no_track") ? GLRT_VISIT_NO_TRACK :
+        (!strcmp(t->mode,"child_fail") || (!strcmp(t->mode,"late_failure") && t->runs==3)) ? -1 :
+        t->loss ? GLRT_VISIT_CLEAN_LOSS : !strcmp(t->mode,"unknown_result") ? 2 : 0;
+    if(!strcmp(kind,"after_run")) assert(result==expected);
     t->retained++;
     return (!strcmp(t->mode,"retention_before") && t->retained==1) ||
         (!strcmp(t->mode,"retention_tuned") && t->retained==2) ||
@@ -84,8 +90,17 @@ int main(int argc,char **argv) {
     if(!strcmp(t.mode,"duplicate")) frequencies[1]=frequencies[0];
     if(!strcmp(t.mode,"invalid_rate")) rate=2500000;
     if(!strcmp(t.mode,"missing_port")) p.inspect=NULL;
-    int rc=count==2 ? glrt_tracking_visit_run(&p,rate,frequencies) : glrt_tracking_visit_plan_run(&p,rate,frequencies,count);
-    printf("%d %u %u %u %u\n",rc,t.inspections,t.tunes,t.runs,t.retained);
+    unsigned selected=99;int rc;
+    if(!strcmp(t.mode,"until_loss")) { t.loss=1;rc=glrt_tracking_visit_until_signal(&p,rate,frequencies,2,&selected); }
+    else if(!strcmp(t.mode,"until_ready") || !strcmp(t.mode,"until_signal"))
+        rc=glrt_tracking_visit_until_signal(&p,rate,frequencies,2,&selected);
+    else if(!strncmp(t.mode,"followup_",9)) {
+        t.loss=!strcmp(t.mode,"followup_loss");
+        rc=glrt_tracking_visit_followup_run(&p,rate,frequencies[0],4);
+    } else rc=count==2 ? glrt_tracking_visit_run(&p,rate,frequencies) : glrt_tracking_visit_plan_run(&p,rate,frequencies,count);
+    printf("%d %u %u %u %u",rc,t.inspections,t.tunes,t.runs,t.retained);
+    if(!strncmp(argv[1],"until_",6)) printf(" %u",selected);
+    printf("\n");
 }
 '''
 
@@ -124,3 +139,13 @@ def test_two_visits_preserve_fixed_rate_and_require_idle_retained_boundaries(pro
     if mode=='ready': assert row==[0,6,2,2,6]
     if mode in ('child_fail','deadline','clock_regress','no_epoch','no_samples'):
         assert row[4]==3  # failure still retains verified post-child state
+
+
+@pytest.mark.parametrize('mode,result,runs,selected',[
+    ('until_loss',2,1,0),('until_signal',2,1,0),('until_ready',0,2,99),
+    ('followup_ready',0,1,None),('followup_loss',1,1,None),('followup_no_track',3,1,None),
+])
+def test_radio_local_scout_selects_one_bounded_followup(probe,mode,result,runs,selected):
+    row=list(map(int,subprocess.check_output([str(probe),mode,'30000000'],text=True).split()))
+    assert (row[0],row[2],row[3],row[4])==(result,1 if mode.startswith('followup_') else runs,runs,3*runs)
+    if selected is not None: assert row[5]==selected

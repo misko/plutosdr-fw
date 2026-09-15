@@ -28,6 +28,7 @@ struct glrt_visit_ports {
 };
 enum glrt_visit_result {
     GLRT_VISIT_DONE=0, GLRT_VISIT_CLEAN_LOSS=1,
+    GLRT_VISIT_SIGNAL=2, GLRT_VISIT_NO_TRACK=3,
     GLRT_VISIT_INVALID=-1, GLRT_VISIT_SOURCE=-2,
     GLRT_VISIT_TUNE=-3, GLRT_VISIT_RUN=-4, GLRT_VISIT_RETENTION=-5,
     GLRT_VISIT_DEADLINE=-6, GLRT_VISIT_CANCELLED=-7
@@ -42,4 +43,16 @@ int glrt_tracking_visit_run(const struct glrt_visit_ports *,uint32_t,
  * performed before the first port call; the shared deadline remains 60 s. */
 int glrt_tracking_visit_plan_run(const struct glrt_visit_ports *,uint32_t,
     const uint64_t *lo_hz,unsigned count);
+/* Short radio-local scouts stop after the first child proves either its finite
+ * signal horizon or a fully cleaned native signal loss and return that plan
+ * index. A caller can then run one long follow-up on that LO without returning
+ * control to a host scheduler. */
+int glrt_tracking_visit_until_signal(const struct glrt_visit_ports *,uint32_t,
+    const uint64_t *lo_hz,unsigned count,unsigned *selected_index);
+/* One bounded long follow-up. The callback number is caller-owned so its
+ * evidence directory cannot collide with preceding scouts. CLEAN_LOSS and
+ * NO_TRACK are reviewed outcomes; zero alone means the callback proved its
+ * requested tracking completion. */
+int glrt_tracking_visit_followup_run(const struct glrt_visit_ports *,uint32_t,
+    uint64_t lo_hz,unsigned evidence_number);
 #endif

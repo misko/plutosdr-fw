@@ -401,3 +401,28 @@ radio ports, plus an ARM build. Before physical qualification, the operator
 and evidence reviewer must support the selected-IQ multi-visit plan and its
 resource budget. No sustained tracking or adaptive frequency ranking is
 established by this extension.
+
+### Radio-local scout and sparse follow-up
+
+The opt-in `sparse10-after-scout16` visit plan composes acquisition and the
+long sparse profile within one ARM process. It checks two to four upper-edge
+LOs with the selected-window, observer-3, scan-64 geometry. Each scout stops
+after proving 16 native measurements. The first retained child status that
+proves a handoff and completed 16-result run selects its LO; a qualified clean
+loss also proves that the scout had acquired a signal. Empty scouts continue
+to the next LO, while partial or inconsistent child summaries stop the plan.
+
+The parent then retunes to the selected LO and runs exactly one
+`45000-selected-observer9-scan80-local2-track10-sparse10-authority` child. A
+zero process result is accepted only when the retained status proves one
+completed native run with at least 751 scheduled measurements. This represents
+ten seconds of 30-MS/s source time at stride ten and the established sustainable
+75-measurement/s cadence. No-signal, clean-loss, retention, deadline and child
+failures remain separate terminal results.
+
+All scouts share a 60-second controller deadline. The follow-up has its own
+320-second deadline, and the complete radio-local process has a 400-second
+alarm. With four LOs its finite source-IQ bound is 837,943,296 samples. This
+composition removes the host feedback loop from frequency selection and
+follow-up launch. Its decision paths and ARM binary are tested offline; a
+physical 751-result completion remains a separate qualification result.

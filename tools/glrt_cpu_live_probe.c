@@ -28,6 +28,7 @@
 #define PAIR_SAMPLES 3333U
 #define RESTART_LIMIT 3U
 #define NATIVE_RESULTS 1500U
+#define SCOUT_NATIVE_RESULTS 16U
 #define LONG_NATIVE_RESULTS 7500U
 #define SPARSE_NATIVE_RESULTS 751U
 #define NATIVE_SECONDS 3.0
@@ -73,6 +74,8 @@ static int dwell_limits(const char *blocks,struct dwell_limits *out)
         *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,8,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1};
     else if(!strcmp(blocks,"1536-selected-observer3-scan64"))
         *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,64,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1};
+    else if(!strcmp(blocks,"1536-selected-observer3-scan64-scout16"))
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,64,0,SCOUT_NATIVE_RESULTS,NATIVE_SECONDS,0,1};
     else if(!strcmp(blocks,"1536-selected-observer3-scan80-local2"))
         *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,80,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1};
     else return -1;
