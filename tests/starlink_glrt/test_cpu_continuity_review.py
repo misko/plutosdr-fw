@@ -90,6 +90,12 @@ def test_ranked_review_requires_full_scan_and_selects_strongest_activity():
                   "activity_selection":"strongest_one_attempt_scan_prior_reacquire"}
     assert review_continuity(prior,prior_parent,serial=SERIAL,los=LOS)["activity_selection"]==(
         "strongest_one_attempt_scan_prior_reacquire")
+    wait=prior.replace("continuity30-prior-after-scout1","continuity30-prior-wait12-after-scout1")
+    wait=wait.replace(" 400000000000\n"," 900000000000\n",1)
+    wait_parent={**parent,"scope":"bounded_arm_scout_prior_wait_segmented_followup",
+                 "activity_selection":"strongest_one_attempt_scan_prior_reacquire_wait12"}
+    assert review_continuity(wait,wait_parent,serial=SERIAL,los=LOS)["activity_selection"]==(
+        "strongest_one_attempt_scan_prior_reacquire_wait12")
 
 
 def test_review_accepts_parent_mapping_of_arbitrary_child_failure():

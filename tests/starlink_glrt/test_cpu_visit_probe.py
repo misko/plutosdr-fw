@@ -157,6 +157,14 @@ int parse_plan(unsigned rate,unsigned count,const char *profile) {
         selected && !strcmp(selected,QUICK_SCOUT_PROFILE) ? 1 : -3;
     return selected && !strcmp(selected,"1536-selected-observer3-scan64") ? 64 : 8;
 }
+int parse_plan_limits(const char *profile,unsigned out[3]) {
+    char *args[]={"probe","30000000","1040005e0b100007100010000bf33a5d4d","bank","refs","out",
+        "1190312500","1440312500",(char *)profile};
+    struct visit_context context={0};uint64_t lo[4];
+    if(visit_arguments(9,args,&context,lo)) return -1;
+    out[0]=context.continuity_rounds;out[1]=context.continuity_segments;
+    out[2]=(unsigned)(context.plan_ns/UINT64_C(1000000000));return 0;
+}
 struct continuity_fake {
     struct glrt_visit_state state;
     uint64_t now;
@@ -177,7 +185,8 @@ static int continuity_run_child(void *pointer,unsigned number,uint64_t deadline)
         f->call==1 ? GLRT_VISIT_CLEAN_LOSS : 0;
     else if(f->mode==2) outcome=(f->call%2)==0 ? GLRT_VISIT_SIGNAL : GLRT_VISIT_CLEAN_LOSS;
     else if(f->mode>=3 && (!strcmp(visit_profile(f->visit),SCOUT_PROFILE) ||
-        !strcmp(visit_profile(f->visit),QUICK_SCOUT_PROFILE)) && number<2) {
+        !strcmp(visit_profile(f->visit),QUICK_SCOUT_PROFILE)) &&
+        (number<2 || (f->mode==6 && number%5<2))) {
         double score=number ? .07 : .04;
         if(f->visit->activity_number==UINT_MAX || score>f->visit->activity_score) {
             f->visit->activity_number=number;f->visit->activity_score=score;
@@ -196,11 +205,16 @@ int exercise_continuity(int mode,unsigned out[7],unsigned numbers[16]) {
     struct glrt_visit_ports ports={&fake,continuity_clock,continuity_cancelled,continuity_inspect,
         continuity_tune,continuity_run_child,continuity_retain};
     struct visit_context context={.journal=tmpfile(),.rate=30000000,.visit_count=4,
-        .profile=SCOUT_PROFILE,.followup_profile=SEGMENT30_PROFILE,.followup_sparse=1,.continuity=1};
+        .profile=SCOUT_PROFILE,.followup_profile=SEGMENT30_PROFILE,.followup_sparse=1,.continuity=1,
+        .continuity_rounds=CONTINUITY_ROUNDS,.continuity_segments=CONTINUITY_ROUNDS,
+        .plan_ns=DEFAULT_PLAN_NS};
     fake.visit=&context;if(mode>=3) context.ranked_continuity=1;
     if(mode==4) { context.fresh_continuity=1;context.followup_profile=FRESH_SEGMENT30_PROFILE; }
     if(mode==5) { context.fresh_continuity=1;context.prior_continuity=1;
         context.followup_profile=PRIOR_SEGMENT30_PROFILE; }
+    if(mode==6) { context.fresh_continuity=1;context.prior_continuity=1;context.wait_continuity=1;
+        context.followup_profile=PRIOR_SEGMENT30_PROFILE;context.continuity_rounds=WAIT_CONTINUITY_ROUNDS;
+        context.continuity_segments=WAIT_CONTINUITY_SEGMENTS;context.plan_ns=WAIT_PLAN_NS; }
     struct continuity_result result;uint64_t lo[4]={1190312500,1440312500,1690312500,1940312500};
     if(!context.journal) return -99;
     int rc=continuity_run(&context,&ports,lo,&result);fclose(context.journal);
@@ -243,6 +257,7 @@ def probe(tmp_path_factory):
     lib.exercise_finite_segment.argtypes=[c.c_char_p]
     lib.exercise_ranked_quick_activity.argtypes=[c.c_char_p,c.c_void_p]
     lib.parse_plan.argtypes=[c.c_uint,c.c_uint,c.c_char_p]
+    lib.parse_plan_limits.argtypes=[c.c_char_p,c.c_void_p]
     lib.exercise_continuity.argtypes=[c.c_int,c.c_void_p,c.c_void_p]
     return lib
 
@@ -370,13 +385,24 @@ def test_retained_activity_score_is_strongest_candidate_not_array_position(probe
 @pytest.mark.parametrize('profile',[None,b'1536-selected-observer3-scan64',b'sparse10-after-scout16',
     b'sparse30-after-scout16',b'sparse100-after-scout16',b'continuity30-after-scout16',
     b'continuity30-ranked-after-scout16',b'continuity30-fresh-after-scout1',
-    b'continuity30-prior-after-scout1',b'unknown'])
+    b'continuity30-prior-after-scout1',b'continuity30-prior-wait12-after-scout1',b'unknown'])
 def test_explicit_scan64_plan_preserves_legacy_and_rejects_invalid_arguments(probe,rate,count,profile):
     valid=rate in (30000000,60000000) and count in (2,3,4) and profile!=b'unknown'
     expected=16 if profile in (b'sparse10-after-scout16',b'sparse30-after-scout16',b'sparse100-after-scout16',
         b'continuity30-after-scout16',b'continuity30-ranked-after-scout16',
-        ) else 1 if profile in (b'continuity30-fresh-after-scout1',b'continuity30-prior-after-scout1') else 64 if profile else 8
+        ) else 1 if profile in (b'continuity30-fresh-after-scout1',b'continuity30-prior-after-scout1',
+            b'continuity30-prior-wait12-after-scout1') else 64 if profile else 8
     assert probe.parse_plan(rate,count,profile)==(expected if valid else -1)
+
+
+@pytest.mark.parametrize('profile,expected',[
+    (b'continuity30-prior-after-scout1',[3,3,400]),
+    (b'continuity30-prior-wait12-after-scout1',[12,3,900]),
+])
+def test_continuity_plan_carries_explicit_round_segment_and_wall_bounds(probe,profile,expected):
+    out=(c.c_uint*3)()
+    assert probe.parse_plan_limits(profile,out)==0
+    assert list(out)==expected
 
 
 @pytest.mark.parametrize('mode,expected,numbers',[
@@ -386,6 +412,7 @@ def test_explicit_scan64_plan_preserves_legacy_and_rejects_invalid_arguments(pro
     (3,[1,13,3,1,0,13,0],list(range(13))),
     (4,[1,13,3,1,0,13,0],list(range(13))),
     (5,[1,13,3,1,0,13,0],list(range(13))),
+    (6,[0,15,3,3,0,15,1],list(range(15))),
 ])
 def test_continuity_rescans_with_contiguous_evidence_and_stops_on_complete(probe,mode,expected,numbers):
     out=(c.c_uint*7)();seen=(c.c_uint*16)()

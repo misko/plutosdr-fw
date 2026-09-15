@@ -24,7 +24,12 @@
 #define RANKED_CONTINUITY30_PLAN "continuity30-ranked-after-scout16"
 #define FRESH_CONTINUITY30_PLAN "continuity30-fresh-after-scout1"
 #define PRIOR_CONTINUITY30_PLAN "continuity30-prior-after-scout1"
+#define WAIT_PRIOR_CONTINUITY30_PLAN "continuity30-prior-wait12-after-scout1"
 #define CONTINUITY_ROUNDS 3U
+#define WAIT_CONTINUITY_ROUNDS 12U
+#define WAIT_CONTINUITY_SEGMENTS 3U
+#define DEFAULT_PLAN_NS UINT64_C(400000000000)
+#define WAIT_PLAN_NS UINT64_C(900000000000)
 #define SCOUT_RF_SAMPLES 25165824U
 #define SEGMENT_RF_SAMPLES 122880000U
 #define SCOUT_ACTIVITY_HITS 1U
@@ -42,6 +47,9 @@ struct visit_context {
     int ranked_continuity;
     int fresh_continuity;
     int prior_continuity;
+    int wait_continuity;
+    unsigned continuity_rounds,continuity_segments;
+    uint64_t plan_ns;
     int activity_selected;
     unsigned activity_number;
     double activity_score;
@@ -68,18 +76,27 @@ static int visit_arguments(int argc,char **argv,struct visit_context *v,uint64_t
               !strcmp(argv[argc-1],CONTINUITY30_PLAN) ||
               !strcmp(argv[argc-1],RANKED_CONTINUITY30_PLAN) ||
               !strcmp(argv[argc-1],FRESH_CONTINUITY30_PLAN) ||
-              !strcmp(argv[argc-1],PRIOR_CONTINUITY30_PLAN)) {
+              !strcmp(argv[argc-1],PRIOR_CONTINUITY30_PLAN) ||
+              !strcmp(argv[argc-1],WAIT_PRIOR_CONTINUITY30_PLAN)) {
         v->profile=SCOUT_PROFILE;v->followup_sparse=1;v->followup_plan=argv[argc-1];
         v->continuity=!strcmp(v->followup_plan,CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,RANKED_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,FRESH_CONTINUITY30_PLAN) ||
-            !strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN);
+            !strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN) ||
+            !strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN);
         v->ranked_continuity=!strcmp(v->followup_plan,RANKED_CONTINUITY30_PLAN) ||
             !strcmp(v->followup_plan,FRESH_CONTINUITY30_PLAN) ||
-            !strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN);
+            !strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN) ||
+            !strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN);
         v->fresh_continuity=!strcmp(v->followup_plan,FRESH_CONTINUITY30_PLAN) ||
-            !strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN);
-        v->prior_continuity=!strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN);
+            !strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN) ||
+            !strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN);
+        v->prior_continuity=!strcmp(v->followup_plan,PRIOR_CONTINUITY30_PLAN) ||
+            !strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN);
+        v->wait_continuity=!strcmp(v->followup_plan,WAIT_PRIOR_CONTINUITY30_PLAN);
+        v->continuity_rounds=v->wait_continuity ? WAIT_CONTINUITY_ROUNDS : CONTINUITY_ROUNDS;
+        v->continuity_segments=v->wait_continuity ? WAIT_CONTINUITY_SEGMENTS : CONTINUITY_ROUNDS;
+        v->plan_ns=v->wait_continuity ? WAIT_PLAN_NS : DEFAULT_PLAN_NS;
         if(v->fresh_continuity) v->profile=QUICK_SCOUT_PROFILE;
         v->followup_profile=v->prior_continuity ? PRIOR_SEGMENT30_PROFILE :
             v->fresh_continuity ? FRESH_SEGMENT30_PROFILE :
@@ -338,7 +355,8 @@ static int continuity_run(struct visit_context *context,const struct glrt_visit_
 {
     int rc=GLRT_VISIT_DONE;
     *result=(struct continuity_result){.selected=UINT_MAX};
-    for(unsigned round=0;round<CONTINUITY_ROUNDS && !result->track_complete;round++) {
+    for(unsigned round=0;round<context->continuity_rounds && !result->track_complete &&
+        result->segments_started<context->continuity_segments;round++) {
         unsigned round_selected=UINT_MAX,first=result->visits_executed;
         context->profile=context->fresh_continuity ? QUICK_SCOUT_PROFILE : SCOUT_PROFILE;
         context->activity_selected=0;
@@ -381,14 +399,14 @@ int main(int argc,char **argv)
     if(snprintf(path,sizeof(path),"%s/visits.txt",argv[5])<=0 || !(context.journal=fopen(path,"wx"))) return 2;
     action.sa_handler=signal_stop;sigemptyset(&action.sa_mask);
     if(sigaction(SIGALRM,&action,NULL) || sigaction(SIGTERM,&action,NULL) || sigaction(SIGINT,&action,NULL)) return 2;
-    alarm(context.followup_sparse ? 400 : 60);
+    alarm(context.followup_sparse ? (unsigned)(context.plan_ns/UINT64_C(1000000000)) : 60);
     ports=(struct glrt_visit_ports){&context,clock_ns,visit_cancelled,visit_inspect,visit_tune,visit_child,visit_retain};
     rc=fprintf(context.journal,"plan %u %s",context.rate,argv[2])<0 ? GLRT_VISIT_RETENTION : 0;
     for(unsigned n=0;n<context.visit_count;n++)
         if(fprintf(context.journal," %" PRIu64,lo[n])<0) rc=GLRT_VISIT_RETENTION;
     if(fprintf(context.journal," %s %u %" PRIu64 "\n",
        context.followup_sparse ? context.followup_plan : visit_profile(&context) ? visit_profile(&context) : "1536",
-       context.visit_count,context.followup_sparse ? UINT64_C(400000000000) : UINT64_C(60000000000))<0 ||
+       context.visit_count,context.followup_sparse ? context.plan_ns : UINT64_C(60000000000))<0 ||
        fflush(context.journal)) rc=GLRT_VISIT_RETENTION;
     if(!rc && context.continuity) {
         rc=continuity_run(&context,&ports,lo,&continuity);
@@ -407,6 +425,7 @@ int main(int argc,char **argv)
     if(fprintf(context.journal,"terminal %d\n",rc)<0 || fclose(context.journal)) rc=GLRT_VISIT_RETENTION;
     alarm(0);
     printf("{\"scope\":\"%s\",\"rate\":%u,\"result\":%d,\"rf_sample_limit\":%u",
+        context.wait_continuity ? "bounded_arm_scout_prior_wait_segmented_followup" :
         context.prior_continuity ? "bounded_arm_scout_prior_segmented_followup" :
         context.fresh_continuity ? "bounded_arm_scout_fresh_segmented_followup" :
         context.ranked_continuity ? "bounded_arm_scout_ranked_segmented_followup" :
@@ -422,6 +441,7 @@ int main(int argc,char **argv)
             !followup_started ? "none" : selected_activity ? "retained_activity" : "native_handoff");
         if(selected==UINT_MAX) printf("null"); else printf("%u",selected);
         if(context.ranked_continuity) printf(",\"activity_selection\":\"%s\"",
+            context.wait_continuity ? "strongest_one_attempt_scan_prior_reacquire_wait12" :
             context.prior_continuity ? "strongest_one_attempt_scan_prior_reacquire" :
             context.fresh_continuity ? "strongest_one_attempt_scan" : "strongest_complete_scan");
     } else if(context.followup_sparse) {

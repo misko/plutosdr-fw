@@ -64,6 +64,7 @@ def test_cycle_has_reviewed_distinct_los_and_explicit_worst_case(operator):
     assert operator.validate_los(ordered) == tuple(ordered)
     assert operator.maximum_source_seconds(4) == pytest.approx(335.1773184)
     assert operator.maximum_source_seconds(4,operator.CONTINUITY30_PROFILE) == pytest.approx(268.2519552)
+    assert operator.maximum_source_seconds(4,operator.WAIT_PRIOR_CONTINUITY30_PROFILE) == pytest.approx(630.6398208)
     for values in ([],[1440312500],[1440312500]*2,[1709687500],list(operator.UPPER_EDGE_LOS)+[1190312500]):
         with pytest.raises(ValueError): operator.validate_los(values)
 
@@ -86,7 +87,7 @@ def test_dry_run_is_explicitly_non_rf_and_contains_reviewable_next_action(operat
 
 @pytest.mark.parametrize('profile',["sparse10-after-scout16","sparse30-after-scout16","sparse100-after-scout16",
     "continuity30-after-scout16","continuity30-ranked-after-scout16","continuity30-fresh-after-scout1",
-    "continuity30-prior-after-scout1"])
+    "continuity30-prior-after-scout1","continuity30-prior-wait12-after-scout1"])
 def test_dry_run_retains_the_selected_tracking_horizon(operator,profile):
     plan=operator.dry_run_plan((1440312500,1940312500),operator.EXPECTED,
         Path('/srv/postgres-nvme/x'),Path('/srv/bulk/leo/x'),profile)
@@ -127,6 +128,21 @@ def test_continuity_parent_retains_round_segment_and_sample_accounting(operator)
         activity_selection="strongest_one_attempt_scan_prior_reacquire")
     assert operator.decode_parent(prior,operator.RATE,4,1,
         operator.PRIOR_CONTINUITY30_PROFILE)["activity_selection"]=="strongest_one_attempt_scan_prior_reacquire"
+    wait=continuity_parent(operator,rounds=12,segments=0,visits=48,result=0,
+        selection="none",selected=None,scope="bounded_arm_scout_prior_wait_segmented_followup",
+        activity_selection="strongest_one_attempt_scan_prior_reacquire_wait12")
+    assert operator.decode_parent(wait,operator.RATE,4,0,
+        operator.WAIT_PRIOR_CONTINUITY30_PROFILE)["scan_rounds"]==12
+    for damaged in (
+        continuity_parent(operator,rounds=13,segments=0,visits=52,result=0,selection="none",selected=None,
+            scope="bounded_arm_scout_prior_wait_segmented_followup",
+            activity_selection="strongest_one_attempt_scan_prior_reacquire_wait12"),
+        continuity_parent(operator,rounds=4,segments=4,visits=8,result=1,
+            scope="bounded_arm_scout_prior_wait_segmented_followup",
+            activity_selection="strongest_one_attempt_scan_prior_reacquire_wait12"),
+    ):
+        with pytest.raises(ValueError):
+            operator.decode_parent(damaged,operator.RATE,4,1,operator.WAIT_PRIOR_CONTINUITY30_PROFILE)
 
 
 @pytest.mark.parametrize("raw,exit_code", [

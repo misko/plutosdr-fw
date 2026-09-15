@@ -15,21 +15,27 @@ def review_continuity(text, parent, *, serial, los):
         raise ValueError("visit journal plan or terminal differs")
     plan=plans[0];count=len(los)
     policy=parent.get("activity_selection","first_qualified")
-    prior=policy=="strongest_one_attempt_scan_prior_reacquire"
+    wait=policy=="strongest_one_attempt_scan_prior_reacquire_wait12"
+    prior=policy in ("strongest_one_attempt_scan_prior_reacquire",
+                     "strongest_one_attempt_scan_prior_reacquire_wait12")
     ranked=policy in ("strongest_complete_scan","strongest_one_attempt_scan",
-                      "strongest_one_attempt_scan_prior_reacquire")
-    fresh=policy in ("strongest_one_attempt_scan","strongest_one_attempt_scan_prior_reacquire")
-    profile=("continuity30-prior-after-scout1" if prior else
+                      "strongest_one_attempt_scan_prior_reacquire",
+                      "strongest_one_attempt_scan_prior_reacquire_wait12")
+    fresh=policy in ("strongest_one_attempt_scan","strongest_one_attempt_scan_prior_reacquire",
+                     "strongest_one_attempt_scan_prior_reacquire_wait12")
+    profile=("continuity30-prior-wait12-after-scout1" if wait else
+             "continuity30-prior-after-scout1" if prior else
              "continuity30-fresh-after-scout1" if fresh else
              "continuity30-ranked-after-scout16" if ranked else "continuity30-after-scout16")
-    expected_scope=("bounded_arm_scout_prior_segmented_followup" if prior else
+    expected_scope=("bounded_arm_scout_prior_wait_segmented_followup" if wait else
+                    "bounded_arm_scout_prior_segmented_followup" if prior else
                     "bounded_arm_scout_fresh_segmented_followup" if fresh else
                     "bounded_arm_scout_ranked_segmented_followup" if ranked else
                     "bounded_arm_scout_segmented_followup")
     if parent.get("scope")!=expected_scope:
         raise ValueError("continuity scope differs")
     expected=["plan",str(parent["rate"]),serial,*map(str,los),profile,
-              str(count),"400000000000"]
+              str(count),"900000000000" if wait else "400000000000"]
     if plan!=expected or terminals[0] != ["terminal",str(parent["result"])]:
         raise ValueError("visit plan identity differs")
 
@@ -79,6 +85,8 @@ def review_continuity(text, parent, *, serial, los):
             raise ValueError("visit source did not advance")
     if not len(starts)==len(ends)==parent["segments_started"]:
         raise ValueError("segment count differs")
+    if parent["scan_rounds"]>(12 if wait else 3) or parent["segments_started"]>(3 if wait else 3):
+        raise ValueError("continuity plan bound differs")
     previous_followup=-1;previous_round=-1
     for start,end in zip(starts,ends,strict=True):
         round_number,followup,selected,lo,selection=start
