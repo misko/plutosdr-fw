@@ -64,6 +64,14 @@ def test_outputs_are_new_and_confined_to_ssd_then_raid(operator,tmp_path):
         with pytest.raises(ValueError): operator.validate_outputs(*bad)
 
 
+def test_dry_run_is_explicitly_non_rf_and_contains_reviewable_next_action(operator):
+    los=(1440312500,1940312500,1190312500,1690312500)
+    plan=operator.dry_run_plan(los,operator.EXPECTED,Path('/srv/postgres-nvme/x'),Path('/srv/bulk/leo/x'))
+    assert plan['rf_collection'] is False and plan['serial']==operator.SERIAL
+    assert plan['maximum_source_seconds']==pytest.approx(335.1773184)
+    assert plan['next_action'].endswith('explicit RF authorization')
+
+
 def test_parent_distinguishes_negative_activity_loss_and_completed_track(operator):
     assert operator.decode_parent(parent(operator),operator.RATE,4,0)["selection"] == "none"
     loss = parent(operator,started=1,result=1,selection="retained_activity",selected=0)

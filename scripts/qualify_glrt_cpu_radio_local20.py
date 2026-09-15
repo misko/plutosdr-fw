@@ -143,6 +143,13 @@ def manifest(root):
     return data
 
 
+def dry_run_plan(los, hashes, output, raid_output):
+    return {"scope":"bounded_radio_local_activity_sparse_followup_dry_run", "rf_collection":False,
+        "serial":SERIAL, "rate":RATE, "profile":PROFILE, "los":list(los),
+        "maximum_source_seconds":maximum_source_seconds(len(los)), "payload_sha256":hashes,
+        "output":str(output), "raid_output":str(raid_output), "next_action":"repeat without --dry-run after explicit RF authorization"}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--deployment", required=True, type=Path)
@@ -150,6 +157,7 @@ def main():
     parser.add_argument("--lo-hz", required=True, nargs="+", type=int)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--raid-output", required=True, type=Path)
+    parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args();los = validate_los(args.lo_hz)
     args.output, args.raid_output = validate_outputs(args.output, args.raid_output)
     plan, layout = live.g.deployment_identity(args.deployment, serial=SERIAL, host=live.ENDPOINT[1])
@@ -160,6 +168,8 @@ def main():
     hashes = {name: digest(data) for name, data in payload.items()}
     if hashes != EXPECTED:
         raise ValueError("payload identity differs")
+    if args.dry_run:
+        print(json.dumps(dry_run_plan(los, hashes, args.output, args.raid_output), indent=2));return
     args.output.mkdir(parents=True)
     receipt = {"scope": "bounded_radio_local_activity_sparse_followup", "serial": SERIAL, "rate": RATE,
                "los": los, "profile": PROFILE, "maximum_source_seconds": maximum_source_seconds(len(los)),
