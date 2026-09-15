@@ -157,13 +157,14 @@ int parse_plan(unsigned rate,unsigned count,const char *profile) {
         selected && !strcmp(selected,QUICK_SCOUT_PROFILE) ? 1 : -3;
     return selected && !strcmp(selected,"1536-selected-observer3-scan64") ? 64 : 8;
 }
-int parse_plan_limits(const char *profile,unsigned out[3]) {
+int parse_plan_limits(const char *profile,unsigned out[4]) {
     char *args[]={"probe","30000000","1040005e0b100007100010000bf33a5d4d","bank","refs","out",
         "1190312500","1440312500",(char *)profile};
     struct visit_context context={0};uint64_t lo[4];
     if(visit_arguments(9,args,&context,lo)) return -1;
     out[0]=context.continuity_rounds;out[1]=context.continuity_segments;
-    out[2]=(unsigned)(context.plan_ns/UINT64_C(1000000000));return 0;
+    out[2]=(unsigned)(context.plan_ns/UINT64_C(1000000000));
+    out[3]=(unsigned)(context.activity_floor*1000);return 0;
 }
 struct continuity_fake {
     struct glrt_visit_state state;
@@ -397,12 +398,12 @@ def test_explicit_scan64_plan_preserves_legacy_and_rejects_invalid_arguments(pro
 
 
 @pytest.mark.parametrize('profile,expected',[
-    (b'continuity30-prior-after-scout1',[3,3,400]),
-    (b'continuity30-prior-wait12-after-scout1',[12,3,900]),
-    (b'sparse100-wait12-after-scout1',[12,1,1200]),
+    (b'continuity30-prior-after-scout1',[3,3,400,0]),
+    (b'continuity30-prior-wait12-after-scout1',[12,3,900,0]),
+    (b'sparse100-wait12-after-scout1',[12,1,1200,50]),
 ])
 def test_continuity_plan_carries_explicit_round_segment_and_wall_bounds(probe,profile,expected):
-    out=(c.c_uint*3)()
+    out=(c.c_uint*4)()
     assert probe.parse_plan_limits(profile,out)==0
     assert list(out)==expected
 

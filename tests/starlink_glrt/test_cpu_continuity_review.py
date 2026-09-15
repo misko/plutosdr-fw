@@ -100,9 +100,12 @@ def test_ranked_review_requires_full_scan_and_selects_strongest_activity():
     wait100=wait100.replace(" 400000000000\n"," 1200000000000\n",1)
     wait100_parent={**parent,"scope":"bounded_arm_scout_wait100_followup",
                     "rf_sample_limit":837943296,
-                    "activity_selection":"strongest_one_attempt_scan_wait12_track100"}
+                    "activity_selection":"strongest_one_attempt_scan_power50_wait12_track100"}
     assert review_continuity(wait100,wait100_parent,serial=SERIAL,los=LOS)["activity_selection"]==(
-        "strongest_one_attempt_scan_wait12_track100")
+        "strongest_one_attempt_scan_power50_wait12_track100")
+    with pytest.raises(ValueError):
+        review_continuity(wait100.replace("candidate 1 0.07","candidate 1 0.049"),
+                          wait100_parent,serial=SERIAL,los=LOS)
 
 
 def test_review_accepts_parent_mapping_of_arbitrary_child_failure():

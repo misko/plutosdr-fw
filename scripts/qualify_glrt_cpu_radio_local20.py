@@ -39,7 +39,7 @@ WAIT_CONTINUITY_SEGMENTS = 3
 FOLLOWUP_RF_SAMPLES = 45000 * 16384
 MAX_ARCHIVE_BYTES = 320 * 1024 * 1024
 EXPECTED = {
-    "probe": "a45d0d9d129395dead695d86f920549b65dbd59735a2901ecb3121e81bad8b26",
+    "probe": "41973ca0c22b3a1313ae984eaba14695021a0827fde38a4612973db3e0566a34",
     "bank": "d9f3452e45180c560a200bb76c9bfe2d7c46b17560fd46495ea74c50f50547f0",
     "references": "78b50e1aea5c350889b0798fc691491299925932e496a918cd5fbd3b9bc4faf2",
 }
@@ -108,7 +108,7 @@ def decode_parent(raw, rate, count, exit_code, profile=PROFILE):
             raise ValueError("parent status identity differs")
         if profile in (RANKED_CONTINUITY30_PROFILE,FRESH_CONTINUITY30_PROFILE,
                        PRIOR_CONTINUITY30_PROFILE,WAIT_PRIOR_CONTINUITY30_PROFILE,WAIT100_PROFILE):
-            expected_policy=("strongest_one_attempt_scan_wait12_track100" if profile==WAIT100_PROFILE else
+            expected_policy=("strongest_one_attempt_scan_power50_wait12_track100" if profile==WAIT100_PROFILE else
                              "strongest_one_attempt_scan_prior_reacquire_wait12" if profile==WAIT_PRIOR_CONTINUITY30_PROFILE else
                              "strongest_one_attempt_scan_prior_reacquire" if profile==PRIOR_CONTINUITY30_PROFILE else
                              "strongest_one_attempt_scan" if profile==FRESH_CONTINUITY30_PROFILE else

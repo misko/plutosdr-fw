@@ -15,7 +15,7 @@ def review_continuity(text, parent, *, serial, los):
         raise ValueError("visit journal plan or terminal differs")
     plan=plans[0];count=len(los)
     policy=parent.get("activity_selection","first_qualified")
-    wait100=policy=="strongest_one_attempt_scan_wait12_track100"
+    wait100=policy=="strongest_one_attempt_scan_power50_wait12_track100"
     wait=policy=="strongest_one_attempt_scan_prior_reacquire_wait12"
     prior=policy in ("strongest_one_attempt_scan_prior_reacquire",
                      "strongest_one_attempt_scan_prior_reacquire_wait12")
@@ -110,6 +110,8 @@ def review_continuity(text, parent, *, serial, los):
         if ranked and selection=="retained_activity":
             if not round_candidates or max(round_candidates,key=lambda row:(row[1],-row[0]))[0]!=round_first+selected:
                 raise ValueError("strongest activity selection differs")
+            if wait100 and max(score for _,score in round_candidates)<0.05:
+                raise ValueError("100-second activity floor differs")
         previous_followup=followup;previous_round=round_number
     if parent["segments_started"]:
         if parent["selected_index"]!=starts[-1][2] or parent["selection"]!=starts[-1][4]:

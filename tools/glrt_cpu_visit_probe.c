@@ -54,6 +54,7 @@ struct visit_context {
     int wait100;
     unsigned continuity_rounds,continuity_segments;
     unsigned segment_rf_samples;
+    double activity_floor;
     uint64_t plan_ns;
     int activity_selected;
     unsigned activity_number;
@@ -108,6 +109,7 @@ static int visit_arguments(int argc,char **argv,struct visit_context *v,uint64_t
         v->continuity_segments=v->wait100 ? 1U : v->wait_continuity ? WAIT_CONTINUITY_SEGMENTS : CONTINUITY_ROUNDS;
         v->plan_ns=v->wait100 ? WAIT100_PLAN_NS : v->wait_continuity ? WAIT_PLAN_NS : DEFAULT_PLAN_NS;
         v->segment_rf_samples=v->wait100 ? FOLLOWUP_RF_SAMPLES : SEGMENT_RF_SAMPLES;
+        v->activity_floor=v->wait100 ? 0.05 : 0;
         if(v->fresh_continuity) v->profile=QUICK_SCOUT_PROFILE;
         v->followup_profile=v->wait100 ? SPARSE100_PROFILE :
             v->prior_continuity ? PRIOR_SEGMENT30_PROFILE :
@@ -340,7 +342,7 @@ static int visit_child(void *pointer,unsigned number,uint64_t deadline)
            !strcmp(visit_profile(v),QUICK_SCOUT_PROFILE))) {
             double score=0;int activity=visit_activity_score(worker,&score);
             if(activity<0) return -1;
-            if(activity) {
+            if(activity && score>=v->activity_floor) {
                 if(v->ranked_continuity) {
                     if(fprintf(v->journal,"activity candidate %u %.17g\n",number,score)<0 ||
                        fflush(v->journal)) return -1;
@@ -454,7 +456,7 @@ int main(int argc,char **argv)
             !followup_started ? "none" : selected_activity ? "retained_activity" : "native_handoff");
         if(selected==UINT_MAX) printf("null"); else printf("%u",selected);
         if(context.ranked_continuity) printf(",\"activity_selection\":\"%s\"",
-            context.wait100 ? "strongest_one_attempt_scan_wait12_track100" :
+            context.wait100 ? "strongest_one_attempt_scan_power50_wait12_track100" :
             context.wait_continuity ? "strongest_one_attempt_scan_prior_reacquire_wait12" :
             context.prior_continuity ? "strongest_one_attempt_scan_prior_reacquire" :
             context.fresh_continuity ? "strongest_one_attempt_scan" : "strongest_complete_scan");

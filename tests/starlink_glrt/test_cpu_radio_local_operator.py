@@ -138,7 +138,7 @@ def test_continuity_parent_retains_round_segment_and_sample_accounting(operator)
     wait100=continuity_parent(operator,rounds=1,segments=1,visits=5,result=0,complete=1,
         scope="bounded_arm_scout_wait100_followup",
         rf_sample_limit=4*operator.SCOUT_SAMPLES+operator.FOLLOWUP_RF_SAMPLES,
-        activity_selection="strongest_one_attempt_scan_wait12_track100")
+        activity_selection="strongest_one_attempt_scan_power50_wait12_track100")
     assert operator.decode_parent(wait100,operator.RATE,4,0,
         operator.WAIT100_PROFILE)["track_complete"]==1
     for damaged in (
