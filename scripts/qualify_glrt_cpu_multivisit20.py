@@ -14,7 +14,10 @@ import qualify_glrt_cpu_live20 as live
 
 UPPER_EDGE_LOS = (1190312500, 1440312500, 1690312500, 1940312500)
 BLOCKS = 45000
-PROFILE = '45000-selected-observer9-scan80-local2-track10-authority'
+PROFILES = {
+    1: '45000-selected-observer9-scan80-local2-track10-authority',
+    10: '45000-selected-observer9-scan80-local2-track10-sparse10-authority',
+}
 SOURCE_SECONDS_PER_VISIT = 16384 * BLOCKS / 2_500_000
 
 
@@ -28,7 +31,7 @@ def validate_los(values):
     return values
 
 
-def decode_status(raw, rate):
+def decode_status(raw, rate, native_frame_stride=1):
     lines = raw.decode().splitlines()
     if len(lines) != 1:
         raise ValueError('probe returned an ambiguous status stream')
@@ -38,9 +41,12 @@ def decode_status(raw, rate):
     if not required <= set(status) or status['rate'] != rate or status['status'] != 0 or \
             status['blocks'] > BLOCKS or status['attempts'] > 256:
         raise ValueError('probe status is not a completed bounded visit')
+    if native_frame_stride not in PROFILES:
+        raise ValueError('unsupported native frame stride')
+    expected_results = 751 if native_frame_stride == 10 else 7500
     complete = status['native_completed_runs'] == 1
     if status['native_completed_runs'] not in (0, 1) or \
-            complete and (status['native_results'] < 7500 or status['handoffs'] < 1 or
+            complete and (status['native_results'] < expected_results or status['handoffs'] < 1 or
                           status['worker_complete'] != 1):
         raise ValueError('completed-track counters are inconsistent')
     return status, complete
@@ -51,14 +57,17 @@ def main():
     parser.add_argument('--deployment', type=Path, required=True)
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--lo-hz', type=int, nargs='+', required=True)
+    parser.add_argument('--native-frame-stride', type=int, choices=tuple(PROFILES), default=10,
+                        help='reviewed dense or sustainable 75-Hz tracking cadence')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     los = validate_los(args.lo_hz)
     rate = 30_000_000
-    selected = live.observer_profile(BLOCKS, 9, 80, 10, True)
-    if selected != PROFILE:
+    profile = PROFILES[args.native_frame_stride]
+    selected = live.observer_profile(BLOCKS, 9, 80, 10, True, args.native_frame_stride)
+    if selected != profile:
         raise ValueError('long authority profile identity differs')
-    artifacts = live.capture_artifacts(BLOCKS, 9, 80, 10, True)
+    artifacts = live.capture_artifacts(BLOCKS, 9, 80, 10, True, args.native_frame_stride)
     plan, deployment_profile = live.g.deployment_identity(
         args.deployment, serial=live.ENDPOINT[0], host=live.ENDPOINT[1])
     if plan['expected_firmware'] != 'glrt-iq-tracking-r30000000-v1':
@@ -75,7 +84,10 @@ def main():
     evidence = {
         'scope': 'bounded_host_supervised_arm_fpga_frequency_visits',
         'rate': rate,
-        'profile': PROFILE,
+        'profile': profile,
+        'native_frame_stride': args.native_frame_stride,
+        'measurement_cadence_hz': 750 / args.native_frame_stride,
+        'target_results': 751 if args.native_frame_stride == 10 else 7500,
         'serial': live.ENDPOINT[0],
         'lo_plan_hz': list(los),
         'maximum_source_seconds': len(los) * SOURCE_SECONDS_PER_VISIT,
@@ -152,7 +164,7 @@ def main():
                     run('chmod 700 '+shlex.quote(remote+'/probe')).check_returncode()
                     print(json.dumps({'phase':'starting_visit','number':number,'lo_hz':lo_hz}), flush=True)
                     command = [remote+'/probe', str(rate), live.ENDPOINT[0], remote+'/bank',
-                               remote+'/references', remote, PROFILE]
+                               remote+'/references', remote, profile]
                     execution_attempted = True
                     result = run(shlex.join(command), timeout=340);terminal = True
                     visit['probe_exit_code'] = result.returncode
@@ -176,7 +188,7 @@ def main():
                         live.require_observer_artifacts(visit)
                     finally:
                         live._close_iio_context(iio, context)
-                    status, complete = decode_status(result.stdout, rate)
+                    status, complete = decode_status(result.stdout, rate, args.native_frame_stride)
                     visit.update(status='track_complete_review_pending' if complete else 'negative_review_pending',
                                  probe=status, track_complete=complete)
                 except BaseException as error:

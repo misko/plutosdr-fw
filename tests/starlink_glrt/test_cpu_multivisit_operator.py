@@ -50,3 +50,19 @@ def test_only_consistent_completed_track_stops_the_plan(operator):
                 wire(native_completed_runs=1,native_results=7500,handoffs=0),
                 wire(status=1),wire(rate=60000000),wire()+b'{}\n'):
         with pytest.raises(ValueError): operator.decode_status(raw,30000000)
+
+
+def test_sparse_completion_requires_exact_profile_horizon(operator):
+    status,complete=operator.decode_status(
+        wire(native_completed_runs=1,native_results=751,handoffs=1,attempts=17),30000000,10)
+    assert complete and status['native_results']==751
+    for raw in (wire(native_completed_runs=1,native_results=750,handoffs=1),
+                wire(native_completed_runs=1,native_results=751,handoffs=0)):
+        with pytest.raises(ValueError): operator.decode_status(raw,30000000,10)
+    with pytest.raises(ValueError,match='unsupported native frame stride'):
+        operator.decode_status(wire(),30000000,15)
+
+
+def test_sparse_profile_identity_matches_live_operator(operator):
+    assert operator.PROFILES[10].endswith('-track10-sparse10-authority')
+    assert operator.PROFILES[1].endswith('-track10-authority')
