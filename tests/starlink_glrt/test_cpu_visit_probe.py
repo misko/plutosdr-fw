@@ -75,12 +75,13 @@ static int simulated_child(int argc,char **argv) {
 }
 static int simulated_followup_child(int argc,char **argv) {
     if(argc!=7 || (strcmp(argv[6],SPARSE_PROFILE) && strcmp(argv[6],SPARSE30_PROFILE) &&
-        strcmp(argv[6],SPARSE100_PROFILE))) return 9;
+        strcmp(argv[6],SPARSE100_PROFILE) && strcmp(argv[6],SEGMENT30_PROFILE))) return 9;
     unsigned results=!strcmp(argv[6],SPARSE_PROFILE) ? 751U :
-        !strcmp(argv[6],SPARSE30_PROFILE) ? 2501U : 8335U;
+        !strcmp(argv[6],SPARSE100_PROFILE) ? 8335U : 2501U;
+    unsigned blocks=!strcmp(argv[6],SEGMENT30_PROFILE) ? 7500U : 45000U;
     printf("{\"scope\":\"bounded_live_cpu_acquisition_native_feedback\",\"rate\":0,"
-        "\"status\":0,\"blocks\":45000,\"attempts\":2,\"handoffs\":1,"
-        "\"native_results\":%u,\"native_completed_runs\":1,\"worker_complete\":1}\n",results);
+        "\"status\":0,\"blocks\":%u,\"attempts\":2,\"handoffs\":1,"
+        "\"native_results\":%u,\"native_completed_runs\":1,\"worker_complete\":1}\n",blocks,results);
     return 0;
 }
 int exercise_child(const char *directory,const char *mode) {
@@ -130,6 +131,43 @@ int parse_plan(unsigned rate,unsigned count,const char *profile) {
     if(context.followup_sparse) return selected && !strcmp(selected,SCOUT_PROFILE) ? 16 : -3;
     return selected && !strcmp(selected,"1536-selected-observer3-scan64") ? 64 : 8;
 }
+struct continuity_fake {
+    struct glrt_visit_state state;
+    uint64_t now;
+    unsigned call,numbers[16];
+    int mode;
+};
+static uint64_t continuity_clock(void *pointer) { return ((struct continuity_fake *)pointer)->now; }
+static int continuity_cancelled(void *pointer) { (void)pointer;return 0; }
+static int continuity_inspect(void *pointer,struct glrt_visit_state *state)
+{ *state=((struct continuity_fake *)pointer)->state;return 0; }
+static int continuity_tune(void *pointer,uint64_t hz)
+{ struct continuity_fake *f=pointer;f->state.lo_hz=hz-4;f->now+=1000;return 0; }
+static int continuity_run_child(void *pointer,unsigned number,uint64_t deadline) {
+    struct continuity_fake *f=pointer;int outcome=0;(void)deadline;
+    f->numbers[f->call]=number;f->state.epoch++;f->state.native_latest+=100000;f->now+=1000;
+    if(f->mode==0) outcome=(f->call==0 || f->call==2) ? GLRT_VISIT_SIGNAL :
+        f->call==1 ? GLRT_VISIT_CLEAN_LOSS : 0;
+    else if(f->mode==2) outcome=(f->call%2)==0 ? GLRT_VISIT_SIGNAL : GLRT_VISIT_CLEAN_LOSS;
+    f->call++;return outcome;
+}
+static int continuity_retain(void *pointer,const char *kind,unsigned number,int outcome,
+    const struct glrt_visit_state *state)
+{ (void)pointer;(void)kind;(void)number;(void)outcome;(void)state;return 0; }
+int exercise_continuity(int mode,unsigned out[7],unsigned numbers[16]) {
+    struct continuity_fake fake={.state={1190312496,1000,30000000,1,1,1},.now=1000,.mode=mode};
+    struct glrt_visit_ports ports={&fake,continuity_clock,continuity_cancelled,continuity_inspect,
+        continuity_tune,continuity_run_child,continuity_retain};
+    struct visit_context context={.journal=tmpfile(),.rate=30000000,.visit_count=4,
+        .profile=SCOUT_PROFILE,.followup_profile=SEGMENT30_PROFILE,.followup_sparse=1,.continuity=1};
+    struct continuity_result result;uint64_t lo[4]={1190312500,1440312500,1690312500,1940312500};
+    if(!context.journal) return -99;
+    int rc=continuity_run(&context,&ports,lo,&result);fclose(context.journal);
+    out[0]=result.selected;out[1]=result.visits_executed;out[2]=result.scan_rounds;
+    out[3]=result.segments_started;out[4]=(unsigned)result.track_complete;
+    out[5]=fake.call;out[6]=(unsigned)rc;
+    memcpy(numbers,fake.numbers,sizeof(fake.numbers));return rc;
+}
 '''
 
 
@@ -160,6 +198,7 @@ def probe(tmp_path_factory):
     lib.exercise_four_children.argtypes=[c.c_char_p]
     lib.exercise_followup_child.argtypes=[c.c_char_p,c.c_char_p]
     lib.parse_plan.argtypes=[c.c_uint,c.c_uint,c.c_char_p]
+    lib.exercise_continuity.argtypes=[c.c_int,c.c_void_p,c.c_void_p]
     return lib
 
 
@@ -202,7 +241,8 @@ def test_four_selected_children_have_separate_evidence_and_are_all_reaped(probe,
 
 @pytest.mark.parametrize('profile',[SPARSE_PROFILE := b'45000-selected-observer9-scan80-local2-track10-sparse10-authority',
     b'45000-selected-observer9-scan80-local2-track30-sparse10-authority',
-    b'45000-selected-observer9-scan80-local2-track100-sparse10-authority'])
+    b'45000-selected-observer9-scan80-local2-track100-sparse10-authority',
+    b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment'])
 def test_sparse_followup_uses_reacquiring_probe(probe,tmp_path,profile):
     assert probe.exercise_followup_child(os.fsencode(tmp_path),profile)==0
     status=json.loads((tmp_path/'visit-4/stdout.json').read_text())
@@ -263,11 +303,23 @@ def test_retained_activity_can_end_after_first_detected_attempt(probe,tmp_path):
 @pytest.mark.parametrize('rate',[30000000,60000000,2500000])
 @pytest.mark.parametrize('count',[1,2,3,4])
 @pytest.mark.parametrize('profile',[None,b'1536-selected-observer3-scan64',b'sparse10-after-scout16',
-    b'sparse30-after-scout16',b'sparse100-after-scout16',b'unknown'])
+    b'sparse30-after-scout16',b'sparse100-after-scout16',b'continuity30-after-scout16',b'unknown'])
 def test_explicit_scan64_plan_preserves_legacy_and_rejects_invalid_arguments(probe,rate,count,profile):
     valid=rate in (30000000,60000000) and count in (2,3,4) and profile!=b'unknown'
-    expected=16 if profile in (b'sparse10-after-scout16',b'sparse30-after-scout16',b'sparse100-after-scout16') else 64 if profile else 8
+    expected=16 if profile in (b'sparse10-after-scout16',b'sparse30-after-scout16',b'sparse100-after-scout16',b'continuity30-after-scout16') else 64 if profile else 8
     assert probe.parse_plan(rate,count,profile)==(expected if valid else -1)
+
+
+@pytest.mark.parametrize('mode,expected,numbers',[
+    (0,[0,4,2,2,1,4,0],[0,1,2,3]),
+    (1,[2**32-1,12,3,0,0,12,0],list(range(12))),
+    (2,[0,6,3,3,0,6,1],list(range(6))),
+])
+def test_continuity_rescans_with_contiguous_evidence_and_stops_on_complete(probe,mode,expected,numbers):
+    out=(c.c_uint*7)();seen=(c.c_uint*16)()
+    rc=probe.exercise_continuity(mode,out,seen)
+    assert list(out)==expected and rc==expected[-1]
+    assert list(seen)[:len(numbers)]==numbers
 
 
 @pytest.mark.parametrize('rate',[30000000,60000000])

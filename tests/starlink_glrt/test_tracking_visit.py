@@ -43,7 +43,8 @@ static int tune(void *p,uint64_t hz) {
 }
 static int run(void *p,unsigned n,uint64_t deadline) {
     struct test *t=p;int followup=!strncmp(t->mode,"followup_",9);
-    assert(n==(followup ? 4U : t->runs) && t->retained==t->runs*3+2);
+    unsigned first=!strcmp(t->mode,"from_ready") ? 5U : 0U;
+    assert(n==(followup ? 4U : first+t->runs) && t->retained==t->runs*3+2);
     assert(deadline==(followup ? UINT64_C(320000001000) : UINT64_C(60000001000)));t->runs++;
     if(strcmp(t->mode,"no_epoch")) t->state.epoch++;
     if(strcmp(t->mode,"no_samples")) t->state.native_latest+=UINT64_C(300000000);
@@ -58,7 +59,8 @@ static int run(void *p,unsigned n,uint64_t deadline) {
         !strcmp(t->mode,"unknown_result") ? 2 : 0;
 }
 static int retain(void *p,const char *kind,unsigned n,int result,const struct glrt_visit_state *s) {
-    struct test *t=p;(void)s;assert(n==(!strncmp(t->mode,"followup_",9) ? 4U : t->retained/3));
+    struct test *t=p;(void)s;unsigned first=!strcmp(t->mode,"from_ready") ? 5U : 0U;
+    assert(n==(!strncmp(t->mode,"followup_",9) ? 4U : first+t->retained/3));
     const char *names[]={"before_tune","tuned","after_run"};assert(!strcmp(kind,names[t->retained%3]));
     int expected=!strcmp(t->mode,"until_signal") ? GLRT_VISIT_SIGNAL :
         !strcmp(t->mode,"followup_no_track") ? GLRT_VISIT_NO_TRACK :
@@ -94,6 +96,8 @@ int main(int argc,char **argv) {
     if(!strcmp(t.mode,"until_loss")) { t.loss=1;rc=glrt_tracking_visit_until_signal(&p,rate,frequencies,2,&selected); }
     else if(!strcmp(t.mode,"until_ready") || !strcmp(t.mode,"until_signal"))
         rc=glrt_tracking_visit_until_signal(&p,rate,frequencies,2,&selected);
+    else if(!strcmp(t.mode,"from_ready"))
+        rc=glrt_tracking_visit_until_signal_from(&p,rate,frequencies,2,5,&selected);
     else if(!strncmp(t.mode,"followup_",9)) {
         t.loss=!strcmp(t.mode,"followup_loss");
         rc=glrt_tracking_visit_followup_run(&p,rate,frequencies[0],4);
@@ -144,6 +148,7 @@ def test_two_visits_preserve_fixed_rate_and_require_idle_retained_boundaries(pro
 @pytest.mark.parametrize('mode,result,runs,selected',[
     ('until_loss',2,1,0),('until_signal',2,1,0),('until_ready',0,2,99),
     ('followup_ready',0,1,None),('followup_loss',1,1,None),('followup_no_track',3,1,None),
+    ('from_ready',0,2,None),
 ])
 def test_radio_local_scout_selects_one_bounded_followup(probe,mode,result,runs,selected):
     row=list(map(int,subprocess.check_output([str(probe),mode,'30000000'],text=True).split()))

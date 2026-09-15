@@ -19,13 +19,16 @@ import qualify_glrt_cpu_live20 as live
 RATE = 30_000_000
 SERIAL = "1040005e0b100007100010000bf33a5d4d"
 PROFILE = "sparse10-after-scout16"
-PROFILES = (PROFILE, "sparse30-after-scout16", "sparse100-after-scout16")
+CONTINUITY30_PROFILE = "continuity30-after-scout16"
+PROFILES = (PROFILE, "sparse30-after-scout16", "sparse100-after-scout16", CONTINUITY30_PROFILE)
 UPPER_EDGE_LOS = (1_190_312_500, 1_440_312_500, 1_690_312_500, 1_940_312_500)
 SCOUT_SAMPLES = 1536 * 16384
 FOLLOWUP_SAMPLES = 45000 * 16384
+SEGMENT_SAMPLES = 7500 * 16384
+CONTINUITY_ROUNDS = 3
 MAX_ARCHIVE_BYTES = 320 * 1024 * 1024
 EXPECTED = {
-    "probe": "1c793e4b6834eacc2ee31e453023072013019bbd9e2119cf43efc0d056af658b",
+    "probe": "80723a8562148641ceea41895281144dfc2a0dc7f3450b906f80553829c56dc7",
     "bank": "d9f3452e45180c560a200bb76c9bfe2d7c46b17560fd46495ea74c50f50547f0",
     "references": "78b50e1aea5c350889b0798fc691491299925932e496a918cd5fbd3b9bc4faf2",
 }
@@ -47,10 +50,12 @@ def validate_los(values):
     return values
 
 
-def maximum_source_seconds(count):
+def maximum_source_seconds(count, profile=PROFILE):
     if type(count) is not int or not 2 <= count <= 4:
         raise ValueError("invalid scout count")
-    return (count * SCOUT_SAMPLES + FOLLOWUP_SAMPLES) / 2_500_000
+    samples = (CONTINUITY_ROUNDS * (count * SCOUT_SAMPLES + SEGMENT_SAMPLES)
+               if profile == CONTINUITY30_PROFILE else count * SCOUT_SAMPLES + FOLLOWUP_SAMPLES)
+    return samples / 2_500_000
 
 
 def validate_outputs(output, raid_output):
@@ -62,11 +67,38 @@ def validate_outputs(output, raid_output):
     return output, raid_output
 
 
-def decode_parent(raw, rate, count, exit_code):
+def decode_parent(raw, rate, count, exit_code, profile=PROFILE):
     lines = raw.decode().splitlines()
     if len(lines) != 1:
         raise ValueError("ambiguous parent status")
     value = json.loads(lines[0])
+    if profile == CONTINUITY30_PROFILE:
+        keys = {"scope", "rate", "result", "rf_sample_limit", "scan_rounds",
+                "segments_started", "visits_executed", "track_complete", "selection", "selected_index"}
+        if set(value) != keys or value["scope"] != "bounded_arm_scout_segmented_followup" or value["rate"] != rate:
+            raise ValueError("parent status identity differs")
+        integers = ("result", "rf_sample_limit", "scan_rounds", "segments_started",
+                    "visits_executed", "track_complete")
+        if any(type(value[k]) is not int for k in integers):
+            raise ValueError("parent status types differ")
+        rounds=value["scan_rounds"];segments=value["segments_started"];visits=value["visits_executed"]
+        scouts=visits-segments
+        valid_counts=(1 <= rounds <= CONTINUITY_ROUNDS and 0 <= segments <= rounds and
+                      rounds <= scouts <= rounds*count and visits == scouts+segments)
+        expected_limit=scouts*SCOUT_SAMPLES+segments*SEGMENT_SAMPLES
+        selected=value["selected_index"]
+        valid_selection=(segments == 0 and value["selection"] == "none" and selected is None) or (
+            segments > 0 and value["selection"] in ("retained_activity", "native_handoff") and
+            type(selected) is int and 0 <= selected < count)
+        valid_result=value["result"] in (-7,-6,-5,-4,-3,-2,-1,0,1,3)
+        if (not valid_counts or value["rf_sample_limit"] != expected_limit or
+                value["track_complete"] not in (0,1) or
+                value["track_complete"] > segments or
+                (value["track_complete"] and value["result"] != 0) or
+                not valid_selection or not valid_result or
+                exit_code != (0 if value["result"] == 0 else 1)):
+            raise ValueError("parent disposition is inconsistent")
+        return value
     keys = {"scope", "rate", "result", "rf_sample_limit", "followup_started",
             "track_complete", "selection", "selected_index"}
     if set(value) != keys or value["scope"] != "bounded_arm_scout_sparse_followup" or value["rate"] != rate:
@@ -92,10 +124,13 @@ def decode_parent(raw, rate, count, exit_code):
 def extract_evidence(payload, destination, parent, count):
     if not payload or len(payload) > MAX_ARCHIVE_BYTES:
         raise ValueError("evidence archive size differs")
-    selected = parent["selected_index"]
-    expected_visits = set(range(count) if selected is None else range(selected + 1))
-    if parent["followup_started"]:
-        expected_visits.add(count)
+    if parent["scope"] == "bounded_arm_scout_segmented_followup":
+        expected_visits=set(range(parent["visits_executed"]))
+    else:
+        selected = parent["selected_index"]
+        expected_visits = set(range(count) if selected is None else range(selected + 1))
+        if parent["followup_started"]:
+            expected_visits.add(count)
     seen_files, seen_visits, seen_dirs = set(), set(), set()
     with tarfile.open(fileobj=io.BytesIO(payload), mode="r:") as archive:
         members = archive.getmembers()
@@ -148,7 +183,7 @@ def manifest(root):
 def dry_run_plan(los, hashes, output, raid_output, profile=PROFILE):
     return {"scope":"bounded_radio_local_activity_sparse_followup_dry_run", "rf_collection":False,
         "serial":SERIAL, "rate":RATE, "profile":profile, "los":list(los),
-        "maximum_source_seconds":maximum_source_seconds(len(los)), "payload_sha256":hashes,
+        "maximum_source_seconds":maximum_source_seconds(len(los),profile), "payload_sha256":hashes,
         "output":str(output), "raid_output":str(raid_output), "next_action":"repeat without --dry-run"}
 
 
@@ -175,7 +210,7 @@ def main():
         print(json.dumps(dry_run_plan(los, hashes, args.output, args.raid_output, args.profile), indent=2));return
     args.output.mkdir(parents=True)
     receipt = {"scope": "bounded_radio_local_activity_sparse_followup", "serial": SERIAL, "rate": RATE,
-               "los": los, "profile": args.profile, "maximum_source_seconds": maximum_source_seconds(len(los)),
+               "los": los, "profile": args.profile, "maximum_source_seconds": maximum_source_seconds(len(los),args.profile),
                "payload_sha256": hashes, "status": "started", "started_ns": time.time_ns()}
     def save(): (args.output / "operator.json").write_text(json.dumps(receipt, indent=2) + "\n")
     save();remote = None;staged = mounted = False
@@ -220,7 +255,7 @@ def main():
             (args.output / "stdout.json").write_bytes(result.stdout);(args.output / "stderr.txt").write_bytes(result.stderr)
             archive = run("tar -C " + shlex.quote(remote) + " -cf - evidence", timeout=90);archive.check_returncode()
             (args.output / "evidence.tar").write_bytes(archive.stdout)
-            parent = decode_parent(result.stdout, RATE, len(los), result.returncode);receipt["parent"] = parent
+            parent = decode_parent(result.stdout, RATE, len(los), result.returncode,args.profile);receipt["parent"] = parent
             receipt["retained_files"] = extract_evidence(archive.stdout, args.output / "retained", parent, len(los))
             receipt["status"] = "track_complete_review_pending" if parent["track_complete"] else "review_pending"
         finally:

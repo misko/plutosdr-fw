@@ -49,6 +49,12 @@ int glrt_tracking_visit_plan_run(const struct glrt_visit_ports *,uint32_t,
  * control to a host scheduler. */
 int glrt_tracking_visit_until_signal(const struct glrt_visit_ports *,uint32_t,
     const uint64_t *lo_hz,unsigned count,unsigned *selected_index);
+/* The same bounded scout with a caller-owned first evidence number. This is
+ * used by an opt-in continuity plan to return to the reviewed LO list after a
+ * clean segment loss without reusing an evidence directory. */
+int glrt_tracking_visit_until_signal_from(const struct glrt_visit_ports *,uint32_t,
+    const uint64_t *lo_hz,unsigned count,unsigned first_evidence_number,
+    unsigned *selected_index);
 /* One bounded long follow-up. The callback number is caller-owned so its
  * evidence directory cannot collide with preceding scouts. CLEAN_LOSS and
  * NO_TRACK are reviewed outcomes; zero alone means the callback proved its

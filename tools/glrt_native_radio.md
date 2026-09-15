@@ -461,3 +461,26 @@ alarm. With four LOs its finite source-IQ bound is 837,943,296 samples. This
 composition removes the host feedback loop from frequency selection and
 follow-up launch. Its decision paths and ARM binary are tested offline; a
 physical 751-result completion remains a separate qualification result.
+
+### Bounded 30-second continuity qualification
+
+`continuity30-after-scout16` is a separate opt-in plan; it does not alter the
+published single-follow-up plans above. It runs at most three scan/segment
+rounds. Every round scouts the same two to four reviewed upper-edge LOs and
+stops at the first retained activity or native handoff. Its selected follow-up
+uses `7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment`.
+That child retains the stride-ten, 96-frame-coast, 2,251-result gate, but turns
+off same-LO restart so a verified clean loss returns control to the parent for
+another frequency scan. Each child gets 7,500 refills, 64 acquisition attempts,
+and 49.152 seconds of source IQ, which is sufficient to complete the exact
+30-second result horizon.
+
+Segment start and terminal records are appended to `visits.txt`; evidence
+numbers remain contiguous across early scout selection, segment loss, and the
+next scan. The parent reports scan rounds, segment count, executed visits and
+the sample bound under the new `bounded_arm_scout_segmented_followup` scope.
+`track_complete` is true only if one segment independently completes all 2,251
+results. Separate shorter segments are never added together to satisfy that
+gate. With four LOs, the three-round worst case is 670,629,888 samples, or
+268.252 seconds at the retained 2.5-MS/s coarse-IQ accounting rate. This is
+below the existing single-follow-up plan's 837,943,296-sample bound.

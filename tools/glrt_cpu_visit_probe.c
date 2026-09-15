@@ -13,9 +13,14 @@
 #define SPARSE_PROFILE "45000-selected-observer9-scan80-local2-track10-sparse10-authority"
 #define SPARSE30_PROFILE "45000-selected-observer9-scan80-local2-track30-sparse10-authority"
 #define SPARSE100_PROFILE "45000-selected-observer9-scan80-local2-track100-sparse10-authority"
+#define SEGMENT30_PROFILE "7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment"
 #define FOLLOWUP_PLAN "sparse10-after-scout16"
 #define FOLLOWUP30_PLAN "sparse30-after-scout16"
 #define FOLLOWUP100_PLAN "sparse100-after-scout16"
+#define CONTINUITY30_PLAN "continuity30-after-scout16"
+#define CONTINUITY_ROUNDS 3U
+#define SCOUT_RF_SAMPLES 25165824U
+#define SEGMENT_RF_SAMPLES 122880000U
 #define SCOUT_ACTIVITY_HITS 1U
 
 struct visit_context {
@@ -27,6 +32,7 @@ struct visit_context {
     const char *followup_profile;
     const char *followup_plan;
     int followup_sparse;
+    int continuity;
     int activity_selected;
     int (*probe_main)(int,char **);
     int (*followup_probe_main)(int,char **);
@@ -47,9 +53,12 @@ static int visit_arguments(int argc,char **argv,struct visit_context *v,uint64_t
         v->profile=argv[argc-1];count--;
     } else if(!strcmp(argv[argc-1],FOLLOWUP_PLAN) ||
               !strcmp(argv[argc-1],FOLLOWUP30_PLAN) ||
-              !strcmp(argv[argc-1],FOLLOWUP100_PLAN)) {
+              !strcmp(argv[argc-1],FOLLOWUP100_PLAN) ||
+              !strcmp(argv[argc-1],CONTINUITY30_PLAN)) {
         v->profile=SCOUT_PROFILE;v->followup_sparse=1;v->followup_plan=argv[argc-1];
-        v->followup_profile=!strcmp(v->followup_plan,FOLLOWUP_PLAN) ? SPARSE_PROFILE :
+        v->continuity=!strcmp(v->followup_plan,CONTINUITY30_PLAN);
+        v->followup_profile=v->continuity ? SEGMENT30_PROFILE :
+            !strcmp(v->followup_plan,FOLLOWUP_PLAN) ? SPARSE_PROFILE :
             !strcmp(v->followup_plan,FOLLOWUP30_PLAN) ? SPARSE30_PROFILE : SPARSE100_PROFILE;
         count--;
     }
@@ -176,10 +185,12 @@ static int visit_status(const char *path,uint32_t rate,const char *profile)
         return !handoffs && !completed && !results ? GLRT_VISIT_DONE : -1;
     }
     if(!strcmp(profile,SPARSE_PROFILE) || !strcmp(profile,SPARSE30_PROFILE) ||
-       !strcmp(profile,SPARSE100_PROFILE)) {
+       !strcmp(profile,SPARSE100_PROFILE) || !strcmp(profile,SEGMENT30_PROFILE)) {
         uint32_t required=!strcmp(profile,SPARSE_PROFILE) ? SPARSE_NATIVE_RESULTS :
-            !strcmp(profile,SPARSE30_PROFILE) ? STABLE30_NATIVE_RESULTS : STABLE100_NATIVE_RESULTS;
-        if(blocks>45000 || attempts>256 || completed>1) return -1;
+            !strcmp(profile,SPARSE100_PROFILE) ? STABLE100_NATIVE_RESULTS : STABLE30_NATIVE_RESULTS;
+        uint32_t maximum_blocks=!strcmp(profile,SEGMENT30_PROFILE) ? 7500U : 45000U;
+        uint32_t maximum_attempts=!strcmp(profile,SEGMENT30_PROFILE) ? 64U : 256U;
+        if(blocks>maximum_blocks || attempts>maximum_attempts || completed>1) return -1;
         if(handoffs>=1 && completed==1 && results>=required) return GLRT_VISIT_DONE;
         return !handoffs && !completed && !results ? GLRT_VISIT_NO_TRACK : -1;
     }
@@ -237,7 +248,8 @@ static int visit_child(void *pointer,unsigned number,uint64_t deadline)
         if(dup2(stdout_fd,STDOUT_FILENO)<0 || dup2(stderr_fd,STDERR_FILENO)<0) _exit(2);
         close(stdout_fd);close(stderr_fd);
         rc=(v->followup_probe_main && (!strcmp(visit_profile(v),SPARSE_PROFILE) ||
-            !strcmp(visit_profile(v),SPARSE30_PROFILE) || !strcmp(visit_profile(v),SPARSE100_PROFILE)) ?
+            !strcmp(visit_profile(v),SPARSE30_PROFILE) || !strcmp(visit_profile(v),SPARSE100_PROFILE) ||
+            !strcmp(visit_profile(v),SEGMENT30_PROFILE)) ?
             v->followup_probe_main : v->probe_main)(visit_profile(v) ? 7 : 6,args);
         if(fflush(stdout) || fflush(stderr)) rc=2;
         _exit(rc);
@@ -273,11 +285,46 @@ fail:
     if(stderr_fd>=0) close(stderr_fd);
     return -1;
 }
+struct continuity_result {
+    unsigned selected,visits_executed,scan_rounds,segments_started;
+    int track_complete,selected_activity;
+};
+static int continuity_run(struct visit_context *context,const struct glrt_visit_ports *ports,
+    const uint64_t *lo,struct continuity_result *result)
+{
+    int rc=GLRT_VISIT_DONE;
+    *result=(struct continuity_result){.selected=UINT_MAX};
+    for(unsigned round=0;round<CONTINUITY_ROUNDS && !result->track_complete;round++) {
+        unsigned round_selected=UINT_MAX,first=result->visits_executed;
+        context->profile=SCOUT_PROFILE;context->activity_selected=0;result->scan_rounds++;
+        rc=glrt_tracking_visit_until_signal_from(ports,context->rate,lo,context->visit_count,
+            first,&round_selected);
+        result->visits_executed+=rc==GLRT_VISIT_SIGNAL ? round_selected+1U : context->visit_count;
+        if(rc==GLRT_VISIT_SIGNAL) {
+            result->selected=round_selected;result->segments_started++;
+            result->selected_activity=context->activity_selected;
+            if(fprintf(context->journal,"segment start %u %u %u %" PRIu64 " %s\n",
+               round,result->visits_executed,result->selected,lo[result->selected],
+               context->activity_selected ? "retained_activity" : "native_handoff")<0 ||
+               fflush(context->journal)) return GLRT_VISIT_RETENTION;
+            context->profile=context->followup_profile;
+            rc=glrt_tracking_visit_followup_run(ports,context->rate,lo[result->selected],
+                result->visits_executed++);
+            if(fprintf(context->journal,"segment terminal %u %d\n",round,rc)<0 ||
+               fflush(context->journal)) return GLRT_VISIT_RETENTION;
+            if(rc==GLRT_VISIT_DONE) { result->track_complete=1;break; }
+            if(rc!=GLRT_VISIT_CLEAN_LOSS && rc!=GLRT_VISIT_NO_TRACK) break;
+        } else if(rc!=GLRT_VISIT_DONE) break;
+    }
+    return rc;
+}
 int main(int argc,char **argv)
 {
     struct visit_context context={0};struct glrt_visit_ports ports;
     char path[PATH_MAX];uint64_t lo[4];struct sigaction action={0};int rc;
-    unsigned selected=UINT_MAX;int followup_started=0;
+    unsigned selected=UINT_MAX,visits_executed=0,scan_rounds=0,segments_started=0;
+    int followup_started=0,track_complete=0,selected_activity=0;
+    struct continuity_result continuity={0};
     if(visit_arguments(argc,argv,&context,lo)) return 2;
     context.probe_main=visit_probe_main;
     context.followup_probe_main=followup_probe_main;
@@ -293,22 +340,37 @@ int main(int argc,char **argv)
        context.followup_sparse ? context.followup_plan : visit_profile(&context) ? visit_profile(&context) : "1536",
        context.visit_count,context.followup_sparse ? UINT64_C(400000000000) : UINT64_C(60000000000))<0 ||
        fflush(context.journal)) rc=GLRT_VISIT_RETENTION;
-    if(!rc && context.followup_sparse) {
+    if(!rc && context.continuity) {
+        rc=continuity_run(&context,&ports,lo,&continuity);
+        selected=continuity.selected;visits_executed=continuity.visits_executed;
+        scan_rounds=continuity.scan_rounds;segments_started=continuity.segments_started;
+        track_complete=continuity.track_complete;selected_activity=continuity.selected_activity;
+        followup_started=segments_started!=0;
+    } else if(!rc && context.followup_sparse) {
         rc=glrt_tracking_visit_until_signal(&ports,context.rate,lo,context.visit_count,&selected);
         if(rc==GLRT_VISIT_SIGNAL) {
             followup_started=1;context.profile=context.followup_profile;
             rc=glrt_tracking_visit_followup_run(&ports,context.rate,lo[selected],context.visit_count);
+            track_complete=rc==GLRT_VISIT_DONE;
         }
     } else if(!rc) rc=glrt_tracking_visit_plan_run(&ports,context.rate,lo,context.visit_count);
     if(fprintf(context.journal,"terminal %d\n",rc)<0 || fclose(context.journal)) rc=GLRT_VISIT_RETENTION;
     alarm(0);
     printf("{\"scope\":\"%s\",\"rate\":%u,\"result\":%d,\"rf_sample_limit\":%u",
+        context.continuity ? "bounded_arm_scout_segmented_followup" :
         context.followup_sparse ? "bounded_arm_scout_sparse_followup" :
         context.visit_count==2 ? "bounded_arm_two_frequency_visits" : "bounded_arm_frequency_revisits",
-        context.rate,rc,context.visit_count*25165824U+(followup_started ? 737280000U : 0U));
-    if(context.followup_sparse) {
+        context.rate,rc,context.continuity ?
+            (visits_executed-segments_started)*SCOUT_RF_SAMPLES+segments_started*SEGMENT_RF_SAMPLES :
+            context.visit_count*SCOUT_RF_SAMPLES+(followup_started ? 737280000U : 0U));
+    if(context.continuity) {
+        printf(",\"scan_rounds\":%u,\"segments_started\":%u,\"visits_executed\":%u,\"track_complete\":%d,"
+            "\"selection\":\"%s\",\"selected_index\":",scan_rounds,segments_started,visits_executed,track_complete,
+            !followup_started ? "none" : selected_activity ? "retained_activity" : "native_handoff");
+        if(selected==UINT_MAX) printf("null"); else printf("%u",selected);
+    } else if(context.followup_sparse) {
         printf(",\"followup_started\":%d,\"track_complete\":%d,\"selection\":\"%s\",\"selected_index\":",
-            followup_started,followup_started && rc==GLRT_VISIT_DONE,
+            followup_started,track_complete,
             !followup_started ? "none" : context.activity_selected ? "retained_activity" : "native_handoff");
         if(selected==UINT_MAX) printf("null"); else printf("%u",selected);
     }

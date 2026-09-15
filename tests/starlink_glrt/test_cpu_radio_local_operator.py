@@ -34,6 +34,17 @@ def parent(operator, *, count=4, started=0, result=0, complete=0, selection="non
     return (json.dumps(value, separators=(",", ":")) + "\n").encode()
 
 
+def continuity_parent(operator, *, count=4, rounds=3, segments=2, visits=10,
+                      result=1, complete=0, selection="retained_activity", selected=1, **changes):
+    scouts=visits-segments
+    value={"scope":"bounded_arm_scout_segmented_followup","rate":operator.RATE,
+        "result":result,"rf_sample_limit":scouts*operator.SCOUT_SAMPLES+segments*operator.SEGMENT_SAMPLES,
+        "scan_rounds":rounds,"segments_started":segments,"visits_executed":visits,
+        "track_complete":complete,"selection":selection,"selected_index":selected}
+    value.update(changes)
+    return (json.dumps(value,separators=(",",":"))+"\n").encode()
+
+
 def archive(visits, *, extra=None):
     output = io.BytesIO()
     with tarfile.open(fileobj=output, mode="w") as tar:
@@ -52,6 +63,7 @@ def test_cycle_has_reviewed_distinct_los_and_explicit_worst_case(operator):
     ordered = [1440312500,1940312500,1190312500,1690312500]
     assert operator.validate_los(ordered) == tuple(ordered)
     assert operator.maximum_source_seconds(4) == pytest.approx(335.1773184)
+    assert operator.maximum_source_seconds(4,operator.CONTINUITY30_PROFILE) == pytest.approx(268.2519552)
     for values in ([],[1440312500],[1440312500]*2,[1709687500],list(operator.UPPER_EDGE_LOS)+[1190312500]):
         with pytest.raises(ValueError): operator.validate_los(values)
 
@@ -72,7 +84,8 @@ def test_dry_run_is_explicitly_non_rf_and_contains_reviewable_next_action(operat
     assert plan['next_action']=='repeat without --dry-run'
 
 
-@pytest.mark.parametrize('profile',["sparse10-after-scout16","sparse30-after-scout16","sparse100-after-scout16"])
+@pytest.mark.parametrize('profile',["sparse10-after-scout16","sparse30-after-scout16","sparse100-after-scout16",
+    "continuity30-after-scout16"])
 def test_dry_run_retains_the_selected_tracking_horizon(operator,profile):
     plan=operator.dry_run_plan((1440312500,1940312500),operator.EXPECTED,
         Path('/srv/postgres-nvme/x'),Path('/srv/bulk/leo/x'),profile)
@@ -89,6 +102,18 @@ def test_parent_distinguishes_negative_activity_loss_and_completed_track(operato
     assert operator.decode_parent(native,operator.RATE,4,1)["result"] == 3
     failed = parent(operator,started=1,result=-4,selection="retained_activity",selected=2)
     assert operator.decode_parent(failed,operator.RATE,4,1)["result"] == -4
+
+
+def test_continuity_parent_retains_round_segment_and_sample_accounting(operator):
+    row=operator.decode_parent(continuity_parent(operator),operator.RATE,4,1,operator.CONTINUITY30_PROFILE)
+    assert row["scan_rounds"]==3 and row["segments_started"]==2 and not row["track_complete"]
+    complete=continuity_parent(operator,rounds=2,segments=2,visits=7,result=0,complete=1)
+    assert operator.decode_parent(complete,operator.RATE,4,0,operator.CONTINUITY30_PROFILE)["track_complete"]
+    empty=continuity_parent(operator,rounds=3,segments=0,visits=12,result=0,selection="none",selected=None)
+    assert not operator.decode_parent(empty,operator.RATE,4,0,operator.CONTINUITY30_PROFILE)["track_complete"]
+    with pytest.raises(ValueError):
+        operator.decode_parent(continuity_parent(operator,rf_sample_limit=1),operator.RATE,4,1,
+                               operator.CONTINUITY30_PROFILE)
 
 
 @pytest.mark.parametrize("raw,exit_code", [
@@ -109,6 +134,13 @@ def test_archive_requires_exact_executed_scouts_and_followup(operator,tmp_path):
     assert operator.extract_evidence(archive({0,1,4}),tmp_path/"triggered",triggered,4) == 13
     for damaged in (archive({0}),archive({0,1},extra="outside"),archive({0,1},extra="evidence/visit-9/stdout.json")):
         with pytest.raises(ValueError): operator.extract_evidence(damaged,tmp_path/("bad"+str(len(damaged))),negative,2)
+
+
+def test_continuity_archive_requires_every_contiguous_segment_visit(operator,tmp_path):
+    row=operator.decode_parent(continuity_parent(operator),operator.RATE,4,1,operator.CONTINUITY30_PROFILE)
+    assert operator.extract_evidence(archive(set(range(10))),tmp_path/"continuity",row,4)==41
+    with pytest.raises(ValueError):
+        operator.extract_evidence(archive(set(range(9))),tmp_path/"missing",row,4)
 
 
 def test_manifest_is_sorted_and_recomputable(operator,tmp_path):

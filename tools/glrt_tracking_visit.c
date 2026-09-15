@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 #include "glrt_tracking_visit.h"
+#include <limits.h>
 #include <string.h>
 
 static int upper(uint64_t hz)
@@ -78,6 +79,12 @@ int glrt_tracking_visit_until_signal(const struct glrt_visit_ports *p,uint32_t r
     const uint64_t *lo,unsigned count,unsigned *selected)
 {
     return run_plan(p,rate,lo,count,0,UINT64_C(60000000000),1,0,selected);
+}
+int glrt_tracking_visit_until_signal_from(const struct glrt_visit_ports *p,uint32_t rate,
+    const uint64_t *lo,unsigned count,unsigned first,unsigned *selected)
+{
+    if(first>UINT_MAX-count) return GLRT_VISIT_INVALID;
+    return run_plan(p,rate,lo,count,first,UINT64_C(60000000000),1,0,selected);
 }
 int glrt_tracking_visit_followup_run(const struct glrt_visit_ports *p,uint32_t rate,
     uint64_t lo,unsigned number)
