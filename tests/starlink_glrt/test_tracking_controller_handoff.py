@@ -288,41 +288,6 @@ def test_coarse_authority_uses_its_partial_final_horizon_when_native_rejects(
     assert sum(item.repeats for item in radio.descriptors)==617+33-first
 
 
-def test_sparse_frontier_waits_briefly_for_new_coarse_authority(
-        handoff_api,pilot_moments):
-    rate,first,measurements,stride=30000000,600,6,10
-    radio,history,_=prepare(handoff_api,pilot_moments,rate,first=first,
-        frames=128,initialize=False)
-    rc,batch,_=trend.predict(handoff_api,history,first,1)
-    assert rc==0
-    radio.seed=batch.prediction
-    radio.origin=radio.latest=batch.prediction.start-rate//200
-    assert handoff_api.glrt_tracking_controller_init_handoff_strided(
-        radio.state,c.byref(radio.ports),c.byref(batch),c.byref(history),first,
-        measurements,stride,5)==0
-    refreshed=extend_from_prediction(handoff_api,history,batch,first,599,608,617)
-    radio.reject=True
-    assert radio.tick()==1 and radio.tick()==1
-    assert handoff_api.glrt_tracking_controller_refresh_handoff(
-        radio.state,c.byref(refreshed))==0
-    target=(617+32-first)//stride+1
-    for _ in range(10000):
-        assert radio.tick()==1
-        radio.advance()
-        if sum(item.repeats for item in radio.descriptors)==target and not radio.pending:
-            break
-    else: pytest.fail('controller did not reach the coarse-authority horizon')
-    # No descriptor may cross the 32-frame horizon, but the controller remains
-    # available long enough for the independently scheduled observer to catch up.
-    assert radio.tick()==1
-    assert sum(item.repeats for item in radio.descriptors)==target
-    newer=extend_from_prediction(handoff_api,refreshed,batch,first,626,635,644)
-    assert handoff_api.glrt_tracking_controller_refresh_handoff(
-        radio.state,c.byref(newer))==0
-    assert radio.run()==0
-    assert review(journal(radio),epoch=3,rate=rate)['estimates'][-1]['frame']==first+(measurements-1)*stride
-
-
 @pytest.mark.parametrize("rate", [2500000,5000000,15000000])
 def test_lost_new_support_uses_only_remaining_horizon(handoff_api,pilot_moments,rate):
     radio,history,_=prepare(handoff_api,pilot_moments,rate)

@@ -106,6 +106,8 @@ int live_native_limits(const char *blocks,uint64_t out[2])
     out[0]=limits.native_results;out[1]=(uint64_t)limits.native_seconds;
     return 0;
 }
+int live_native_stride(const char *blocks)
+{ struct dwell_limits limits;return dwell_limits(blocks,&limits) ? -1 : (int)limits.native_stride; }
 int live_observer_limits(const char *blocks,uint64_t out[4])
 {
     struct dwell_limits limits;
@@ -312,6 +314,7 @@ def live_api(tmp_path_factory):
     lib.live_totals.argtypes = [c.c_void_p,c.c_void_p]
     lib.live_restart_fault.argtypes = [c.c_void_p,c.c_uint]
     lib.live_native_limits.argtypes = [c.c_char_p,c.c_void_p]
+    lib.live_native_stride.argtypes = [c.c_char_p]
     lib.live_observer_limits.argtypes = [c.c_char_p,c.c_void_p]
     lib.unused_probe_main.argtypes = [c.c_int, c.POINTER(c.c_char_p)]
     lib.live_rank.argtypes = [c.c_void_p,c.c_void_p,c.c_void_p,c.c_uint,c.c_void_p,c.c_void_p]
@@ -337,8 +340,8 @@ def live_api(tmp_path_factory):
     (b'45000-selected-observer9-scan80-local2-track10', [45000,256,325,300000000000]),
     (b'45000-selected-observer9-scan80-local2-track10-authority', [45000,256,325,300000000000]),
     (b'45000-selected-observer9-scan80-local2-track10-sparse10-authority', [45000,256,325,300000000000]),
-    (b'45000-selected-observer9-scan80-local2-track30-sparse10-authority', [45000,256,325,300000000000]),
-    (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority', [45000,256,325,300000000000]),
+    (b'45000-selected-observer9-scan80-local2-track30-sparse9-authority', [45000,256,325,300000000000]),
+    (b'45000-selected-observer9-scan80-local2-track100-sparse9-authority', [45000,256,325,300000000000]),
     (b'1536-selected', [1536,6,25,12000000000]),
     (b'1536-selected-observer3', [1536,6,25,12000000000]),
     (b'1536-selected-observer3-scan64', [1536,6,25,12000000000]),
@@ -361,8 +364,8 @@ def test_dwell_profiles_have_finite_capture_and_worker_limits(live_api, blocks, 
     (b'45000-selected-observer9-scan80-local2-track10',[7500,120]),
     (b'45000-selected-observer9-scan80-local2-track10-authority',[7500,120]),
     (b'45000-selected-observer9-scan80-local2-track10-sparse10-authority',[751,30]),
-    (b'45000-selected-observer9-scan80-local2-track30-sparse10-authority',[2251,60]),
-    (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority',[7501,150]),
+    (b'45000-selected-observer9-scan80-local2-track30-sparse9-authority',[2501,60]),
+    (b'45000-selected-observer9-scan80-local2-track100-sparse9-authority',[8335,150]),
 ])
 def test_native_result_horizon_and_wall_deadline_are_explicit_per_profile(live_api,profile,expected):
     lib,_=live_api
@@ -372,12 +375,26 @@ def test_native_result_horizon_and_wall_deadline_are_explicit_per_profile(live_a
 
 
 @pytest.mark.parametrize('profile,expected',[
+    (b'45000-selected-observer9-scan80-local2-track10-sparse10-authority',10),
+    (b'45000-selected-observer9-scan80-local2-track30-sparse9-authority',9),
+    (b'45000-selected-observer9-scan80-local2-track100-sparse9-authority',9),
+])
+def test_extended_native_cadence_aligns_with_the_observer(live_api,profile,expected):
+    lib,_=live_api
+    assert lib.live_native_stride(profile)==expected
+    limits=(c.c_uint64*2)();assert lib.live_native_limits(profile,limits)==0
+    target=10 if b'track10-' in profile else 30 if b'track30-' in profile else 100
+    assert (limits[0]-1)*expected/750 >= target
+    assert (limits[0]-1)*expected/750 < target+.0121
+
+
+@pytest.mark.parametrize('profile,expected',[
     (b'1536',[200,800,7500000,3000000000]),
     (b'45000-selected-observer9-scan80-local2-track10-sparse10-authority',
         [1024,4096,30000000,15000000000]),
-    (b'45000-selected-observer9-scan80-local2-track30-sparse10-authority',
+    (b'45000-selected-observer9-scan80-local2-track30-sparse9-authority',
         [2700,2700,80000000,40000000000]),
-    (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority',
+    (b'45000-selected-observer9-scan80-local2-track100-sparse9-authority',
         [8600,8600,260000000,120000000000]),
 ])
 def test_observer_authority_and_retention_are_bounded_per_profile(live_api,profile,expected):
@@ -393,8 +410,8 @@ def test_observer_authority_and_retention_are_bounded_per_profile(live_api,profi
     (b'45000-selected-observer9-scan80-local2-track10',1),(b'1536',0),
     (b'45000-selected-observer9-scan80-local2-track10-authority',1),
     (b'45000-selected-observer9-scan80-local2-track10-sparse10-authority',1),
-    (b'45000-selected-observer9-scan80-local2-track30-sparse10-authority',1),
-    (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority',1),
+    (b'45000-selected-observer9-scan80-local2-track30-sparse9-authority',1),
+    (b'45000-selected-observer9-scan80-local2-track100-sparse9-authority',1),
     (b'4096',0),(b'1536-selected',0),(b'1536-selected-observer3',0),
     (b'1536-selected-observer3-scan64',0),(b'1536-selected-observer3-scan64-scout16',0),
     (b'1536-selected-observer3-scan80-local2',0),(b'unknown',-1)])

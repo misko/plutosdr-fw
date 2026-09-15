@@ -76,7 +76,7 @@ static int simulated_followup_child(int argc,char **argv) {
     if(argc!=7 || (strcmp(argv[6],SPARSE_PROFILE) && strcmp(argv[6],SPARSE30_PROFILE) &&
         strcmp(argv[6],SPARSE100_PROFILE))) return 9;
     unsigned results=!strcmp(argv[6],SPARSE_PROFILE) ? 751U :
-        !strcmp(argv[6],SPARSE30_PROFILE) ? 2251U : 7501U;
+        !strcmp(argv[6],SPARSE30_PROFILE) ? 2501U : 8335U;
     printf("{\"scope\":\"bounded_live_cpu_acquisition_native_feedback\",\"rate\":0,"
         "\"status\":0,\"blocks\":45000,\"attempts\":2,\"handoffs\":1,"
         "\"native_results\":%u,\"native_completed_runs\":1,\"worker_complete\":1}\n",results);
@@ -199,8 +199,8 @@ def test_four_selected_children_have_separate_evidence_and_are_all_reaped(probe,
 
 
 @pytest.mark.parametrize('profile',[SPARSE_PROFILE := b'45000-selected-observer9-scan80-local2-track10-sparse10-authority',
-    b'45000-selected-observer9-scan80-local2-track30-sparse10-authority',
-    b'45000-selected-observer9-scan80-local2-track100-sparse10-authority'])
+    b'45000-selected-observer9-scan80-local2-track30-sparse9-authority',
+    b'45000-selected-observer9-scan80-local2-track100-sparse9-authority'])
 def test_sparse_followup_uses_reacquiring_probe(probe,tmp_path,profile):
     assert probe.exercise_followup_child(os.fsencode(tmp_path),profile)==0
     status=json.loads((tmp_path/'visit-4/stdout.json').read_text())
