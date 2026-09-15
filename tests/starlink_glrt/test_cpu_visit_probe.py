@@ -85,11 +85,12 @@ static int simulated_followup_child(int argc,char **argv) {
         !strcmp(argv[6],SPARSE100_PROFILE) ? 8335U : 2501U;
     unsigned blocks=(!strcmp(argv[6],SEGMENT30_PROFILE) || !strcmp(argv[6],FRESH_SEGMENT30_PROFILE) ||
         !strcmp(argv[6],PRIOR_SEGMENT30_PROFILE)) ? 7500U : 45000U;
-    unsigned finite=!strcmp(argv[1],"sparse_finite");
+    unsigned finite=!strcmp(argv[1],"sparse_finite"),partial=!strcmp(argv[1],"sparse_partial_loss");
     printf("{\"scope\":\"bounded_live_cpu_acquisition_native_feedback\",\"rate\":0,"
         "\"status\":0,\"blocks\":%u,\"attempts\":2,\"handoffs\":%u,"
         "\"native_results\":%u,\"native_completed_runs\":%u,\"worker_complete\":%u}\n",
-        blocks,!finite,finite ? 0U : results,!finite,!finite);
+        blocks,partial ? 1U : !finite,finite ? 0U : partial ? 113U : results,
+        partial ? 0U : !finite,finite ? 0U : 1U);
     return 0;
 }
 int exercise_child(const char *directory,const char *mode) {
@@ -132,6 +133,13 @@ int exercise_finite_segment(const char *directory) {
         .followup_probe_main=simulated_followup_child,.visit_count=4,
         .profile=SEGMENT30_PROFILE,.followup_sparse=1};
     interrupted=0;return visit_child(&context,4,clock_ns(NULL)+UINT64_C(2000000000));
+}
+int exercise_partial_followup(const char *directory) {
+    char *args[]={"probe","sparse_partial_loss","serial","bank","refs",(char *)directory};
+    struct visit_context context={.args=args,.probe_main=simulated_child,
+        .followup_probe_main=simulated_followup_child,.visit_count=2,
+        .profile=SPARSE100_PROFILE,.followup_sparse=1};
+    interrupted=0;return visit_child(&context,2,clock_ns(NULL)+UINT64_C(2000000000));
 }
 int exercise_ranked_quick_activity(const char *directory,unsigned out[2]) {
     char *args[]={"probe","scout_quick_activity","serial","bank","refs",(char *)directory};
@@ -256,6 +264,7 @@ def probe(tmp_path_factory):
     lib.exercise_four_children.argtypes=[c.c_char_p]
     lib.exercise_followup_child.argtypes=[c.c_char_p,c.c_char_p]
     lib.exercise_finite_segment.argtypes=[c.c_char_p]
+    lib.exercise_partial_followup.argtypes=[c.c_char_p]
     lib.exercise_ranked_quick_activity.argtypes=[c.c_char_p,c.c_void_p]
     lib.parse_plan.argtypes=[c.c_uint,c.c_uint,c.c_char_p]
     lib.parse_plan_limits.argtypes=[c.c_char_p,c.c_void_p]
@@ -271,7 +280,7 @@ def test_child_is_reaped_before_return_and_evidence_is_never_overwritten(probe,t
         (tmp_path/'visit-0').mkdir();(tmp_path/'visit-0/stdout.json').write_text('preserved')
     expected={'pass':0,'selected':0,'scan64':0,'clean_loss':1,'scout_signal':2,'scout_activity':2,
         'scout_weak':2,'scout_empty':0,
-        'sparse_complete':0,'sparse_empty':3}.get(mode,-1)
+        'sparse_complete':0,'sparse_empty':3,'sparse_partial':1}.get(mode,-1)
     assert probe.exercise_child(os.fsencode(tmp_path),mode.encode())==expected
     if mode=='existing': assert (tmp_path/'visit-0/stdout.json').read_text()=='preserved'
     elif mode.startswith(('scout_','sparse_')):
@@ -317,6 +326,13 @@ def test_finite_segment_without_handoff_is_typed_no_track(probe,tmp_path):
     assert probe.exercise_finite_segment(os.fsencode(tmp_path))==3
     status=json.loads((tmp_path/'visit-4/stdout.json').read_text())
     assert not status['worker_complete'] and not status['handoffs'] and status['blocks']==7500
+
+
+def test_joined_partial_100_second_followup_is_typed_clean_loss(probe,tmp_path):
+    assert probe.exercise_partial_followup(os.fsencode(tmp_path))==1
+    status=json.loads((tmp_path/'visit-2/stdout.json').read_text())
+    assert status['worker_complete'] and status['handoffs']==1
+    assert status['native_results']==113 and not status['native_completed_runs']
 
 
 def test_ranked_one_attempt_scout_retains_activity_for_parent_selection(probe,tmp_path):

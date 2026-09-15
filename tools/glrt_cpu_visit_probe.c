@@ -274,6 +274,12 @@ static int visit_status(const char *path,uint32_t rate,const char *profile)
             !strcmp(profile,PRIOR_SEGMENT30_PROFILE)) ? 16U : segment ? 64U : 256U;
         if(blocks>maximum_blocks || attempts>maximum_attempts || completed>1) return -1;
         if(handoffs>=1 && completed==1 && results>=required && worker) return GLRT_VISIT_DONE;
+        /* A fully joined worker may exhaust its bounded reacquisition after
+         * one or more clean native losses. Partial results prove that tracking
+         * started, while status zero and worker_complete prove cleanup. Expose
+         * that disposition to a continuity parent so it may rescan. */
+        if(handoffs>=1 && !completed && results && results<required && worker)
+            return GLRT_VISIT_CLEAN_LOSS;
         return !handoffs && !completed && !results ? GLRT_VISIT_NO_TRACK : -1;
     }
     return -1;
