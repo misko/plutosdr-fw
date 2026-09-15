@@ -102,7 +102,7 @@ static int dwell_limits(const char *blocks,struct dwell_limits *out)
         *out=(struct dwell_limits){7500,16,65,UINT64_C(60000000000),1,9,80,0,STABLE30_NATIVE_RESULTS,SPARSE30_NATIVE_WALL_SECONDS,1,10,
             2700,2700,UINT64_C(80000000),UINT64_C(60000000000),SPARSE30_NATIVE_JOURNAL_BYTES,GLRT_TRACKING_FORECAST_COAST};
     else if(!strcmp(blocks,"7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16-prior8"))
-        *out=(struct dwell_limits){7500,16,65,UINT64_C(60000000000),1,9,80,0,STABLE30_NATIVE_RESULTS,SPARSE30_NATIVE_WALL_SECONDS,1,10,
+        *out=(struct dwell_limits){7500,16,65,UINT64_C(60000000000),1,9,80,1,STABLE30_NATIVE_RESULTS,SPARSE30_NATIVE_WALL_SECONDS,1,10,
             2700,2700,UINT64_C(80000000),UINT64_C(60000000000),SPARSE30_NATIVE_JOURNAL_BYTES,GLRT_TRACKING_FORECAST_COAST};
     else if(!strcmp(blocks,"45000-selected-observer9-scan80-local2-track100-sparse10-authority"))
         *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,STABLE100_NATIVE_RESULTS,SPARSE100_NATIVE_WALL_SECONDS,1,10,
@@ -840,6 +840,13 @@ static void *worker_thread(void *pointer)
     s->result=result;s->done=1;
     return (void *)(uintptr_t)(pthread_mutex_unlock(&s->mutex)!=0);
 }
+static void retain_observer_reacquisition_prior(struct live *s)
+{
+    if(s && s->prior_reacquire && s->authority_generation &&
+       s->observer_authority.history.count>=8) {
+        s->reacquire_prior=s->observer_authority;s->prior_pending=1;
+    }
+}
 /* Caller has joined the worker and set started=0. No owner may be destroyed
  * while a worker can still reference it. Retry only the controller's clean
  * acquisition loss, not another component's numerically equal error code.
@@ -847,7 +854,7 @@ static void *worker_thread(void *pointer)
 static int restart_owner(struct live *s,FILE *capture_journal)
 {
     char raw[4096];uint32_t w[24];int n;
-    if(!s->restart_on_loss || s->visit_mode || s->started || s->observer_started || !s->done || !s->selected_iq || !s->native_clean_loss ||
+    if(!s->restart_on_loss || (s->visit_mode && !s->prior_reacquire) || s->started || s->observer_started || !s->done || !s->selected_iq || !s->native_clean_loss ||
        s->result!=GLRT_NATIVE_ACQUISITION_LOST || s->restarts>=RESTART_LIMIT ||
        s->attempts>=s->attempt_limit || cancelled(s)) return 0;
     n=s->native.read(s->native.context,"tracking_snapshot",raw,sizeof(raw));
@@ -857,6 +864,7 @@ static int restart_owner(struct live *s,FILE *capture_journal)
     if(glrt_tracking_snapshot_parse(raw,(size_t)n,w) || w[2]!=s->epoch || w[20]!=s->rate ||
        (w[5]&48)!=32 || w[6] || w[7] || w[18] || w[19] || !glrt_tracking_snapshot_drained(w))
         return GLRT_NATIVE_SOURCE_LOST;
+    retain_observer_reacquisition_prior(s);
     fprintf(s->journal,"{\"kind\":\"reacquisition\",\"previous_epoch\":%u,\"native_episode\":%u,"
         "\"attempts_used\":%u,\"attempt_limit\":%u,\"deadline_ns\":%" PRIu64 "}\n",
         s->epoch,s->restarts+1,s->attempts,s->attempt_limit,s->deadline_ns);

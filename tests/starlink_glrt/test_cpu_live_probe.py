@@ -207,6 +207,18 @@ void live_prior_seed(struct test_live *t,uint64_t anchor)
     }
     s->prior_reacquire=1;s->prior_pending=1;
 }
+int live_retains_observer_prior(uint64_t anchor)
+{
+    struct live s={.prior_reacquire=1,.authority_generation=1};
+    struct glrt_native_estimate e={.coherence=.9,.linearized_coherence=.9};
+    if(glrt_tracking_trend_reset(&s.observer_authority,3,2500000)) return 0;
+    for(uint32_t frame=1;frame<=8;frame++)
+        if(glrt_tracking_trend_observe(&s.observer_authority,3,frame,
+            anchor+(uint64_t)(frame-1)*10000/3,0,&e)!=1) return 0;
+    retain_observer_reacquisition_prior(&s);
+    return s.prior_pending && s.reacquire_prior.history.anchor==anchor &&
+        s.reacquire_prior.history.last_supported==8;
+}
 void live_coarse_authority(struct test_live *t,unsigned results)
 { t->live.coarse_authority=1;t->live.native_result_limit=results;t->live.native_seconds=12; }
 void live_deadline(struct test_live *t,uint64_t nanoseconds) { t->live.deadline_ns=clock_ns(NULL)+nanoseconds; }
@@ -357,6 +369,7 @@ def live_api(tmp_path_factory):
     lib.live_observer_join.argtypes = [c.c_void_p]
     lib.live_observer_spacing.argtypes = [c.c_void_p,c.c_uint]
     lib.live_prior_seed.argtypes = [c.c_void_p,c.c_uint64]
+    lib.live_retains_observer_prior.argtypes = [c.c_uint64]
     lib.live_coarse_authority.argtypes = [c.c_void_p,c.c_uint]
     lib.live_rebase.argtypes = [c.c_void_p,c.c_void_p]
     lib.live_totals.argtypes = [c.c_void_p,c.c_void_p]
@@ -464,6 +477,11 @@ def test_prior_guided_fresh_scan_remeasures_local_peak_and_rebuilds_handoff(
     assert resolved['resolver_mode']=='prior_local' and resolved['timing_radius']==2
     assert terminal['resolver_timing_radius']==2 and terminal['fft_calls']==20
     assert terminal['supported_history']>=8 and terminal['bootstrap_failure']==0
+
+
+def test_clean_native_loss_retains_measured_observer_history_as_search_only_prior(live_api):
+    lib,_=live_api
+    assert lib.live_retains_observer_prior(760022)==1
 
 
 @pytest.mark.parametrize('profile,expected', [
@@ -621,7 +639,7 @@ def test_observer_authority_and_retention_are_bounded_per_profile(live_api,profi
     (b'1536-selected-observer3-scan64',0),(b'1536-selected-observer3-scan64-scout16',0),
     (b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment',0),
     (b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16',0),
-    (b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16-prior8',0),
+    (b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16-prior8',1),
     (b'1536-selected-observer3-scan64-scout1',0),
     (b'1536-selected-observer3-scan80-local2',0),(b'unknown',-1)])
 def test_only_long_profiles_restart_after_clean_native_loss(live_api,profile,expected):
