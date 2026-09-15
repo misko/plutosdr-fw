@@ -97,7 +97,7 @@ def test_artifact_matches_packaged_dt(fit, tmp_path):
     assert "packaged DT" in result.stderr
 
 
-def test_artifact_validator_supports_pinned_buildroot_dumpimage(tmp_path, monkeypatch):
+def test_artifact_validator_decodes_pinned_fdtget_byte_format(tmp_path, monkeypatch):
     script = ROOT / "scripts/validate_flash_artifact.py"
     spec = importlib.util.spec_from_file_location("validate_flash_artifact", script)
     assert spec is not None and spec.loader is not None
@@ -108,26 +108,19 @@ def test_artifact_validator_supports_pinned_buildroot_dumpimage(tmp_path, monkey
     destination = tmp_path / "board.dtb"
     calls = []
 
-    def legacy_dumpimage(*args):
+    def fdtget_bytes(*args):
         calls.append(args)
-        if "-i" not in args:
-            destination.write_bytes(b"partial")
-            raise subprocess.CalledProcessError(1, args)
         assert args == (
-            "dumpimage", "-i", str(fit), "-T", "flat_dt", "-p", "2", str(destination)
+            "fdtget", "-t", "bx", str(fit), "/images/fdt@3", "data"
         )
-        assert not destination.exists()
-        destination.write_bytes(b"complete device tree")
-        return ""
+        # fdtget deliberately does not zero-pad values below 0x10.
+        return "d0 d fe ed 0 a ff"
 
-    monkeypatch.setattr(validator, "output", legacy_dumpimage)
-    validator.extract_flat_dt(fit, 2, destination)
+    monkeypatch.setattr(validator, "output", fdtget_bytes)
+    validator.extract_flat_dt(fit, "fdt@3", destination)
 
-    assert destination.read_bytes() == b"complete device tree"
-    assert calls[0] == (
-        "dumpimage", "-T", "flat_dt", "-p", "2", "-o", str(destination), str(fit)
-    )
-    assert len(calls) == 2
+    assert destination.read_bytes() == bytes((0xD0, 0x0D, 0xFE, 0xED, 0, 0x0A, 0xFF))
+    assert len(calls) == 1
 
 
 @pytest.fixture

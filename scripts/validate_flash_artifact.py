@@ -17,43 +17,18 @@ def output(*args: str) -> str:
     return subprocess.check_output(args, text=True, stderr=subprocess.PIPE).strip()
 
 
-def extract_flat_dt(fit: Path, index: int, destination: Path) -> None:
-    """Extract one FIT component with current or pinned-Buildroot dumpimage."""
+def extract_flat_dt(fit: Path, name: str, destination: Path) -> None:
+    """Extract an inline FIT device-tree property with the pinned fdtget."""
     try:
-        output(
-            "dumpimage",
-            "-T",
-            "flat_dt",
-            "-p",
-            str(index),
-            "-o",
-            str(destination),
-            str(fit),
-        )
-        return
-    except subprocess.CalledProcessError as modern_error:
-        destination.unlink(missing_ok=True)
-        try:
-            # U-Boot 2017's dumpimage uses -i for the input and the final
-            # positional argument for the output. The protected source graph's
-            # Buildroot host tool still has that interface.
-            output(
-                "dumpimage",
-                "-i",
-                str(fit),
-                "-T",
-                "flat_dt",
-                "-p",
-                str(index),
-                str(destination),
-            )
-            return
-        except subprocess.CalledProcessError as legacy_error:
-            raise ValueError(
-                "dumpimage could not extract FIT component "
-                f"{index} with modern or legacy syntax "
-                f"(modern={modern_error.returncode}, legacy={legacy_error.returncode})"
-            ) from legacy_error
+        values = [
+            int(value, 16)
+            for value in output("fdtget", "-t", "bx", str(fit), f"/images/{name}", "data").split()
+        ]
+    except ValueError as error:
+        raise ValueError(f"invalid inline FIT data for {name}") from error
+    if not values or any(not 0 <= value <= 0xFF for value in values):
+        raise ValueError(f"invalid inline FIT data for {name}")
+    destination.write_bytes(bytes(values))
 
 
 def validate(path: Path, profile_path: Path, target: str, *, frm: bool) -> dict:
@@ -92,7 +67,7 @@ def validate(path: Path, profile_path: Path, target: str, *, frm: bool) -> dict:
             if output("fdtget", "-t", "s", str(fit), f"/images/{name}", "type") != "flat_dt":
                 continue
             dtb = Path(scratch) / f"{index}.dtb"
-            extract_flat_dt(fit, index, dtb)
+            extract_flat_dt(fit, name, dtb)
             node = profile["firmware_node"]
             if output("fdtget", "-t", "s", str(dtb), node, "label") != "qspi-linux":
                 raise ValueError("packaged DT firmware partition role mismatch")
