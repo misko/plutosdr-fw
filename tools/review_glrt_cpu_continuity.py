@@ -75,30 +75,35 @@ def review_continuity(text, parent, *, serial, los):
             raise ValueError("visit source did not advance")
     if not len(starts)==len(ends)==parent["segments_started"]:
         raise ValueError("segment count differs")
-    previous_followup=-1
-    for expected_round,(start,end) in enumerate(zip(starts,ends,strict=True)):
+    previous_followup=-1;previous_round=-1
+    for start,end in zip(starts,ends,strict=True):
         round_number,followup,selected,lo,selection=start
-        if round_number!=expected_round or end[0]!=expected_round or followup<=previous_followup:
+        if not previous_round<round_number<parent["scan_rounds"] or end[0]!=round_number or followup<=previous_followup:
             raise ValueError("segment order differs")
-        round_first=previous_followup+1
+        round_first=previous_followup+1+(round_number-previous_round-1)*count
         expected_followup=round_first+count if ranked and selection=="retained_activity" else round_first+selected+1
         if not 0<=selected<count or followup!=expected_followup or lo!=los[selected]:
             raise ValueError("segment scout selection differs")
         scout=grouped[round_first+selected][-1];track=grouped[followup][-1]
         expected_scout=0 if ranked and selection=="retained_activity" else 2
         mapped_track=(track[2] if track[2] in (0,1,3) else -4)
-        if scout[2]!=expected_scout or scout[3]!=lo or track[3]!=lo or mapped_track!=end[1]:
+        if (scout[2]!=expected_scout or abs(scout[3]-lo)>16 or abs(track[3]-lo)>16 or
+                mapped_track!=end[1]):
             raise ValueError("segment transition disposition differs")
         round_candidates=[row for row in candidates if round_first<=row[0]<followup]
         if ranked and selection=="retained_activity":
             if not round_candidates or max(round_candidates,key=lambda row:(row[1],-row[0]))[0]!=round_first+selected:
                 raise ValueError("strongest activity selection differs")
-        previous_followup=followup
+        previous_followup=followup;previous_round=round_number
     if parent["segments_started"]:
         if parent["selected_index"]!=starts[-1][2] or parent["selection"]!=starts[-1][4]:
             raise ValueError("parent selection differs")
     elif parent["selected_index"] is not None or parent["selection"]!="none":
         raise ValueError("empty parent selection differs")
+    expected_visits=(parent["scan_rounds"]*count if not starts else
+        previous_followup+1+(parent["scan_rounds"]-previous_round-1)*count)
+    if parent["visits_executed"]!=expected_visits:
+        raise ValueError("scan round visit accounting differs")
     scouts=parent["visits_executed"]-parent["segments_started"]
     expected_limit=scouts*25165824+parent["segments_started"]*122880000
     if parent["rf_sample_limit"]!=expected_limit:

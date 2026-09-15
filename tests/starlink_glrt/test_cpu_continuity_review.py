@@ -93,3 +93,38 @@ def test_review_accepts_parent_mapping_of_arbitrary_child_failure():
     text=text.replace("segment terminal 1 0","segment terminal 1 -4").replace("terminal 0\n","terminal -4\n")
     parent.update(result=-4,track_complete=0)
     assert review_continuity(text,parent,serial=SERIAL,los=LOS)["status"]=="pass"
+
+
+def test_review_accepts_attested_lo_rounding_within_controller_tolerance():
+    text,parent=evidence()
+    text="\n".join(line.replace(" 1190312500 30000000"," 1190312498 30000000")
+                   if line.startswith("visit ") else line for line in text.splitlines())+"\n"
+    assert review_continuity(text,parent,serial=SERIAL,los=LOS)["status"]=="pass"
+
+
+def test_review_accepts_empty_round_between_ranked_segments():
+    text,parent=evidence()
+    # Shift the second round's two scouts and follow-up by one complete empty
+    # four-LO round, and retain that round as visits 2..5.
+    lines=text.splitlines();prefix=[];suffix=[]
+    for line in lines:
+        if line.startswith("segment start 1 ") or line.startswith("segment terminal 1") or any(
+                line.startswith(f"visit {kind} {number} ")
+                for kind in ("before_tune","tuned","after_run") for number in (2,3)):
+            suffix.append(line)
+        else: prefix.append(line)
+    terminal=prefix.pop();snapshot=next(line for line in prefix if line.startswith("snapshot "))
+    for number,lo in zip(range(2,6),LOS,strict=True):
+        prefix.append(snapshot)
+        for kind,epoch,latest in (("before_tune",3,300+number*20),("tuned",3,301+number*20),("after_run",4,310+number*20)):
+            prefix.append(f"visit {kind} {number} 0 {lo} 30000000 {epoch} {latest} 1 1")
+    shifted=[]
+    for line in suffix:
+        line=line.replace("segment start 1 3 ","segment start 2 7 ").replace("segment terminal 1 ","segment terminal 2 ")
+        for kind in ("before_tune","tuned","after_run"):
+            line=line.replace(f"visit {kind} 2 ",f"visit {kind} 6 ")
+            line=line.replace(f"visit {kind} 3 ",f"visit {kind} 7 ")
+        shifted.append(line)
+    text="\n".join([*prefix,*shifted,terminal])+"\n"
+    parent.update(scan_rounds=3,visits_executed=8,rf_sample_limit=396754944)
+    assert review_continuity(text,parent,serial=SERIAL,los=LOS)["visits"]==8
