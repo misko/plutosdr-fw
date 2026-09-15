@@ -23,7 +23,7 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
 cp "$1" "$work/input.frm" || fail 'cannot stage firmware'
-frm_bytes=$(stat -c %s "$work/input.frm")
+frm_bytes=$(wc -c <"$work/input.frm")
 [ "$frm_bytes" -gt 33 ] || fail 'truncated FRM'
 fit_bytes=$((frm_bytes - 33))
 head -c "$fit_bytes" "$work/input.frm" > "$work/firmware.itb"
