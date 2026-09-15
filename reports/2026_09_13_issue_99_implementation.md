@@ -1,16 +1,13 @@
 # Firmware #99: implementation and verification evidence
 
-Status updated 2026-09-15: **candidate implemented; first Winbond RAM/read and
-boundary erase/program bench milestones complete; persistent candidate and
-extended-range qualification pending**. PPU's separate hardware task restored
-radio `.14` to its recovered GLRT baseline and verified normal QSPI power-on
-return. The candidate remains isolated on `codex/issue-99-flash-safety`; no
-extended-range release or issue closure is claimed.
+Status updated 2026-09-15: **conservative candidate deployed on `.14`; update,
+subsequent update, warm boot, rollback/reinstallation and live oversize refusal
+verified. Cold boot and extended-range qualification remain pending.**
 
-The current ordered plan and review of PPU through `9a4dc78` are in
-[the September 15 plan](2026_09_15_issue_99_plan.md). The original September 13
-implementation evidence below remains applicable; hardware results are attributed
-to the companion PPU task, not to the offline tests in this report.
+See [the deployment evidence](2026_09_15_issue_99_deployment.md) for the corrected
+updater and current artifact hashes, and [the current plan](2026_09_15_issue_99_plan.md)
+for remaining qualification. The original September 13 build evidence below is
+historical; the current exact artifacts are in `issue-99-candidate.json`.
 
 ## Result and scope
 
