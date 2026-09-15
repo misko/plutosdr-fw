@@ -92,6 +92,8 @@ int glrt_native_controller_init(struct glrt_native_controller *c,
     memset(c,0,sizeof(*c));
     c->ports = *p;
     c->frames = frames;
+    c->frame_stride = 1;
+    c->result_limit = frames;
     c->deadline = now+seconds;
     c->slots[0].batch = *b;
     c->next_tag = b->tag+1;
@@ -114,6 +116,8 @@ int glrt_tracking_controller_init(struct glrt_native_controller *c,
     memset(c,0,sizeof(*c));
     c->ports = *p;
     c->frames = frames;
+    c->frame_stride = 1;
+    c->result_limit = frames;
     c->deadline = now+seconds;
     c->slots[0].batch = b->prediction;
     c->next_tag = b->prediction.tag+1;
@@ -141,6 +145,32 @@ int glrt_tracking_controller_init_handoff(struct glrt_native_controller *c,
     if (glrt_tracking_controller_init(c,p,b,frames,seconds)) return -1;
     c->trend=retained;
     c->next_frame=first; c->frames=first+frames; c->handoff_pending=1;
+    return 0;
+}
+
+int glrt_tracking_controller_init_handoff_strided(struct glrt_native_controller *c,
+    const struct glrt_native_ports *p, const struct glrt_tracking_batch *b,
+    const struct glrt_tracking_trend *history, uint32_t first,
+    uint32_t measurements, uint32_t stride, double seconds)
+{
+    struct glrt_tracking_batch predicted;
+    struct glrt_tracking_trend retained;
+    char expected[256],supplied[256];
+    uint32_t span;
+    double slope;
+    if(!measurements || measurements>225000 || stride<2 || stride>750 ||
+       measurements>UINT32_MAX/stride || (span=measurements*stride)>UINT32_MAX-first ||
+       !glrt_tracking_batch_valid(b) || b->prediction.repeats!=1 ||
+       !glrt_tracking_trend_handoff_valid(history,first,span) ||
+       history->rate!=b->rate || history->history.epoch!=b->prediction.epoch ||
+       glrt_tracking_trend_batch(history,first,1,b->prediction.tag,b->prediction.seed,
+           &predicted,&slope) ||
+       glrt_tracking_batch_encode(&predicted,expected,sizeof(expected))<0 ||
+       glrt_tracking_batch_encode(b,supplied,sizeof(supplied))<0 || strcmp(expected,supplied)) return -1;
+    retained=*history;
+    if(glrt_tracking_controller_init(c,p,b,measurements,seconds)) return -1;
+    c->trend=retained;c->next_frame=first;c->frames=first+span;
+    c->frame_stride=stride;c->result_limit=measurements;c->handoff_pending=1;
     return 0;
 }
 
@@ -282,7 +312,9 @@ static int submit(struct glrt_native_controller *c, unsigned slot,
     const uint64_t lead = c->trend.rate/10000; /* 100 microseconds at every rate. */
     struct glrt_tracking_batch tracking_batch = {*b,c->trend.rate};
     double now;
-    int n = c->tracking ? glrt_tracking_batch_encode(&tracking_batch,encoded,sizeof(encoded)) :
+    int n;
+    if(c->frame_stride>1 && b->repeats!=1) return GLRT_NATIVE_PROTOCOL_ERROR;
+    n = c->tracking ? glrt_tracking_batch_encode(&tracking_batch,encoded,sizeof(encoded)) :
         glrt_native_batch_encode(b,encoded,sizeof(encoded));
     if (n < 0 || prediction(c,b,0,&start,&phase) ||
         start <= latest || start-latest < lead) return GLRT_NATIVE_DEADLINE;
@@ -308,7 +340,7 @@ static int submit(struct glrt_native_controller *c, unsigned slot,
     /* Track even an uncertain submission, so its eventual heads can be
      * retained/associated during cancellation. Never retry SUBMIT. */
     c->slots[slot] = (struct glrt_native_owned_batch){*b,first,0,1};
-    c->next_frame = first+b->repeats;
+    c->next_frame = first+(c->frame_stride>1 ? c->frame_stride : b->repeats);
     if (command(c,attribute(c,"native_schedule_submit","tracking_submit"),encoded)) return GLRT_NATIVE_IO_ERROR;
     c->configured += b->repeats;
     return 0;
@@ -403,6 +435,15 @@ int glrt_native_controller_tick(struct glrt_native_controller *c)
         if (c->stopping || !snapshot_drained(c,w) || w[7] || !(w[5]&1))
             return finish_error(c,GLRT_NATIVE_PROTOCOL_ERROR);
         if (c->handoff_pending) {
+            if(c->frame_stride>1) {
+                char cadence[128];
+                int cadence_n=snprintf(cadence,sizeof(cadence),"stride %" PRIu32 " results %" PRIu32
+                    " first %" PRIu32 " end %" PRIu32 "\n",c->frame_stride,c->result_limit,
+                    c->next_frame,c->frames);
+                if(cadence_n<0 || (size_t)cadence_n>=sizeof(cadence) ||
+                   c->ports.retain(c->ports.context,"tracking_cadence",cadence,(size_t)cadence_n))
+                    return finish_error(c,GLRT_NATIVE_RETENTION_ERROR);
+            }
             rc=retain_history(c,"tracking_handoff",&c->trend);
             if (rc) return finish_error(c,rc);
             c->handoff_pending=0;
@@ -430,21 +471,22 @@ int glrt_native_controller_tick(struct glrt_native_controller *c)
         if (rc) return finish_error(c,rc);
         return GLRT_NATIVE_RUNNING; /* Refresh snapshot after POP before SUBMIT. */
     }
-    if (snapshot_drained(c,w) && (c->stopping || c->next_frame == c->frames)) {
+    if (snapshot_drained(c,w) && (c->stopping || c->configured == c->result_limit)) {
         if (c->ports.retain(c->ports.context,"drained",raw,(size_t)n))
             return finish_error(c,GLRT_NATIVE_RETENTION_ERROR);
         c->clearing = 1;
         if (command(c,attribute(c,"native_schedule_command","tracking_command"),"4\n")) return finish_error(c,GLRT_NATIVE_IO_ERROR);
         return GLRT_NATIVE_RUNNING;
     }
-    if (!c->stopping && (w[5]&1) && c->next_frame < c->frames) {
+    if (!c->stopping && (w[5]&1) && c->configured < c->result_limit) {
         for (i=0; i<2; i++) if (!c->slots[i].occupied) {
             struct glrt_native_batch b;
             double rate;
-            uint32_t count = c->frames-c->next_frame;
+            uint32_t count = c->frame_stride>1 ? 1 : c->frames-c->next_frame;
             uint32_t authorized = last_authorized_support(c);
             int predicted;
             if (count > 16) count = 16;
+            if(count>c->result_limit-c->configured) count=c->result_limit-c->configured;
             /* Use the remaining valid native horizon even when a full batch
              * would exceed it. No job may extend past last_supported + 32. */
             if ((c->trend.history.initialized || c->authority_valid) &&

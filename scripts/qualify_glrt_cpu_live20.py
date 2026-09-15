@@ -38,7 +38,8 @@ def retention_budget_kib(blocks):
     return 256*1024 if blocks == 45000 else 16384*blocks*4//1024
 
 
-def observer_profile(blocks, spacing, candidate_budget=8, tracking_seconds=2, coarse_authority=False):
+def observer_profile(blocks, spacing, candidate_budget=8, tracking_seconds=2, coarse_authority=False,
+                     native_frame_stride=1):
     retention_budget_kib(blocks)
     if tracking_seconds not in (2,10) or (tracking_seconds==10 and
             (blocks,candidate_budget)!=(45000,80)):
@@ -47,6 +48,9 @@ def observer_profile(blocks, spacing, candidate_budget=8, tracking_seconds=2, co
             not (blocks==45000 and candidate_budget in (64,80))):
         raise ValueError('three-frame observer requires a bounded selected-IQ profile')
     observer9_scan80=(blocks,spacing,candidate_budget,tracking_seconds)==(45000,9,80,10)
+    sparse = native_frame_stride == 10
+    if native_frame_stride not in (1,10) or (sparse and not (observer9_scan80 and coarse_authority)):
+        raise ValueError('sparse native cadence requires the ten-second observer9 authority profile')
     if coarse_authority and not observer9_scan80:
         raise ValueError('coarse authority requires the ten-second long scan80 observer9 profile')
     if candidate_budget not in (8,64,80) or (candidate_budget>8 and
@@ -57,14 +61,16 @@ def observer_profile(blocks, spacing, candidate_budget=8, tracking_seconds=2, co
         observer='observer9' if observer9_scan80 else 'observer3'
         profile=f'1536-selected-observer3-{suffix}' if blocks==1536 else f'45000-selected-{observer}-{suffix}'
         profile=profile+'-track10' if tracking_seconds==10 else profile
-        return profile+'-authority' if coarse_authority else profile
+        profile = profile+'-authority' if coarse_authority else profile
+        return profile.replace('-authority','-sparse10-authority') if sparse else profile
     return '1536-selected-observer3' if spacing==3 else str(blocks)
 
 
 def capture_artifacts(blocks, observer_spacing=9, candidate_budget=8, tracking_seconds=2,
-                      coarse_authority=False):
+                      coarse_authority=False, native_frame_stride=1):
     retention_budget_kib(blocks)
-    observer_profile(blocks,observer_spacing,candidate_budget,tracking_seconds,coarse_authority)
+    observer_profile(blocks,observer_spacing,candidate_budget,tracking_seconds,coarse_authority,
+                     native_frame_stride)
     names = tuple('scan.iq.ci16' if (blocks == 45000 or observer_spacing==3) and name == 'iq.ci16' else name
                   for name in ARTIFACTS)
     # At most three clean-loss restarts. Unopened episode files are recorded
@@ -154,6 +160,8 @@ def main():
                         help='successful native horizon; 10 is long-scan80 only')
     parser.add_argument('--coarse-authority',action='store_true',
                         help='let retained 2.5-MS/s observer support future 30-MS/s jobs; long observer9 only')
+    parser.add_argument('--native-frame-stride',type=int,choices=(1,10),default=1,
+                        help='schedule every frame or one 30-MS/s pilot every 10 frames')
     parser.add_argument('--blocks', type=int, choices=(1536, 4096, 45000), default=1536,
                         help='1536/4096 retain full IQ for 10.066/26.844 s; '
                              '45000 retains searched windows for at most 294.912 s; expanded scans permit 256 attempts')
@@ -162,9 +170,9 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     selected_profile=observer_profile(args.blocks,args.observer_spacing,args.candidate_budget,
-                                      args.tracking_seconds,args.coarse_authority)
+                                      args.tracking_seconds,args.coarse_authority,args.native_frame_stride)
     artifacts = capture_artifacts(args.blocks,args.observer_spacing,args.candidate_budget,
-                                  args.tracking_seconds,args.coarse_authority)
+                                  args.tracking_seconds,args.coarse_authority,args.native_frame_stride)
     if not 70000000 <= args.lo_hz <= 6000000000:
         raise ValueError('receive LO is outside the AD9361 range')
     plan, profile = g.deployment_identity(args.deployment, serial=ENDPOINT[0], host=ENDPOINT[1])
@@ -184,9 +192,14 @@ def main():
                 'candidate_budget': args.candidate_budget,
                 'ranking_fft': 512 if args.candidate_budget==80 else 4096 if args.candidate_budget==64 else 16384,
                 'ranking_timing_radius': 2 if args.candidate_budget==80 else 0,
-                'native_tracking': {'rate_hz': 750, 'target_source_seconds_per_episode': args.tracking_seconds,
-                                    'maximum_results_per_episode': 750*args.tracking_seconds,
-                                    'controller_wall_deadline_seconds': 120 if args.tracking_seconds==10 else 3},
+                'native_tracking': {'rate_hz': 750, 'source_frame_rate_hz': 750,
+                                    'measurement_cadence_hz': 750/args.native_frame_stride,
+                                    'frame_stride': args.native_frame_stride,
+                                    'target_source_seconds_per_episode': args.tracking_seconds,
+                                    'maximum_results_per_episode': (751 if args.native_frame_stride==10 else
+                                                                    750*args.tracking_seconds),
+                                    'controller_wall_deadline_seconds': (30 if args.native_frame_stride==10 else
+                                                                         120 if args.tracking_seconds==10 else 3)},
                 'retention_mode': 'selected_windows' if args.blocks == 45000 or args.observer_spacing==3 else 'full',
                 'passive_observer': {'rate': 2500000, 'feedback_authority': args.coarse_authority,
                                      'frame_spacing': args.observer_spacing,

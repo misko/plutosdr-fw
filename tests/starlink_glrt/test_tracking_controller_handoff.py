@@ -25,6 +25,9 @@ def handoff_api(controller):
     trend.core.__wrapped__(controller)
     controller.glrt_tracking_controller_init_handoff.argtypes=[c.c_void_p,c.POINTER(Ports),
         c.POINTER(TrackingBatch),c.POINTER(trend.TrackingTrend),c.c_uint32,c.c_uint32,c.c_double]
+    controller.glrt_tracking_controller_init_handoff_strided.argtypes=[c.c_void_p,c.POINTER(Ports),
+        c.POINTER(TrackingBatch),c.POINTER(trend.TrackingTrend),c.c_uint32,c.c_uint32,
+        c.c_uint32,c.c_double]
     controller.glrt_tracking_controller_refresh_handoff.argtypes=[
         c.c_void_p,c.POINTER(trend.TrackingTrend)]
     return controller
@@ -109,6 +112,47 @@ def test_ten_second_30_msps_handoff_runs_all_7500_scheduled_results(
     assert result['estimates'][0]['frame']==600
     assert result['estimates'][-1]['frame']==8099
     assert sum(item.repeats for item in radio.descriptors)==7500
+
+
+def test_ten_second_30_msps_strided_handoff_runs_751_single_pilot_measurements(
+        handoff_api,pilot_moments):
+    rate,first,measurements,stride=30000000,600,751,10
+    radio,history,_=prepare(handoff_api,pilot_moments,rate,frames=measurements,initialize=False)
+    rc,batch,_=trend.predict(handoff_api,history,first,1)
+    assert rc==0
+    radio.seed=batch.prediction
+    radio.origin=radio.latest=batch.prediction.start-rate//200
+    assert handoff_api.glrt_tracking_controller_init_handoff_strided(
+        radio.state,c.byref(radio.ports),c.byref(batch),c.byref(history),first,
+        measurements,stride,30)==0
+    for _ in range(30000):
+        status=radio.tick()
+        if status!=1:
+            break
+        radio.advance(rate//1000)
+    assert status==0
+    result=review(journal(radio),epoch=3,rate=rate)
+    assert len(result['heads'])==result['supported']==measurements
+    assert [e['frame'] for e in result['estimates']]==[
+        first+n*stride for n in range(measurements)]
+    assert all(item.repeats==1 for item in radio.descriptors)
+    assert result['cadence']=={'stride':stride,'results':measurements,'first':first,
+                               'end':first+measurements*stride}
+    actions=[(kind,name) for kind,name,_ in radio.events]
+    assert actions.index(('retain','tracking_cadence'))<actions.index(('retain','tracking_handoff'))
+
+
+@pytest.mark.parametrize('measurements,stride',[(0,15),(501,1),(501,751),(2**32-1,15)])
+def test_invalid_strided_handoff_cannot_modify_controller(
+        handoff_api,pilot_moments,measurements,stride):
+    radio,history,_=prepare(handoff_api,pilot_moments,rate=30000000,initialize=False)
+    rc,batch,_=trend.predict(handoff_api,history,600,1)
+    assert rc==0
+    before=bytes(radio.state)
+    assert handoff_api.glrt_tracking_controller_init_handoff_strided(
+        radio.state,c.byref(radio.ports),c.byref(batch),c.byref(history),600,
+        measurements,stride,30)==-1
+    assert bytes(radio.state)==before and not radio.events
 
 
 def test_drained_coarse_authority_renews_only_future_tracking_work(

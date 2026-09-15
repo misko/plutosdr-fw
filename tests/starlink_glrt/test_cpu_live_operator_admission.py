@@ -73,6 +73,10 @@ def test_ten_second_tracking_is_opt_in_and_long_scan80_only(storage_operator):
         '45000-selected-observer9-scan80-local2-track10'
     assert storage_operator.observer_profile(45000,9,80,10,True)==\
         '45000-selected-observer9-scan80-local2-track10-authority'
+    assert storage_operator.observer_profile(45000,9,80,10,True,10)==\
+        '45000-selected-observer9-scan80-local2-track10-sparse10-authority'
+    with pytest.raises(ValueError,match='sparse native cadence'):
+        storage_operator.observer_profile(45000,9,80,10,False,10)
     with pytest.raises(ValueError,match='coarse authority'):
         storage_operator.observer_profile(45000,3,80,10,True)
     assert 'scan.iq.ci16' in storage_operator.capture_artifacts(45000,3,80,10)

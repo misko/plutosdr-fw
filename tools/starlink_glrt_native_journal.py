@@ -19,7 +19,8 @@ from .starlink_glrt_schedule_abi import (
 )
 
 KINDS = {"bootstrap_seed", "initial", "descriptor", "head", "estimate", "before_submit",
-         "stopping", "drained", "final", "snapshot", "tracking_handoff", "tracking_authority"}
+         "stopping", "drained", "final", "snapshot", "tracking_cadence", "tracking_handoff",
+         "tracking_authority"}
 
 
 @dataclass(frozen=True)
@@ -80,14 +81,27 @@ def _descriptors(entries: list[JournalRecord], *, epoch: int, codec: JournalCode
     history = None
     last_authorized = None
     pending_frame = None
+    cadence = None
     head_sequence = 0
     started = False
     for record in entries:
-        if record.kind == "tracking_handoff":
+        if record.kind == "tracking_cadence":
+            match = re.fullmatch(rb"stride ([0-9]{1,3}) results ([0-9]{1,6}) first ([0-9]{1,10}) end ([0-9]{1,10})\n",
+                                 record.payload)
+            if cadence is not None or history is not None or started or codec.handoff is None or not match:
+                raise ValueError("duplicate, late or invalid tracking cadence")
+            stride, result_limit, first, limit = map(int, match.groups())
+            if not 2 <= stride <= 750 or not 1 <= result_limit <= 225000 or \
+                    limit != first+result_limit*stride or limit > 2**32-1:
+                raise ValueError("invalid tracking cadence bounds")
+            cadence = stride, result_limit, first, limit
+        elif record.kind == "tracking_handoff":
             if history is not None or started or codec.handoff is None:
                 raise ValueError("duplicate, late or unsupported tracking handoff")
             history = codec.handoff(record.payload, epoch=epoch)
             next_frame, frame_limit = history.first, history.limit
+            if cadence is not None and cadence[2:] != (next_frame, frame_limit):
+                raise ValueError("tracking cadence differs from handoff bounds")
             last_authorized = history.last_supported
         elif record.kind == "tracking_authority":
             if history is None or codec.handoff is None:
@@ -99,7 +113,7 @@ def _descriptors(entries: list[JournalRecord], *, epoch: int, codec: JournalCode
                 raise ValueError("tracking authority does not advance causal support")
             history = refreshed
             last_authorized = refreshed.last_supported
-        elif record.kind not in {"bootstrap_seed", "snapshot"}:
+        elif record.kind not in {"bootstrap_seed", "snapshot", "tracking_cadence"}:
             started = True
         if record.kind == "head" and history is not None:
             head = codec.head(record.payload.decode("ascii"))
@@ -125,12 +139,13 @@ def _descriptors(entries: list[JournalRecord], *, epoch: int, codec: JournalCode
                 not re.fullmatch(r"[0-9]{1,10}" if history else r"[0-9]{1,6}", fields[1])):
             raise ValueError("invalid retained global frame mapping")
         first, b = int(fields[1]), codec.batch(fields[2])
-        if b.epoch != epoch or b.tag in owners or first != next_frame or first+b.repeats > frame_limit:
+        if (b.epoch != epoch or b.tag in owners or first != next_frame or
+                first+b.repeats > frame_limit or (cadence is not None and b.repeats != 1)):
             raise ValueError("retained descriptor ownership is inconsistent")
         if history is not None and first+b.repeats-1-last_authorized > 32:
             raise ValueError("descriptor exceeds retained tracking authority")
         owners[b.tag] = first, b
-        next_frame += b.repeats
+        next_frame += cadence[0] if cadence is not None else b.repeats
     if pending_frame is not None:
         raise ValueError("tracking head lacks retained estimate")
     return owners
@@ -213,6 +228,10 @@ def _review(data: bytes, *, epoch: int, codec: JournalCodec) -> dict:
     result = dict(heads=heads, estimates=estimates, descriptors=owners, drained=drained, final=final,
                   supported=sum(e["rejection"] == 0 for e in estimates))
     for entry in entries:
+        if entry.kind == "tracking_cadence":
+            fields = entry.payload.decode("ascii").split()
+            result["cadence"] = dict(stride=int(fields[1]), results=int(fields[3]),
+                                     first=int(fields[5]), end=int(fields[7]))
         if entry.kind == "tracking_handoff":
             result["handoff"] = codec.handoff(entry.payload, epoch=epoch)
     return result

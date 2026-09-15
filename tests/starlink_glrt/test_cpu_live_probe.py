@@ -53,7 +53,7 @@ void *live_new(const int16_t *refs,const int16_t *bank,const char *directory,
        pthread_mutex_init(&s->authority_mutex,NULL)) abort();
     memcpy(s->refs,refs,sizeof(s->refs));memcpy(s->bank,bank,sizeof(s->bank));
     s->native=*ports;s->epoch=3;s->rate=rate;s->attempt_limit=ATTEMPTS;s->restart_on_loss=1;
-    s->native_result_limit=NATIVE_RESULTS;s->native_seconds=NATIVE_SECONDS;t->end=1000000;
+    s->native_result_limit=NATIVE_RESULTS;s->native_seconds=NATIVE_SECONDS;s->native_stride=1;t->end=1000000;
     s->fft=fftw_plan_dft_1d(GLRT_RESOLVER_FFT,t->fft,t->fft,FFTW_FORWARD,FFTW_ESTIMATE|FFTW_UNALIGNED);
     if(!s->fft || glrt_tracking_iq_owner_init(&s->owner,t->ring,RING,s->epoch,t->end)) abort();
     snprintf(path,sizeof(path),"%s/worker.jsonl",directory);s->journal=fopen(path,"wx");
@@ -83,6 +83,7 @@ int live_set_dwell(struct test_live *t,const char *blocks,uint64_t out[4])
         t->live.restart_on_loss=limits.restart_on_loss;
         t->live.coarse_authority=limits.coarse_authority;
         t->live.native_result_limit=limits.native_results;t->live.native_seconds=limits.native_seconds;
+        t->live.native_stride=limits.native_stride;
         if(limits.rank_budget>8 && !t->live.ranking_fft) {
             t->live.ranking_fft=fftw_plan_dft_1d(limits.rank_budget==80 ? 512 : 4096,
                 t->fft,t->fft,FFTW_FORWARD,FFTW_ESTIMATE|FFTW_UNALIGNED);
@@ -322,6 +323,7 @@ def live_api(tmp_path_factory):
     (b'45000-selected-observer3-scan80-local2-track10', [45000,256,325,300000000000]),
     (b'45000-selected-observer9-scan80-local2-track10', [45000,256,325,300000000000]),
     (b'45000-selected-observer9-scan80-local2-track10-authority', [45000,256,325,300000000000]),
+    (b'45000-selected-observer9-scan80-local2-track10-sparse10-authority', [45000,256,325,300000000000]),
     (b'1536-selected', [1536,6,25,12000000000]),
     (b'1536-selected-observer3', [1536,6,25,12000000000]),
     (b'1536-selected-observer3-scan64', [1536,6,25,12000000000]),
@@ -341,6 +343,7 @@ def test_dwell_profiles_have_finite_capture_and_worker_limits(live_api, blocks, 
     (b'45000-selected-observer3-scan80-local2-track10',[7500,120]),
     (b'45000-selected-observer9-scan80-local2-track10',[7500,120]),
     (b'45000-selected-observer9-scan80-local2-track10-authority',[7500,120]),
+    (b'45000-selected-observer9-scan80-local2-track10-sparse10-authority',[751,30]),
 ])
 def test_native_result_horizon_and_wall_deadline_are_explicit_per_profile(live_api,profile,expected):
     lib,_=live_api
@@ -354,6 +357,7 @@ def test_native_result_horizon_and_wall_deadline_are_explicit_per_profile(live_a
     (b'45000-selected-observer3-scan80-local2-track10',1),
     (b'45000-selected-observer9-scan80-local2-track10',1),(b'1536',0),
     (b'45000-selected-observer9-scan80-local2-track10-authority',1),
+    (b'45000-selected-observer9-scan80-local2-track10-sparse10-authority',1),
     (b'4096',0),(b'1536-selected',0),(b'1536-selected-observer3',0),
     (b'1536-selected-observer3-scan64',0),(b'1536-selected-observer3-scan80-local2',0),(b'unknown',-1)])
 def test_only_long_profiles_restart_after_clean_native_loss(live_api,profile,expected):

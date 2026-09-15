@@ -29,8 +29,10 @@
 #define RESTART_LIMIT 3U
 #define NATIVE_RESULTS 1500U
 #define LONG_NATIVE_RESULTS 7500U
+#define SPARSE_NATIVE_RESULTS 751U
 #define NATIVE_SECONDS 3.0
 #define LONG_NATIVE_WALL_SECONDS 120.0
+#define SPARSE_NATIVE_WALL_SECONDS 30.0
 #define SCAN80_RESOLVER_POWER_FLOOR 0.03
 #define SCAN80_WEAK_FALLBACK_INTERVAL 4U
 struct paired_head { uint32_t words[32]; };
@@ -43,33 +45,36 @@ struct dwell_limits {
     uint32_t native_results;
     double native_seconds;
     int coarse_authority;
+    uint32_t native_stride;
 };
 static int dwell_limits(const char *blocks,struct dwell_limits *out)
 {
     if(!blocks || !strcmp(blocks,"1536"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),0,9,8,0,NATIVE_RESULTS,NATIVE_SECONDS,0};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),0,9,8,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1};
     else if(!strcmp(blocks,"4096"))
-        *out=(struct dwell_limits){4096,16,45,UINT64_C(30000000000),0,9,8,0,NATIVE_RESULTS,NATIVE_SECONDS,0};
+        *out=(struct dwell_limits){4096,16,45,UINT64_C(30000000000),0,9,8,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1};
     else if(!strcmp(blocks,"45000"))
-        *out=(struct dwell_limits){45000,200,325,UINT64_C(300000000000),1,9,8,1,NATIVE_RESULTS,NATIVE_SECONDS,0};
+        *out=(struct dwell_limits){45000,200,325,UINT64_C(300000000000),1,9,8,1,NATIVE_RESULTS,NATIVE_SECONDS,0,1};
     else if(!strcmp(blocks,"45000-selected-observer3-scan64"))
-        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,64,1,NATIVE_RESULTS,NATIVE_SECONDS,0};
+        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,64,1,NATIVE_RESULTS,NATIVE_SECONDS,0,1};
     else if(!strcmp(blocks,"45000-selected-observer3-scan80-local2"))
-        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,80,1,NATIVE_RESULTS,NATIVE_SECONDS,0};
+        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,80,1,NATIVE_RESULTS,NATIVE_SECONDS,0,1};
     else if(!strcmp(blocks,"45000-selected-observer3-scan80-local2-track10"))
-        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_WALL_SECONDS,0};
+        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,3,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_WALL_SECONDS,0,1};
     else if(!strcmp(blocks,"45000-selected-observer9-scan80-local2-track10"))
-        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_WALL_SECONDS,0};
+        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_WALL_SECONDS,0,1};
     else if(!strcmp(blocks,"45000-selected-observer9-scan80-local2-track10-authority"))
-        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_WALL_SECONDS,1};
+        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,LONG_NATIVE_RESULTS,LONG_NATIVE_WALL_SECONDS,1,1};
+    else if(!strcmp(blocks,"45000-selected-observer9-scan80-local2-track10-sparse10-authority"))
+        *out=(struct dwell_limits){45000,256,325,UINT64_C(300000000000),1,9,80,1,SPARSE_NATIVE_RESULTS,SPARSE_NATIVE_WALL_SECONDS,1,10};
     else if(!strcmp(blocks,"1536-selected"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,9,8,0,NATIVE_RESULTS,NATIVE_SECONDS,0};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,9,8,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1};
     else if(!strcmp(blocks,"1536-selected-observer3"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,8,0,NATIVE_RESULTS,NATIVE_SECONDS,0};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,8,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1};
     else if(!strcmp(blocks,"1536-selected-observer3-scan64"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,64,0,NATIVE_RESULTS,NATIVE_SECONDS,0};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,64,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1};
     else if(!strcmp(blocks,"1536-selected-observer3-scan80-local2"))
-        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,80,0,NATIVE_RESULTS,NATIVE_SECONDS,0};
+        *out=(struct dwell_limits){BLOCKS,ATTEMPTS,25,UINT64_C(12000000000),1,3,80,0,NATIVE_RESULTS,NATIVE_SECONDS,0,1};
     else return -1;
     return 0;
 }
@@ -106,7 +111,7 @@ struct live {
     struct paired_head paired[PAIR_LIMIT];
     uint32_t paired_queued,paired_copied,paired_episode_first;
     int selected_iq,visit_mode,restart_on_loss;
-    unsigned observer_spacing,native_result_limit;
+    unsigned observer_spacing,native_result_limit,native_stride;
     double native_seconds;
     pthread_t observer_thread;
     int observer_started,observer_stop,observer_result;
@@ -514,8 +519,9 @@ static int run_native_feedback(struct live *s)
     struct glrt_native_ports ports={s,paired_read,paired_write,paired_retain,paired_clock};
     uint32_t frame=s->worker.trace.frame;
     s->native_clean_loss=0;
-    if(glrt_tracking_trend_from_coarse(&s->worker.live.core.trend,s->rate,frame,
-        s->native_result_limit,&native)) return -1;
+    if(s->native_result_limit>UINT32_MAX/s->native_stride ||
+       glrt_tracking_trend_from_coarse(&s->worker.live.core.trend,s->rate,frame,
+        s->native_result_limit*s->native_stride,&native)) return -1;
     n=s->native.read(s->native.context,"tracking_snapshot",raw,sizeof(raw));
     if(n<=0 || (size_t)n>sizeof(raw)) return GLRT_NATIVE_IO_ERROR;
     if(s->native.retain(s->native.context,"snapshot",raw,(size_t)n)) return GLRT_NATIVE_RETENTION_ERROR;
@@ -528,12 +534,15 @@ static int run_native_feedback(struct live *s)
      * a fresh batch from the SAME supported history and its existing horizon;
      * the controller still rereads hardware after descriptor retention. */
     for(;frame<=native.history.last_supported+25;frame++) {
-        if(!glrt_tracking_trend_batch(&native,frame,8,s->attempts,0,&batch,&slope) &&
+        uint32_t repeats=s->native_stride>1 ? 1 : 8;
+        if(!glrt_tracking_trend_batch(&native,frame,repeats,s->attempts,0,&batch,&slope) &&
            !glrt_tracking_prediction(&batch,0,&job) && job.start>=earliest) break;
     }
     if(frame>native.history.last_supported+25) return GLRT_NATIVE_DEADLINE;
-    if(glrt_tracking_controller_init_handoff(&s->controller,&ports,&batch,&native,frame,
-        s->native_result_limit,s->native_seconds)) return -1;
+    if((s->native_stride>1 ? glrt_tracking_controller_init_handoff_strided(&s->controller,&ports,
+        &batch,&native,frame,s->native_result_limit,s->native_stride,s->native_seconds) :
+        glrt_tracking_controller_init_handoff(&s->controller,&ports,&batch,&native,frame,
+        s->native_result_limit,s->native_seconds))) return -1;
     s->native_runs++;
     do {
         struct timespec pause={0,100000};
@@ -778,7 +787,7 @@ static int live_probe_run(int argc,char **argv,int visit_mode)
 #define NEED(x,name) do { stage=name; if(!(x)) goto done; } while(0)
     if((argc!=6 && argc!=7) || (strcmp(argv[1],"30000000") && strcmp(argv[1],"60000000")) ||
        dwell_limits(argc==7 ? argv[6] : NULL,&limits)) {
-        fprintf(stderr,"usage: %s 30000000|60000000 SERIAL BANK REFERENCES NEW_OUTPUT_DIRECTORY [1536|4096|45000|1536-selected|1536-selected-observer3|1536-selected-observer3-scan64|45000-selected-observer3-scan64|1536-selected-observer3-scan80-local2|45000-selected-observer3-scan80-local2|45000-selected-observer3-scan80-local2-track10|45000-selected-observer9-scan80-local2-track10|45000-selected-observer9-scan80-local2-track10-authority]\n",argv[0]);return 2;
+        fprintf(stderr,"usage: %s 30000000|60000000 SERIAL BANK REFERENCES NEW_OUTPUT_DIRECTORY [reviewed-profile]\n",argv[0]);return 2;
     }
     rate=(uint32_t)strtoul(argv[1],NULL,10);
     action.sa_handler=signal_stop;sigemptyset(&action.sa_mask);
@@ -790,6 +799,7 @@ static int live_probe_run(int argc,char **argv,int visit_mode)
     s->restart_on_loss=limits.restart_on_loss;
     s->coarse_authority=limits.coarse_authority;
     s->native_result_limit=limits.native_results;s->native_seconds=limits.native_seconds;
+    s->native_stride=limits.native_stride;
     NEED(!pthread_mutex_init(&s->mutex,NULL),"mutex");mutex=1;
     NEED(!pthread_mutex_init(&s->authority_mutex,NULL),"authority_mutex");mutex=2;
     NEED(!load(argv[3],s->bank,sizeof(s->bank)) && !load(argv[4],s->refs,sizeof(s->refs)),"reference_files");

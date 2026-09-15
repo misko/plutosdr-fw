@@ -37,6 +37,7 @@ struct glrt_native_controller {
     struct glrt_native_batch bootstrap;
     int64_t bootstrap_delay_q16, bootstrap_cfo_q48;
     uint32_t frames, next_frame, next_tag, sequence, configured;
+    uint32_t frame_stride, result_limit;
     double deadline, cleanup_deadline;
     int started, stopping, cancelled, clearing, done, failure, bootstrap_active, bootstrap_offset_valid;
     int acquisition_horizon_exhausted;
@@ -70,6 +71,15 @@ int glrt_tracking_controller_init_handoff(struct glrt_native_controller *,
     const struct glrt_native_ports *, const struct glrt_tracking_batch *,
     const struct glrt_tracking_trend *, uint32_t first_frame,
     uint32_t frames, double seconds);
+/* Schedule one 30/60-MS/s pilot at each stride-th 750-Hz frame. This changes
+ * only controller-owned frame selection: every GLT1 descriptor/result keeps
+ * the published rate-bound ABI and uses repeats=1. The retained cadence record
+ * makes skipped frame ordinals explicit. Existing dense initializers remain
+ * stride one. */
+int glrt_tracking_controller_init_handoff_strided(struct glrt_native_controller *,
+    const struct glrt_native_ports *, const struct glrt_tracking_batch *,
+    const struct glrt_tracking_trend *, uint32_t first_frame,
+    uint32_t measurements, uint32_t frame_stride, double seconds);
 /* Supply a separate predictor for work beyond the current descriptor frontier.
  * The caller supplies causal history in the same rate and epoch, beginning at
  * exactly the next unowned frame. The refresh is persisted before it can affect
