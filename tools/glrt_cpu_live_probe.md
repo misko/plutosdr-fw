@@ -30,9 +30,10 @@ its source span from three to twelve seconds and its wall bound to fifteen
 seconds. At nine-frame spacing, 834 measurements cover ten seconds. Each
 descriptor remains within its journaled forecast horizon of retained native or coarse support.
 The established ten-second profile retains the 32-frame bound; the distinct
-30- and 100-second stride-ten profiles use a 64-frame coast so that three
-consecutive rejected nine-frame observer measurements do not strand the next
-descriptor. If neither source renews the selected horizon, the controller drains and reports clean
+30- and 100-second stride-ten profiles use a 96-frame coast, equal to the
+retained trend's fit window, so the measured four-rejection burst plus the
+committed descriptor frontier does not strand the next descriptor. If neither
+source renews the selected horizon, the controller drains and reports clean
 acquisition loss. The journal reviewer reconstructs the causal authority
 horizon from the cadence record, initial history, accepted native estimates and authority records;
 removing or altering an authority record invalidates later descriptors.

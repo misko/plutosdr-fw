@@ -448,9 +448,9 @@ stride-ten sampling leaves fewer than eight supported native points in its
 96-frame fit window, the retained denser coarse predictor can therefore cover
 the next unowned frame instead of ending the episode at that cadence alias.
 The established profiles keep the 32-frame descriptor horizon. The new
-30- and 100-second stride-ten profiles alone select a 64-frame horizon, enough
-to cross three rejected nine-frame observer measurements while remaining
-finite. Their cadence record includes that value, and the independent journal
+30- and 100-second stride-ten profiles alone select a 96-frame horizon, equal
+to the retained trend's fit window and enough to cross the measured four
+rejected nine-frame observer measurements while remaining finite. Their cadence record includes that value, and the independent journal
 reviewer applies it with the same per-source monotonic rule over the newest
 support from either source.
 

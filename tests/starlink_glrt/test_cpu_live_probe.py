@@ -393,8 +393,8 @@ def test_dwell_profiles_have_finite_capture_and_worker_limits(live_api, blocks, 
     (b'45000-selected-observer9-scan80-local2-track10-sparse10-authority', 32),
     (b'45000-selected-observer9-scan80-local2-track30-sparse9-authority', 32),
     (b'45000-selected-observer9-scan80-local2-track100-sparse9-authority', 32),
-    (b'45000-selected-observer9-scan80-local2-track30-sparse10-authority', 64),
-    (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority', 64),
+    (b'45000-selected-observer9-scan80-local2-track30-sparse10-authority', 96),
+    (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority', 96),
 ])
 def test_forecast_coast_is_scoped_to_stable_stride10_profiles(live_api, profile, expected):
     lib, _ = live_api

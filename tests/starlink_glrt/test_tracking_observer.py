@@ -75,7 +75,7 @@ int main(int argc,char **argv)
     int16_t refs[52800],scratch[6600];
     uint64_t anchor=!strcmp(mode,"large") ? UINT64_C(0x1000000000000000)+1000 : 1000000;
     uint64_t first=anchor+240000;
-    size_t count=273300,capacity=!strcmp(mode,"overwrite") ? 3300 : 300000;
+    size_t count=400000,capacity=!strcmp(mode,"overwrite") ? 3300 : 500000;
     int16_t *storage=calloc(2*capacity,sizeof(*storage)),*iq=calloc(2*count,sizeof(*iq));
     FILE *f=fopen(argv[2],"rb");assert(f && storage && iq);
     assert(fread(refs,sizeof(refs),1,f)==1 && fgetc(f)==EOF);assert(!fclose(f));
@@ -114,9 +114,9 @@ int main(int argc,char **argv)
         free(iq);free(storage);puts("PASS");return 0;
     }
     if(!strcmp(mode,"coast_noise")) {
-        maximum=30;
+        maximum=40;
         assert(!glrt_tracking_observer_init_cadence_horizon(&observer,&original,frame,
-            cadence,maximum,limit,now,budget,64));
+            cadence,maximum,limit,now,budget,96));
     } else
         assert(!glrt_tracking_observer_init(&observer,&original,frame,maximum,limit,now,budget));
     assert(!memcmp(&original,&saved,sizeof(saved)));
@@ -175,7 +175,7 @@ int main(int argc,char **argv)
                     assert(observer.trend.history.last_supported==63);
                     jobs++;
                 }
-                unsigned expected=!strcmp(mode,"coast_noise") ? (cadence==9 ? 7 : 19) :
+                unsigned expected=!strcmp(mode,"coast_noise") ? (cadence==9 ? 10 : 30) :
                     (cadence==9 ? 3 : 8);
                 assert(rc==GLRT_OBSERVER_HISTORY && jobs==expected && c.retained==expected);
             } else {

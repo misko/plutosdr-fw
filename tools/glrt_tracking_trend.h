@@ -12,7 +12,7 @@ struct glrt_tracking_trend {
     uint32_t rate;
 };
 #define GLRT_TRACKING_FORECAST_DEFAULT 32U
-#define GLRT_TRACKING_FORECAST_COAST 64U
+#define GLRT_TRACKING_FORECAST_COAST 96U
 int glrt_tracking_trend_reset(struct glrt_tracking_trend *, uint32_t epoch, uint32_t rate);
 /* delay_correction_s is relative to the selected reference. Its fractional
  * delay is added exactly once; observed start remains the integer IQ index.

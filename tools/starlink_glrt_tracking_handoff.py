@@ -23,7 +23,7 @@ class TrackingHandoff:
     observations: tuple[tuple[int, float, float], ...]
 
 
-def decode(data: bytes, *, epoch: int, rate: int) -> TrackingHandoff:
+def decode(data: bytes, *, epoch: int, rate: int, forecast_horizon: int = 32) -> TrackingHandoff:
     """Check storage/order/forecast bounds, not the truth of imported estimates.
 
     Binary64 values use fixed hexadecimal bit strings in physical ring order,
@@ -31,6 +31,8 @@ def decode(data: bytes, *, epoch: int, rate: int) -> TrackingHandoff:
     retained provenance; this record says exactly which state was transferred.
     """
     bank_id(rate)
+    if forecast_horizon not in (32, 64, 96):
+        raise ValueError("invalid tracking handoff forecast horizon")
     if len(data)>4096 or not data.endswith(b"\n"):
         raise ValueError("invalid tracking handoff extent")
     lines=data.decode("ascii").splitlines()
@@ -43,7 +45,7 @@ def decode(data: bytes, *, epoch: int, rate: int) -> TrackingHandoff:
     if ((r,e)!=(rate,epoch) or not epoch or not 8<=count<=96 or next_slot>=96 or
             (count<96 and next_slot!=count) or len(lines)!=count+1 or
             not hfirst<=supported<=seen<first<limit or limit-first>225000 or
-            limit-1-hfirst>1350000 or first-supported>32):
+            limit-1-hfirst>1350000 or first-supported>forecast_horizon):
         raise ValueError("tracking handoff profile, storage or horizon invalid")
     observations=[]
     for line in lines[1:]:

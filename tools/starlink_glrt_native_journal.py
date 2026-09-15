@@ -95,13 +95,13 @@ def _descriptors(entries: list[JournalRecord], *, epoch: int, codec: JournalCode
             horizon = int(match.group(5) or 32)
             if not 2 <= stride <= 750 or not 1 <= result_limit <= 225000 or \
                     limit != first+result_limit*stride or limit > 2**32-1 or \
-                    horizon not in (32,64):
+                    horizon not in (32,64,96):
                 raise ValueError("invalid tracking cadence bounds")
             cadence = stride, result_limit, first, limit, horizon
         elif record.kind == "tracking_handoff":
             if history is not None or started or codec.handoff is None:
                 raise ValueError("duplicate, late or unsupported tracking handoff")
-            history = codec.handoff(record.payload, epoch=epoch)
+            history = codec.handoff(record.payload, epoch, cadence[4] if cadence is not None else 32)
             next_frame, frame_limit = history.first, history.limit
             if cadence is not None and cadence[2:4] != (next_frame, frame_limit):
                 raise ValueError("tracking cadence differs from handoff bounds")
@@ -110,7 +110,7 @@ def _descriptors(entries: list[JournalRecord], *, epoch: int, codec: JournalCode
         elif record.kind == "tracking_authority":
             if history is None or codec.handoff is None:
                 raise ValueError("tracking authority lacks an initial handoff")
-            refreshed = codec.handoff(record.payload, epoch=epoch)
+            refreshed = codec.handoff(record.payload, epoch, cadence[4] if cadence is not None else 32)
             if refreshed.first != next_frame or refreshed.limit != frame_limit:
                 raise ValueError("tracking authority crosses owned frame bounds")
             if refreshed.last_supported <= last_coarse_authorized:
@@ -243,7 +243,8 @@ def _review(data: bytes, *, epoch: int, codec: JournalCodec) -> dict:
             if len(fields)==10:
                 result["cadence"]["horizon"] = int(fields[9])
         if entry.kind == "tracking_handoff":
-            result["handoff"] = codec.handoff(entry.payload, epoch=epoch)
+            result["handoff"] = codec.handoff(
+                entry.payload, epoch, result.get("cadence", {}).get("horizon", 32))
     return result
 
 

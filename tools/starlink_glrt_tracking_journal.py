@@ -48,7 +48,8 @@ def _codec(rate: int) -> JournalCodec:
         return result
 
     return JournalCodec(lambda text: batch(text, rate=rate), snapshot, head, "tracking_",
-                        lambda raw, epoch: decode_handoff(raw, epoch=epoch, rate=rate))
+                        lambda raw, epoch, horizon: decode_handoff(
+                            raw, epoch=epoch, rate=rate, forecast_horizon=horizon))
 
 
 def descriptors(entries, *, epoch: int, rate: int) -> dict[int, tuple[int, TrackingBatch]]:

@@ -64,13 +64,13 @@ def test_explicit_coast_extends_only_the_bounded_prediction_window(core):
     assert t.history.last_supported == 63
     batch, rate = TrackingBatch(), c.c_double()
     assert predict(core, t, 96, 1)[0] == -1
-    assert core.glrt_tracking_trend_batch_horizon(c.byref(t), 96, 1, 99, 17, 64,
+    assert core.glrt_tracking_trend_batch_horizon(c.byref(t), 96, 1, 99, 17, 96,
         c.byref(batch), c.byref(rate)) == 0
-    assert core.glrt_tracking_trend_batch_horizon(c.byref(t), 127, 1, 99, 17, 64,
+    assert core.glrt_tracking_trend_batch_horizon(c.byref(t), 159, 1, 99, 17, 96,
         c.byref(batch), c.byref(rate)) == 0
-    assert core.glrt_tracking_trend_batch_horizon(c.byref(t), 128, 1, 99, 17, 64,
+    assert core.glrt_tracking_trend_batch_horizon(c.byref(t), 160, 1, 99, 17, 96,
         c.byref(batch), c.byref(rate)) == -1
-    for invalid in (0, 31, 33, 65):
+    for invalid in (0, 31, 33, 64, 65, 97):
         assert core.glrt_tracking_trend_batch_horizon(c.byref(t), 64, 1, 99, 17, invalid,
             c.byref(batch), c.byref(rate)) == -1
 

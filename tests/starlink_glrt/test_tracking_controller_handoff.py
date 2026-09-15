@@ -300,18 +300,18 @@ def test_profile_scoped_coast_runs_to_64_frames_and_is_journal_attested(
     radio.seed=batch.prediction
     radio.origin=radio.latest=batch.prediction.start-rate//200
     assert handoff_api.glrt_tracking_controller_init_handoff_strided_horizon(
-        radio.state,c.byref(radio.ports),c.byref(batch),c.byref(history),first,20,10,5,64)==0
+        radio.state,c.byref(radio.ports),c.byref(batch),c.byref(history),first,20,10,5,96)==0
     radio.reject=True
     assert radio.run()==-4
     data=journal(radio)
     result=review(data,epoch=3,rate=rate)
     assert not result['supported']
     assert result['estimates'][-1]['frame'] > history.history.last_supported+32
-    assert result['estimates'][-1]['frame'] <= history.history.last_supported+64
+    assert result['estimates'][-1]['frame'] <= history.history.last_supported+96
     assert result['cadence']=={'stride':10,'results':20,'first':first,
-                               'end':first+200,'horizon':64}
+                               'end':first+200,'horizon':96}
     with pytest.raises(ValueError,match='authority'):
-        review(data.replace(b' horizon 64\n',b' horizon 32\n',1),epoch=3,rate=rate)
+        review(data.replace(b' horizon 96\n',b' horizon 32\n',1),epoch=3,rate=rate)
 
 
 @pytest.mark.parametrize("rate", [2500000,5000000,15000000])
