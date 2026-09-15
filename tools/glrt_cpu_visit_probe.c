@@ -11,8 +11,8 @@
 
 #define SCOUT_PROFILE "1536-selected-observer3-scan64-scout16"
 #define SPARSE_PROFILE "45000-selected-observer9-scan80-local2-track10-sparse10-authority"
-#define SPARSE30_PROFILE "45000-selected-observer9-scan80-local2-track30-sparse9-authority"
-#define SPARSE100_PROFILE "45000-selected-observer9-scan80-local2-track100-sparse9-authority"
+#define SPARSE30_PROFILE "45000-selected-observer9-scan80-local2-track30-sparse10-authority"
+#define SPARSE100_PROFILE "45000-selected-observer9-scan80-local2-track100-sparse10-authority"
 #define FOLLOWUP_PLAN "sparse10-after-scout16"
 #define FOLLOWUP30_PLAN "sparse30-after-scout16"
 #define FOLLOWUP100_PLAN "sparse100-after-scout16"
@@ -178,7 +178,7 @@ static int visit_status(const char *path,uint32_t rate,const char *profile)
     if(!strcmp(profile,SPARSE_PROFILE) || !strcmp(profile,SPARSE30_PROFILE) ||
        !strcmp(profile,SPARSE100_PROFILE)) {
         uint32_t required=!strcmp(profile,SPARSE_PROFILE) ? SPARSE_NATIVE_RESULTS :
-            !strcmp(profile,SPARSE30_PROFILE) ? SPARSE30_NATIVE_RESULTS : SPARSE100_NATIVE_RESULTS;
+            !strcmp(profile,SPARSE30_PROFILE) ? STABLE30_NATIVE_RESULTS : STABLE100_NATIVE_RESULTS;
         if(blocks>45000 || attempts>256 || completed>1) return -1;
         if(handoffs>=1 && completed==1 && results>=required) return GLRT_VISIT_DONE;
         return !handoffs && !completed && !results ? GLRT_VISIT_NO_TRACK : -1;

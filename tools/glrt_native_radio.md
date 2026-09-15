@@ -411,20 +411,27 @@ after proving 16 native measurements. The first retained child status that
 proves a handoff and completed 16-result run selects its LO; a qualified clean
 loss also proves that the scout had acquired a signal. Empty scouts continue
 to the next LO, while partial or inconsistent child summaries stop the plan.
-If scan64 retains no native handoff but any of its six attempts has normalized
-single-pilot power of at least 0.04, that retained activity also selects the LO.
+If scan64 retains no native handoff but an attempt has normalized single-pilot
+power of at least 0.015 and at least six times the mean of the other candidate
+scores, that retained activity selects the LO and ends the scout immediately.
 This permissive trigger does not claim signal or tracking: the subsequent
 scan80/local-2 acquisition and unchanged native gates make that decision. The
-threshold covers four of five historical scan64 handoffs when applied to the
-six attempts ending at each handoff; zero of 1,080 attempts in the first
-radio-local campaign reached native handoff directly.
+two-factor gate separates retained weak events from the measured noise-only
+floor while avoiding unused scout attempts after an event.
 
-The parent then retunes to the selected LO and runs exactly one
-`45000-selected-observer9-scan80-local2-track10-sparse10-authority` child. A
+The parent then retunes to the selected LO and runs exactly one explicit sparse
+follow-up child. The ten-second plan uses
+`45000-selected-observer9-scan80-local2-track10-sparse10-authority`. The
+30- and 100-second plans use distinct `track30-sparse10-authority` and
+`track100-sparse10-authority` profiles. They preserve the observer's nine-frame
+cadence and schedule 2,251 or 7,501 FPGA measurements ten frames apart. The
+one-frame cadence difference lets causal observer authority close a fixed
+descriptor-queue lag; the earlier stride-nine profiles remain available for
+replay of their persisted evidence. A
 zero process result is accepted only when the retained status proves one
-completed native run with at least 751 scheduled measurements. This represents
-ten seconds of 30-MS/s source time at stride ten and the established sustainable
-75-measurement/s cadence. The long child uses the profile's existing bounded
+completed native run with at least 751, 2,251, or 7,501 scheduled measurements.
+These represent ten, thirty, or one hundred seconds of 30-MS/s source time at
+stride ten and the established sustainable 75-measurement/s cadence. The long child uses the profile's existing bounded
 clean-loss reacquisition path (at most three restarts); the short frequency
 scouts remain single-visit children. No-signal, exhausted clean-loss,
 retention, deadline and child failures remain separate terminal results.

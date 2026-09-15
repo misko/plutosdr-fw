@@ -201,8 +201,8 @@ def test_four_selected_children_have_separate_evidence_and_are_all_reaped(probe,
 
 
 @pytest.mark.parametrize('profile',[SPARSE_PROFILE := b'45000-selected-observer9-scan80-local2-track10-sparse10-authority',
-    b'45000-selected-observer9-scan80-local2-track30-sparse9-authority',
-    b'45000-selected-observer9-scan80-local2-track100-sparse9-authority'])
+    b'45000-selected-observer9-scan80-local2-track30-sparse10-authority',
+    b'45000-selected-observer9-scan80-local2-track100-sparse10-authority'])
 def test_sparse_followup_uses_reacquiring_probe(probe,tmp_path,profile):
     assert probe.exercise_followup_child(os.fsencode(tmp_path),profile)==0
     status=json.loads((tmp_path/'visit-4/stdout.json').read_text())
