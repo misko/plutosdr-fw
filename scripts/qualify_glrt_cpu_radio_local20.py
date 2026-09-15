@@ -19,12 +19,13 @@ import qualify_glrt_cpu_live20 as live
 RATE = 30_000_000
 SERIAL = "1040005e0b100007100010000bf33a5d4d"
 PROFILE = "sparse10-after-scout16"
+PROFILES = (PROFILE, "sparse30-after-scout16", "sparse100-after-scout16")
 UPPER_EDGE_LOS = (1_190_312_500, 1_440_312_500, 1_690_312_500, 1_940_312_500)
 SCOUT_SAMPLES = 1536 * 16384
 FOLLOWUP_SAMPLES = 45000 * 16384
 MAX_ARCHIVE_BYTES = 320 * 1024 * 1024
 EXPECTED = {
-    "probe": "f7700d64c5adc7733995a166201e48b37b2e70944b48cc87aa0e22f179c14e10",
+    "probe": "7e6d593d01c8a389c51a87763f986b471122ec157c9faa363d9d0982153422c7",
     "bank": "d9f3452e45180c560a200bb76c9bfe2d7c46b17560fd46495ea74c50f50547f0",
     "references": "78b50e1aea5c350889b0798fc691491299925932e496a918cd5fbd3b9bc4faf2",
 }
@@ -143,11 +144,11 @@ def manifest(root):
     return data
 
 
-def dry_run_plan(los, hashes, output, raid_output):
+def dry_run_plan(los, hashes, output, raid_output, profile=PROFILE):
     return {"scope":"bounded_radio_local_activity_sparse_followup_dry_run", "rf_collection":False,
-        "serial":SERIAL, "rate":RATE, "profile":PROFILE, "los":list(los),
+        "serial":SERIAL, "rate":RATE, "profile":profile, "los":list(los),
         "maximum_source_seconds":maximum_source_seconds(len(los)), "payload_sha256":hashes,
-        "output":str(output), "raid_output":str(raid_output), "next_action":"repeat without --dry-run after explicit RF authorization"}
+        "output":str(output), "raid_output":str(raid_output), "next_action":"repeat without --dry-run"}
 
 
 def main():
@@ -157,6 +158,7 @@ def main():
     parser.add_argument("--lo-hz", required=True, nargs="+", type=int)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--raid-output", required=True, type=Path)
+    parser.add_argument("--profile", choices=PROFILES, default=PROFILE)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args();los = validate_los(args.lo_hz)
     args.output, args.raid_output = validate_outputs(args.output, args.raid_output)
@@ -169,10 +171,10 @@ def main():
     if hashes != EXPECTED:
         raise ValueError("payload identity differs")
     if args.dry_run:
-        print(json.dumps(dry_run_plan(los, hashes, args.output, args.raid_output), indent=2));return
+        print(json.dumps(dry_run_plan(los, hashes, args.output, args.raid_output, args.profile), indent=2));return
     args.output.mkdir(parents=True)
     receipt = {"scope": "bounded_radio_local_activity_sparse_followup", "serial": SERIAL, "rate": RATE,
-               "los": los, "profile": PROFILE, "maximum_source_seconds": maximum_source_seconds(len(los)),
+               "los": los, "profile": args.profile, "maximum_source_seconds": maximum_source_seconds(len(los)),
                "payload_sha256": hashes, "status": "started", "started_ns": time.time_ns()}
     def save(): (args.output / "operator.json").write_text(json.dumps(receipt, indent=2) + "\n")
     save();remote = None;staged = mounted = False
@@ -212,7 +214,7 @@ def main():
             run("chmod 700 " + shlex.quote(remote + "/probe")).check_returncode()
             run("mkdir " + shlex.quote(remote + "/evidence")).check_returncode()
             command = [remote + "/probe", str(RATE), SERIAL, remote + "/bank", remote + "/references",
-                       remote + "/evidence", *map(str, los), PROFILE]
+                       remote + "/evidence", *map(str, los), args.profile]
             result = run(shlex.join(command), timeout=430)
             (args.output / "stdout.json").write_bytes(result.stdout);(args.output / "stderr.txt").write_bytes(result.stderr)
             archive = run("tar -C " + shlex.quote(remote) + " -cf - evidence", timeout=90);archive.check_returncode()

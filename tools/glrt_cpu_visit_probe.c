@@ -11,7 +11,11 @@
 
 #define SCOUT_PROFILE "1536-selected-observer3-scan64-scout16"
 #define SPARSE_PROFILE "45000-selected-observer9-scan80-local2-track10-sparse10-authority"
+#define SPARSE30_PROFILE "45000-selected-observer9-scan80-local2-track30-sparse10-authority"
+#define SPARSE100_PROFILE "45000-selected-observer9-scan80-local2-track100-sparse10-authority"
 #define FOLLOWUP_PLAN "sparse10-after-scout16"
+#define FOLLOWUP30_PLAN "sparse30-after-scout16"
+#define FOLLOWUP100_PLAN "sparse100-after-scout16"
 #define SCOUT_ACTIVITY_POWER 0.04
 #define SCOUT_ACTIVITY_HITS 1U
 
@@ -21,6 +25,8 @@ struct visit_context {
     uint32_t rate;
     unsigned visit_count;
     const char *profile;
+    const char *followup_profile;
+    const char *followup_plan;
     int followup_sparse;
     int activity_selected;
     int (*probe_main)(int,char **);
@@ -40,8 +46,13 @@ static int visit_arguments(int argc,char **argv,struct visit_context *v,uint64_t
     v->profile=NULL;
     if(!strcmp(argv[argc-1],"1536-selected-observer3-scan64")) {
         v->profile=argv[argc-1];count--;
-    } else if(!strcmp(argv[argc-1],FOLLOWUP_PLAN)) {
-        v->profile=SCOUT_PROFILE;v->followup_sparse=1;count--;
+    } else if(!strcmp(argv[argc-1],FOLLOWUP_PLAN) ||
+              !strcmp(argv[argc-1],FOLLOWUP30_PLAN) ||
+              !strcmp(argv[argc-1],FOLLOWUP100_PLAN)) {
+        v->profile=SCOUT_PROFILE;v->followup_sparse=1;v->followup_plan=argv[argc-1];
+        v->followup_profile=!strcmp(v->followup_plan,FOLLOWUP_PLAN) ? SPARSE_PROFILE :
+            !strcmp(v->followup_plan,FOLLOWUP30_PLAN) ? SPARSE30_PROFILE : SPARSE100_PROFILE;
+        count--;
     }
     if(count<2 || count>4) return -1;
     for(int n=0;n<count;n++) {
@@ -165,9 +176,12 @@ static int visit_status(const char *path,uint32_t rate,const char *profile)
         if(handoffs>=1 && completed==1 && results>=SCOUT_NATIVE_RESULTS) return GLRT_VISIT_SIGNAL;
         return !handoffs && !completed && !results ? GLRT_VISIT_DONE : -1;
     }
-    if(!strcmp(profile,SPARSE_PROFILE)) {
+    if(!strcmp(profile,SPARSE_PROFILE) || !strcmp(profile,SPARSE30_PROFILE) ||
+       !strcmp(profile,SPARSE100_PROFILE)) {
+        uint32_t required=!strcmp(profile,SPARSE_PROFILE) ? SPARSE_NATIVE_RESULTS :
+            !strcmp(profile,SPARSE30_PROFILE) ? SPARSE30_NATIVE_RESULTS : SPARSE100_NATIVE_RESULTS;
         if(blocks>45000 || attempts>256 || completed>1) return -1;
-        if(handoffs>=1 && completed==1 && results>=SPARSE_NATIVE_RESULTS) return GLRT_VISIT_DONE;
+        if(handoffs>=1 && completed==1 && results>=required) return GLRT_VISIT_DONE;
         return !handoffs && !completed && !results ? GLRT_VISIT_NO_TRACK : -1;
     }
     return -1;
@@ -223,7 +237,8 @@ static int visit_child(void *pointer,unsigned number,uint64_t deadline)
         int rc;
         if(dup2(stdout_fd,STDOUT_FILENO)<0 || dup2(stderr_fd,STDERR_FILENO)<0) _exit(2);
         close(stdout_fd);close(stderr_fd);
-        rc=(v->followup_probe_main && !strcmp(visit_profile(v),SPARSE_PROFILE) ?
+        rc=(v->followup_probe_main && (!strcmp(visit_profile(v),SPARSE_PROFILE) ||
+            !strcmp(visit_profile(v),SPARSE30_PROFILE) || !strcmp(visit_profile(v),SPARSE100_PROFILE)) ?
             v->followup_probe_main : v->probe_main)(visit_profile(v) ? 7 : 6,args);
         if(fflush(stdout) || fflush(stderr)) rc=2;
         _exit(rc);
@@ -276,13 +291,13 @@ int main(int argc,char **argv)
     for(unsigned n=0;n<context.visit_count;n++)
         if(fprintf(context.journal," %" PRIu64,lo[n])<0) rc=GLRT_VISIT_RETENTION;
     if(fprintf(context.journal," %s %u %" PRIu64 "\n",
-       context.followup_sparse ? FOLLOWUP_PLAN : visit_profile(&context) ? visit_profile(&context) : "1536",
+       context.followup_sparse ? context.followup_plan : visit_profile(&context) ? visit_profile(&context) : "1536",
        context.visit_count,context.followup_sparse ? UINT64_C(400000000000) : UINT64_C(60000000000))<0 ||
        fflush(context.journal)) rc=GLRT_VISIT_RETENTION;
     if(!rc && context.followup_sparse) {
         rc=glrt_tracking_visit_until_signal(&ports,context.rate,lo,context.visit_count,&selected);
         if(rc==GLRT_VISIT_SIGNAL) {
-            followup_started=1;context.profile=SPARSE_PROFILE;
+            followup_started=1;context.profile=context.followup_profile;
             rc=glrt_tracking_visit_followup_run(&ports,context.rate,lo[selected],context.visit_count);
         }
     } else if(!rc) rc=glrt_tracking_visit_plan_run(&ports,context.rate,lo,context.visit_count);

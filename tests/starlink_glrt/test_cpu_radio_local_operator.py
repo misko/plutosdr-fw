@@ -69,7 +69,14 @@ def test_dry_run_is_explicitly_non_rf_and_contains_reviewable_next_action(operat
     plan=operator.dry_run_plan(los,operator.EXPECTED,Path('/srv/postgres-nvme/x'),Path('/srv/bulk/leo/x'))
     assert plan['rf_collection'] is False and plan['serial']==operator.SERIAL
     assert plan['maximum_source_seconds']==pytest.approx(335.1773184)
-    assert plan['next_action'].endswith('explicit RF authorization')
+    assert plan['next_action']=='repeat without --dry-run'
+
+
+@pytest.mark.parametrize('profile',["sparse10-after-scout16","sparse30-after-scout16","sparse100-after-scout16"])
+def test_dry_run_retains_the_selected_tracking_horizon(operator,profile):
+    plan=operator.dry_run_plan((1440312500,1940312500),operator.EXPECTED,
+        Path('/srv/postgres-nvme/x'),Path('/srv/bulk/leo/x'),profile)
+    assert profile in operator.PROFILES and plan['profile']==profile
 
 
 def test_parent_distinguishes_negative_activity_loss_and_completed_track(operator):

@@ -88,13 +88,13 @@ int main(int argc,char **argv)
     if(!strcmp(mode,"init_history")) original.history.count=7;
     if(!strcmp(mode,"init_frame")) frame=63;
     if(!strcmp(mode,"init_far_frame")) frame=100;
-    if(!strcmp(mode,"init_count")) maximum=1025;
+    if(!strcmp(mode,"init_count")) maximum=GLRT_TRACKING_OBSERVER_MAXIMUM+1;
     if(!strcmp(mode,"init_zero_count")) maximum=0;
-    if(!strcmp(mode,"init_budget")) budget=UINT64_C(15000000001);
+    if(!strcmp(mode,"init_budget")) budget=GLRT_TRACKING_OBSERVER_MAX_BUDGET_NS+1;
     if(!strcmp(mode,"init_zero_budget")) budget=0;
     if(!strcmp(mode,"init_overflow")) now=UINT64_MAX-10;
     if(!strcmp(mode,"init_source")) limit=first+3299;
-    if(!strcmp(mode,"init_long_source")) limit=first+30000001;
+    if(!strcmp(mode,"init_long_source")) limit=first+GLRT_TRACKING_OBSERVER_MAX_SOURCE_SPAN+1;
     if(!strncmp(mode,"init_",5)) {
         if(!strncmp(mode,"init_spacing",12)) {
             assert(glrt_tracking_observer_init_cadence(&observer,&original,frame,

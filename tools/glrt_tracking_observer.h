@@ -4,6 +4,10 @@
 #include "glrt_tracking_iq_owner.h"
 #include "glrt_tracking_trend.h"
 
+#define GLRT_TRACKING_OBSERVER_MAXIMUM 8600U
+#define GLRT_TRACKING_OBSERVER_MAX_SOURCE_SPAN UINT64_C(260000000)
+#define GLRT_TRACKING_OBSERVER_MAX_BUDGET_NS UINT64_C(120000000000)
+
 enum glrt_observer_result {
     GLRT_OBSERVER_DONE=0, GLRT_OBSERVER_WAIT=1, GLRT_OBSERVER_MEASURED=2,
     GLRT_OBSERVER_INVALID=-1, GLRT_OBSERVER_SOURCE=-2,
@@ -39,9 +43,9 @@ struct glrt_tracking_observer_ports {
  * measure every nine frames starting at first_frame. Keep its own history;
  * this module has no native-controller, radio-configuration or SUBMIT port.
  * The caller attests reference identity and retains the imported history.
- * At most 1024 measurements, fifteen seconds of wall time and twelve seconds
- * of source look-ahead from the first predicted pilot are allowed. Callers use
- * smaller profile-owned bounds unless continuous coarse authority is enabled. The existing
+ * The hard ceiling permits 8,600 measurements, 120 seconds of wall time and
+ * 104 seconds of source look-ahead. Callers use smaller profile-owned bounds.
+ * The existing
  * eight-support, 96-frame fit and last-supported-plus-32 limits are unchanged.
  * DONE and failures are terminal until init. Init performs no I/O.
  */
