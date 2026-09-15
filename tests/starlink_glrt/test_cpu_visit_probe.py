@@ -41,7 +41,8 @@ static int simulated_child(int argc,char **argv) {
     } else if(!strcmp(argv[1],"selected")) {
         if(argc!=7 || strcmp(argv[6],"1536-selected")) return 9;
     } else if(!strncmp(argv[1],"scout_",6)) {
-        if(argc!=7 || strcmp(argv[6],SCOUT_PROFILE)) return 9;
+        const char *expected=strstr(argv[1],"quick") ? QUICK_SCOUT_PROFILE : SCOUT_PROFILE;
+        if(argc!=7 || strcmp(argv[6],expected)) return 9;
     } else if(!strncmp(argv[1],"sparse_",7)) {
         if(argc!=7 || strcmp(argv[6],SPARSE_PROFILE)) return 9;
     } else if(argc!=6) return 9;
@@ -56,7 +57,7 @@ static int simulated_child(int argc,char **argv) {
             scout ? 1536U : 45000U,handoffs,results,complete);
         if(scout) {
             char path[4096];snprintf(path,sizeof(path),"%s/worker.jsonl",argv[5]);FILE *f=fopen(path,"wx");
-            unsigned strong=!strcmp(argv[1],"scout_activity") ? 2U : !strcmp(argv[1],"scout_weak") ? 1U : 0U;
+            unsigned strong=strstr(argv[1],"activity") ? 2U : !strcmp(argv[1],"scout_weak") ? 1U : 0U;
             if(!f) return 8;
             for(unsigned n=1;n<=6;n++)
                 fprintf(f,"{\"kind\":\"candidate_order\",\"attempt\":%u,\"single_pilot_power\":[%.3f,0.003,0.003]}\n",
@@ -130,6 +131,16 @@ int exercise_finite_segment(const char *directory) {
         .followup_probe_main=simulated_followup_child,.visit_count=4,
         .profile=SEGMENT30_PROFILE,.followup_sparse=1};
     interrupted=0;return visit_child(&context,4,clock_ns(NULL)+UINT64_C(2000000000));
+}
+int exercise_ranked_quick_activity(const char *directory,unsigned out[2]) {
+    char *args[]={"probe","scout_quick_activity","serial","bank","refs",(char *)directory};
+    struct visit_context context={.args=args,.journal=tmpfile(),.probe_main=simulated_child,
+        .visit_count=4,.profile=QUICK_SCOUT_PROFILE,.followup_sparse=1,.continuity=1,
+        .ranked_continuity=1,.fresh_continuity=1,.activity_number=UINT_MAX};
+    if(!context.journal) return -99;
+    interrupted=0;int rc=visit_child(&context,0,clock_ns(NULL)+UINT64_C(2000000000));
+    fclose(context.journal);out[0]=context.activity_number;out[1]=(unsigned)(context.activity_score*1000000);
+    return rc;
 }
 int parse_plan(unsigned rate,unsigned count,const char *profile) {
     char raw_rate[32];snprintf(raw_rate,sizeof(raw_rate),"%u",rate);
@@ -226,6 +237,7 @@ def probe(tmp_path_factory):
     lib.exercise_four_children.argtypes=[c.c_char_p]
     lib.exercise_followup_child.argtypes=[c.c_char_p,c.c_char_p]
     lib.exercise_finite_segment.argtypes=[c.c_char_p]
+    lib.exercise_ranked_quick_activity.argtypes=[c.c_char_p,c.c_void_p]
     lib.parse_plan.argtypes=[c.c_uint,c.c_uint,c.c_char_p]
     lib.exercise_continuity.argtypes=[c.c_int,c.c_void_p,c.c_void_p]
     return lib
@@ -284,6 +296,12 @@ def test_finite_segment_without_handoff_is_typed_no_track(probe,tmp_path):
     assert probe.exercise_finite_segment(os.fsencode(tmp_path))==3
     status=json.loads((tmp_path/'visit-4/stdout.json').read_text())
     assert not status['worker_complete'] and not status['handoffs'] and status['blocks']==7500
+
+
+def test_ranked_one_attempt_scout_retains_activity_for_parent_selection(probe,tmp_path):
+    out=(c.c_uint*2)()
+    assert probe.exercise_ranked_quick_activity(os.fsencode(tmp_path),out)==0
+    assert list(out)==[0,50000]
 
 
 @pytest.mark.parametrize('damage,expected',[

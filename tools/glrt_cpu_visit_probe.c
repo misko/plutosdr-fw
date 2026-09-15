@@ -295,7 +295,8 @@ static int visit_child(void *pointer,unsigned number,uint64_t deadline)
     if(WEXITSTATUS(status)) return -1;
     if(v->followup_sparse) {
         int outcome=visit_status(out,v->rate,visit_profile(v));
-        if(outcome==GLRT_VISIT_DONE && !strcmp(visit_profile(v),SCOUT_PROFILE)) {
+        if(outcome==GLRT_VISIT_DONE && (!strcmp(visit_profile(v),SCOUT_PROFILE) ||
+           !strcmp(visit_profile(v),QUICK_SCOUT_PROFILE))) {
             double score=0;int activity=visit_activity_score(worker,&score);
             if(activity<0) return -1;
             if(activity) {
