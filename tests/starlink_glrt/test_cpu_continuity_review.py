@@ -152,7 +152,8 @@ def test_persistent_100_second_policy_requires_same_lo_in_consecutive_rounds():
             "activity_selection":"strongest_one_attempt_scan_power50_consecutive2_wait40x2_track100"}
     assert review_continuity(text,parent,serial=SERIAL,los=LOS)["status"]=="pass"
     for damaged in (text.replace("activity candidate 1 0.07\n",""),
-                    text.replace("activity candidate 1 0.07","activity candidate 1 0.049")):
+                    text.replace("activity candidate 1 0.07","activity candidate 1 0.049"),
+                    text.replace("activity candidate 1 0.07","activity candidate 1 0.07\nactivity candidate 2 0.08")):
         with pytest.raises(ValueError,match="persistence"):
             review_continuity(damaged,parent,serial=SERIAL,los=LOS)
 

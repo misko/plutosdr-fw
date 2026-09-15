@@ -127,7 +127,10 @@ def review_continuity(text, parent, *, serial, los):
                 raise ValueError("100-second activity floor differs")
             if persistent100:
                 current=round_first+selected;previous=current-count
-                if previous<0 or not any(number==previous and score>=0.05 for number,score in candidates):
+                previous_candidates=[row for row in candidates if round_first-count<=row[0]<round_first]
+                if (previous<0 or not previous_candidates or
+                    max(previous_candidates,key=lambda row:(row[1],-row[0]))[0]!=previous or
+                    not any(number==previous and score>=0.05 for number,score in previous_candidates)):
                     raise ValueError("100-second persistence confirmation differs")
         previous_followup=followup;previous_round=round_number
     if parent["segments_started"]:
