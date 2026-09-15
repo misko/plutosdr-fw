@@ -14,6 +14,7 @@
 #define SPARSE_PROFILE "45000-selected-observer9-scan80-local2-track10-sparse10-authority"
 #define SPARSE30_PROFILE "45000-selected-observer9-scan80-local2-track30-sparse10-authority"
 #define SPARSE100_PROFILE "45000-selected-observer9-scan80-local2-track100-sparse10-authority"
+#define PRIOR_SPARSE100_PROFILE "45000-selected-observer9-scan80-local2-track100-sparse10-authority-prior8"
 #define SEGMENT30_PROFILE "7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment"
 #define FRESH_SEGMENT30_PROFILE "7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16"
 #define PRIOR_SEGMENT30_PROFILE "7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16-prior8"
@@ -131,7 +132,7 @@ static int visit_arguments(int argc,char **argv,struct visit_context *v,uint64_t
         v->segment_rf_samples=v->wait100 ? FOLLOWUP_RF_SAMPLES : SEGMENT_RF_SAMPLES;
         v->activity_floor=v->wait100 ? 0.05 : 0;
         if(v->fresh_continuity) v->profile=QUICK_SCOUT_PROFILE;
-        v->followup_profile=v->wait100 ? SPARSE100_PROFILE :
+        v->followup_profile=v->wait100 ? PRIOR_SPARSE100_PROFILE :
             v->prior_continuity ? PRIOR_SEGMENT30_PROFILE :
             v->fresh_continuity ? FRESH_SEGMENT30_PROFILE :
             v->continuity ? SEGMENT30_PROFILE :
@@ -263,10 +264,12 @@ static int visit_status(const char *path,uint32_t rate,const char *profile)
         return !handoffs && !completed && !results ? GLRT_VISIT_DONE : -1;
     }
     if(!strcmp(profile,SPARSE_PROFILE) || !strcmp(profile,SPARSE30_PROFILE) ||
-       !strcmp(profile,SPARSE100_PROFILE) || !strcmp(profile,SEGMENT30_PROFILE) ||
+       !strcmp(profile,SPARSE100_PROFILE) || !strcmp(profile,PRIOR_SPARSE100_PROFILE) ||
+       !strcmp(profile,SEGMENT30_PROFILE) ||
        !strcmp(profile,FRESH_SEGMENT30_PROFILE) || !strcmp(profile,PRIOR_SEGMENT30_PROFILE)) {
         uint32_t required=!strcmp(profile,SPARSE_PROFILE) ? SPARSE_NATIVE_RESULTS :
-            !strcmp(profile,SPARSE100_PROFILE) ? STABLE100_NATIVE_RESULTS : STABLE30_NATIVE_RESULTS;
+            (!strcmp(profile,SPARSE100_PROFILE) || !strcmp(profile,PRIOR_SPARSE100_PROFILE)) ?
+            STABLE100_NATIVE_RESULTS : STABLE30_NATIVE_RESULTS;
         int segment=!strcmp(profile,SEGMENT30_PROFILE) || !strcmp(profile,FRESH_SEGMENT30_PROFILE) ||
             !strcmp(profile,PRIOR_SEGMENT30_PROFILE);
         uint32_t maximum_blocks=segment ? 7500U : 45000U;
@@ -340,6 +343,7 @@ static int visit_child(void *pointer,unsigned number,uint64_t deadline)
         close(stdout_fd);close(stderr_fd);
         rc=(v->followup_probe_main && (!strcmp(visit_profile(v),SPARSE_PROFILE) ||
             !strcmp(visit_profile(v),SPARSE30_PROFILE) || !strcmp(visit_profile(v),SPARSE100_PROFILE) ||
+            !strcmp(visit_profile(v),PRIOR_SPARSE100_PROFILE) ||
             !strcmp(visit_profile(v),SEGMENT30_PROFILE) || !strcmp(visit_profile(v),FRESH_SEGMENT30_PROFILE) ||
             !strcmp(visit_profile(v),PRIOR_SEGMENT30_PROFILE)) ?
             v->followup_probe_main : v->probe_main)(visit_profile(v) ? 7 : 6,args);

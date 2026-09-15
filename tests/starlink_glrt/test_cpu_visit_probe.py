@@ -79,10 +79,11 @@ static int simulated_child(int argc,char **argv) {
 }
 static int simulated_followup_child(int argc,char **argv) {
     if(argc!=7 || (strcmp(argv[6],SPARSE_PROFILE) && strcmp(argv[6],SPARSE30_PROFILE) &&
-        strcmp(argv[6],SPARSE100_PROFILE) && strcmp(argv[6],SEGMENT30_PROFILE) &&
+        strcmp(argv[6],SPARSE100_PROFILE) && strcmp(argv[6],PRIOR_SPARSE100_PROFILE) &&
+        strcmp(argv[6],SEGMENT30_PROFILE) &&
         strcmp(argv[6],FRESH_SEGMENT30_PROFILE) && strcmp(argv[6],PRIOR_SEGMENT30_PROFILE))) return 9;
     unsigned results=!strcmp(argv[6],SPARSE_PROFILE) ? 751U :
-        !strcmp(argv[6],SPARSE100_PROFILE) ? 8335U : 2501U;
+        (!strcmp(argv[6],SPARSE100_PROFILE) || !strcmp(argv[6],PRIOR_SPARSE100_PROFILE)) ? 8335U : 2501U;
     unsigned blocks=(!strcmp(argv[6],SEGMENT30_PROFILE) || !strcmp(argv[6],FRESH_SEGMENT30_PROFILE) ||
         !strcmp(argv[6],PRIOR_SEGMENT30_PROFILE)) ? 7500U : 45000U;
     unsigned finite=!strcmp(argv[1],"sparse_finite"),partial=!strcmp(argv[1],"sparse_partial_loss");
@@ -312,6 +313,7 @@ def test_four_selected_children_have_separate_evidence_and_are_all_reaped(probe,
 @pytest.mark.parametrize('profile',[SPARSE_PROFILE := b'45000-selected-observer9-scan80-local2-track10-sparse10-authority',
     b'45000-selected-observer9-scan80-local2-track30-sparse10-authority',
     b'45000-selected-observer9-scan80-local2-track100-sparse10-authority',
+    b'45000-selected-observer9-scan80-local2-track100-sparse10-authority-prior8',
     b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment',
     b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16',
     b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16-prior8'])

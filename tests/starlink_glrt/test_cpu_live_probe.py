@@ -93,7 +93,9 @@ int live_set_dwell(struct test_live *t,const char *blocks,uint64_t out[4])
         t->live.native_journal_bytes=limits.native_journal_bytes;
         t->live.forecast_horizon=limits.forecast_horizon;
         t->live.prior_reacquire=!strcmp(blocks,
-            "7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16-prior8");
+            "7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment16-prior8") ||
+            !strcmp(blocks,
+            "45000-selected-observer9-scan80-local2-track100-sparse10-authority-prior8");
         if(limits.rank_budget>8 && !t->live.ranking_fft) {
             t->live.ranking_fft=fftw_plan_dft_1d(limits.rank_budget==80 ? 512 : 4096,
                 t->fft,t->fft,FFTW_FORWARD,FFTW_ESTIMATE|FFTW_UNALIGNED);
@@ -412,6 +414,7 @@ def live_api(tmp_path_factory):
     (b'45000-selected-observer9-scan80-local2-track100-sparse9-authority', [45000,256,325,300000000000]),
     (b'45000-selected-observer9-scan80-local2-track30-sparse10-authority', [45000,256,325,300000000000]),
     (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority', [45000,256,325,300000000000]),
+    (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority-prior8', [45000,256,325,300000000000]),
     (b'1536-selected', [1536,6,25,12000000000]),
     (b'1536-selected-observer3', [1536,6,25,12000000000]),
     (b'1536-selected-observer3-scan64', [1536,6,25,12000000000]),
@@ -491,6 +494,7 @@ def test_clean_native_loss_retains_measured_observer_history_as_search_only_prio
     (b'45000-selected-observer9-scan80-local2-track100-sparse9-authority', 32),
     (b'45000-selected-observer9-scan80-local2-track30-sparse10-authority', 96),
     (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority', 96),
+    (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority-prior8', 96),
 ])
 def test_forecast_coast_is_scoped_to_stable_stride10_profiles(live_api, profile, expected):
     lib, _ = live_api
@@ -504,6 +508,7 @@ def test_forecast_coast_is_scoped_to_stable_stride10_profiles(live_api, profile,
     (b'45000-selected-observer9-scan80-local2-track30-sparse9-authority', 9),
     (b'45000-selected-observer9-scan80-local2-track30-sparse10-authority', 10),
     (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority', 10),
+    (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority-prior8', 10),
 ])
 def test_long_stride10_passive_observer_has_processing_margin(live_api, profile, expected):
     lib, _ = live_api
@@ -541,6 +546,7 @@ def test_long_profile_starts_aligned_ten_frame_passive_authority(live_api, tmp_p
     (b'45000-selected-observer9-scan80-local2-track100-sparse9-authority',[8335,150]),
     (b'45000-selected-observer9-scan80-local2-track30-sparse10-authority',[2251,60]),
     (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority',[7501,150]),
+    (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority-prior8',[7501,150]),
 ])
 def test_native_result_horizon_and_wall_deadline_are_explicit_per_profile(live_api,profile,expected):
     lib,_=live_api
@@ -556,6 +562,7 @@ def test_native_result_horizon_and_wall_deadline_are_explicit_per_profile(live_a
     (b'45000-selected-observer9-scan80-local2-track100-sparse9-authority',64*1024**2),
     (b'45000-selected-observer9-scan80-local2-track30-sparse10-authority',16*1024**2),
     (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority',64*1024**2),
+    (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority-prior8',64*1024**2),
 ])
 def test_native_journal_capacity_covers_each_tracking_horizon(live_api,profile,expected):
     lib,_=live_api
@@ -568,6 +575,7 @@ def test_native_journal_capacity_covers_each_tracking_horizon(live_api,profile,e
     (b'45000-selected-observer9-scan80-local2-track100-sparse9-authority',9),
     (b'45000-selected-observer9-scan80-local2-track30-sparse10-authority',10),
     (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority',10),
+    (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority-prior8',10),
 ])
 def test_extended_native_cadence_aligns_with_the_observer(live_api,profile,expected):
     lib,_=live_api
@@ -584,6 +592,7 @@ def test_extended_native_cadence_aligns_with_the_observer(live_api,profile,expec
     (b'45000-selected-observer9-scan80-local2-track100-sparse9-authority',1278,1278),
     (b'45000-selected-observer9-scan80-local2-track30-sparse10-authority',1274,1279),
     (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority',1278,1279),
+    (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority-prior8',1278,1279),
     (b'45000-selected-observer9-scan80-local2-track10-sparse10-authority',1274,1274),
 ])
 def test_extended_native_start_uses_the_observer_frame_grid(live_api,profile,requested,expected):
@@ -599,6 +608,7 @@ def test_extended_native_start_uses_the_observer_frame_grid(live_api,profile,req
     (b'45000-selected-observer9-scan80-local2-track100-sparse9-authority',1071,1104),
     (b'45000-selected-observer9-scan80-local2-track30-sparse10-authority',1071,1105),
     (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority',1071,1105),
+    (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority-prior8',1071,1105),
 ])
 def test_native_freshness_horizon_includes_cadence_alignment_cost(live_api,profile,last_supported,expected):
     lib,_=live_api
@@ -616,6 +626,8 @@ def test_native_freshness_horizon_includes_cadence_alignment_cost(live_api,profi
     (b'45000-selected-observer9-scan80-local2-track30-sparse10-authority',
         [2700,8000,80000000,40000000000]),
     (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority',
+        [8600,8600,260000000,120000000000]),
+    (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority-prior8',
         [8600,8600,260000000,120000000000]),
 ])
 def test_observer_authority_and_retention_are_bounded_per_profile(live_api,profile,expected):
@@ -635,6 +647,7 @@ def test_observer_authority_and_retention_are_bounded_per_profile(live_api,profi
     (b'45000-selected-observer9-scan80-local2-track100-sparse9-authority',1),
     (b'45000-selected-observer9-scan80-local2-track30-sparse10-authority',1),
     (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority',1),
+    (b'45000-selected-observer9-scan80-local2-track100-sparse10-authority-prior8',1),
     (b'4096',0),(b'1536-selected',0),(b'1536-selected-observer3',0),
     (b'1536-selected-observer3-scan64',0),(b'1536-selected-observer3-scan64-scout16',0),
     (b'7500-selected-observer9-scan80-local2-track30-sparse10-authority-segment',0),
