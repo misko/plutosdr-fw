@@ -484,3 +484,16 @@ results. Separate shorter segments are never added together to satisfy that
 gate. With four LOs, the three-round worst case is 670,629,888 samples, or
 268.252 seconds at the retained 2.5-MS/s coarse-IQ accounting rate. This is
 below the existing single-follow-up plan's 837,943,296-sample bound.
+
+`continuity30-ranked-after-scout16` retains those limits and adds complete-scan
+selection for the permissive activity path. A scout that proves the full
+16-result native handoff still starts its segment immediately. A weaker
+retained-activity trigger is recorded with its strongest single-pilot power;
+the controller finishes that round's configured LO list and starts one segment
+on the strongest qualifying LO. The parent advertises
+`strongest_complete_scan` under the distinct
+`bounded_arm_scout_ranked_segmented_followup` scope. Its independent reviewer
+requires every completed scout, recomputes the strongest recorded activity,
+and rejects an inconsistent selection. Existing first-activity continuity
+evidence and all earlier single-follow-up contracts remain reviewable without
+reinterpretation.

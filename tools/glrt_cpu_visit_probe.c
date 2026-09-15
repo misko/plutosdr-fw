@@ -18,6 +18,7 @@
 #define FOLLOWUP30_PLAN "sparse30-after-scout16"
 #define FOLLOWUP100_PLAN "sparse100-after-scout16"
 #define CONTINUITY30_PLAN "continuity30-after-scout16"
+#define RANKED_CONTINUITY30_PLAN "continuity30-ranked-after-scout16"
 #define CONTINUITY_ROUNDS 3U
 #define SCOUT_RF_SAMPLES 25165824U
 #define SEGMENT_RF_SAMPLES 122880000U
@@ -33,7 +34,10 @@ struct visit_context {
     const char *followup_plan;
     int followup_sparse;
     int continuity;
+    int ranked_continuity;
     int activity_selected;
+    unsigned activity_number;
+    double activity_score;
     int (*probe_main)(int,char **);
     int (*followup_probe_main)(int,char **);
 };
@@ -54,9 +58,12 @@ static int visit_arguments(int argc,char **argv,struct visit_context *v,uint64_t
     } else if(!strcmp(argv[argc-1],FOLLOWUP_PLAN) ||
               !strcmp(argv[argc-1],FOLLOWUP30_PLAN) ||
               !strcmp(argv[argc-1],FOLLOWUP100_PLAN) ||
-              !strcmp(argv[argc-1],CONTINUITY30_PLAN)) {
+              !strcmp(argv[argc-1],CONTINUITY30_PLAN) ||
+              !strcmp(argv[argc-1],RANKED_CONTINUITY30_PLAN)) {
         v->profile=SCOUT_PROFILE;v->followup_sparse=1;v->followup_plan=argv[argc-1];
-        v->continuity=!strcmp(v->followup_plan,CONTINUITY30_PLAN);
+        v->continuity=!strcmp(v->followup_plan,CONTINUITY30_PLAN) ||
+            !strcmp(v->followup_plan,RANKED_CONTINUITY30_PLAN);
+        v->ranked_continuity=!strcmp(v->followup_plan,RANKED_CONTINUITY30_PLAN);
         v->followup_profile=v->continuity ? SEGMENT30_PROFILE :
             !strcmp(v->followup_plan,FOLLOWUP_PLAN) ? SPARSE_PROFILE :
             !strcmp(v->followup_plan,FOLLOWUP30_PLAN) ? SPARSE30_PROFILE : SPARSE100_PROFILE;
@@ -199,11 +206,11 @@ static int visit_status(const char *path,uint32_t rate,const char *profile)
 /* A short scan64 child can retain strong activity without satisfying the full
  * native handoff. One attempt above the corpus-derived floor selects the LO
  * for stricter scan80/local refinement; this never claims tracking success. */
-static int visit_activity(const char *path)
+static int visit_activity_score(const char *path,double *strongest)
 {
     FILE *file=fopen(path,"r");char *line=NULL;size_t capacity=0;ssize_t length;
-    unsigned expected_attempt=1,hits=0;int rc=-1;
-    if(!file) return -1;
+    unsigned expected_attempt=1,hits=0;int rc=-1;double best=0;
+    if(!file || !strongest) return -1;
     while((length=getline(&line,&capacity,file))>=0) {
         static const char token[]="\"single_pilot_power\":[";
         char *at,*end;uint32_t attempt;unsigned count=0;double scores[64];
@@ -223,10 +230,13 @@ static int visit_activity(const char *path)
             at=end+1;
         }
         if(count<2 || (*at!=',' && *at!='}')) goto done;
-        if(isolated_activity(scores,count)) hits++;
+        if(isolated_activity(scores,count)) {
+            double peak=scores[0];for(unsigned n=1;n<count;n++) if(scores[n]>peak) peak=scores[n];
+            hits++;if(peak>best) best=peak;
+        }
     }
     if(ferror(file) || expected_attempt<2 || expected_attempt>ATTEMPTS+1) goto done;
-    rc=hits>=SCOUT_ACTIVITY_HITS;
+    rc=hits>=SCOUT_ACTIVITY_HITS;*strongest=best;
 done:
     free(line);if(fclose(file)) rc=-1;return rc;
 }
@@ -273,9 +283,17 @@ static int visit_child(void *pointer,unsigned number,uint64_t deadline)
     if(v->followup_sparse) {
         int outcome=visit_status(out,v->rate,visit_profile(v));
         if(outcome==GLRT_VISIT_DONE && !strcmp(visit_profile(v),SCOUT_PROFILE)) {
-            int activity=visit_activity(worker);
+            double score=0;int activity=visit_activity_score(worker,&score);
             if(activity<0) return -1;
-            if(activity) { v->activity_selected=1;return GLRT_VISIT_SIGNAL; }
+            if(activity) {
+                if(v->ranked_continuity) {
+                    if(fprintf(v->journal,"activity candidate %u %.17g\n",number,score)<0 ||
+                       fflush(v->journal)) return -1;
+                    if(v->activity_number==UINT_MAX || score>v->activity_score) {
+                        v->activity_number=number;v->activity_score=score;
+                    }
+                } else { v->activity_selected=1;return GLRT_VISIT_SIGNAL; }
+            }
         }
         return outcome;
     }
@@ -296,10 +314,15 @@ static int continuity_run(struct visit_context *context,const struct glrt_visit_
     *result=(struct continuity_result){.selected=UINT_MAX};
     for(unsigned round=0;round<CONTINUITY_ROUNDS && !result->track_complete;round++) {
         unsigned round_selected=UINT_MAX,first=result->visits_executed;
-        context->profile=SCOUT_PROFILE;context->activity_selected=0;result->scan_rounds++;
+        context->profile=SCOUT_PROFILE;context->activity_selected=0;
+        context->activity_number=UINT_MAX;context->activity_score=0;result->scan_rounds++;
         rc=glrt_tracking_visit_until_signal_from(ports,context->rate,lo,context->visit_count,
             first,&round_selected);
         result->visits_executed+=rc==GLRT_VISIT_SIGNAL ? round_selected+1U : context->visit_count;
+        if(rc==GLRT_VISIT_DONE && context->ranked_continuity && context->activity_number!=UINT_MAX) {
+            round_selected=context->activity_number-first;context->activity_selected=1;
+            rc=GLRT_VISIT_SIGNAL;
+        }
         if(rc==GLRT_VISIT_SIGNAL) {
             result->selected=round_selected;result->segments_started++;
             result->selected_activity=context->activity_selected;
@@ -357,6 +380,7 @@ int main(int argc,char **argv)
     if(fprintf(context.journal,"terminal %d\n",rc)<0 || fclose(context.journal)) rc=GLRT_VISIT_RETENTION;
     alarm(0);
     printf("{\"scope\":\"%s\",\"rate\":%u,\"result\":%d,\"rf_sample_limit\":%u",
+        context.ranked_continuity ? "bounded_arm_scout_ranked_segmented_followup" :
         context.continuity ? "bounded_arm_scout_segmented_followup" :
         context.followup_sparse ? "bounded_arm_scout_sparse_followup" :
         context.visit_count==2 ? "bounded_arm_two_frequency_visits" : "bounded_arm_frequency_revisits",
@@ -368,6 +392,7 @@ int main(int argc,char **argv)
             "\"selection\":\"%s\",\"selected_index\":",scan_rounds,segments_started,visits_executed,track_complete,
             !followup_started ? "none" : selected_activity ? "retained_activity" : "native_handoff");
         if(selected==UINT_MAX) printf("null"); else printf("%u",selected);
+        if(context.ranked_continuity) printf(",\"activity_selection\":\"strongest_complete_scan\"");
     } else if(context.followup_sparse) {
         printf(",\"followup_started\":%d,\"track_complete\":%d,\"selection\":\"%s\",\"selected_index\":",
             followup_started,track_complete,

@@ -14,7 +14,10 @@ pytestmark=pytest.mark.fftw
 WRAPPER=r'''
 #include "glrt_cpu_visit_probe.c"
 int inspect_idle_words(const uint32_t w[24],uint32_t rate) { return visit_idle_snapshot(w,rate); }
-int classify_activity(const char *path) { return visit_activity(path); }
+int classify_activity(const char *path) { double score;return visit_activity_score(path,&score); }
+double classify_retained_activity_score(const char *path) {
+    double score=0;int rc=visit_activity_score(path,&score);return rc==1 ? score : rc ? -2 : -1;
+}
 int classify_activity_scores(const double *scores,unsigned count) { return isolated_activity(scores,count); }
 int loss_disposition(unsigned fault) {
     struct live s={0};s.done=1;s.result=GLRT_NATIVE_ACQUISITION_LOST;s.native_clean_loss=1;
@@ -136,6 +139,7 @@ struct continuity_fake {
     uint64_t now;
     unsigned call,numbers[16];
     int mode;
+    struct visit_context *visit;
 };
 static uint64_t continuity_clock(void *pointer) { return ((struct continuity_fake *)pointer)->now; }
 static int continuity_cancelled(void *pointer) { (void)pointer;return 0; }
@@ -149,6 +153,13 @@ static int continuity_run_child(void *pointer,unsigned number,uint64_t deadline)
     if(f->mode==0) outcome=(f->call==0 || f->call==2) ? GLRT_VISIT_SIGNAL :
         f->call==1 ? GLRT_VISIT_CLEAN_LOSS : 0;
     else if(f->mode==2) outcome=(f->call%2)==0 ? GLRT_VISIT_SIGNAL : GLRT_VISIT_CLEAN_LOSS;
+    else if(f->mode==3 && !strcmp(visit_profile(f->visit),SCOUT_PROFILE) && number<2) {
+        double score=number ? .07 : .04;
+        if(f->visit->activity_number==UINT_MAX || score>f->visit->activity_score) {
+            f->visit->activity_number=number;f->visit->activity_score=score;
+        }
+    } else if(f->mode==3 && !strcmp(visit_profile(f->visit),SEGMENT30_PROFILE))
+        outcome=GLRT_VISIT_CLEAN_LOSS;
     f->call++;return outcome;
 }
 static int continuity_retain(void *pointer,const char *kind,unsigned number,int outcome,
@@ -160,6 +171,7 @@ int exercise_continuity(int mode,unsigned out[7],unsigned numbers[16]) {
         continuity_tune,continuity_run_child,continuity_retain};
     struct visit_context context={.journal=tmpfile(),.rate=30000000,.visit_count=4,
         .profile=SCOUT_PROFILE,.followup_profile=SEGMENT30_PROFILE,.followup_sparse=1,.continuity=1};
+    fake.visit=&context;if(mode==3) context.ranked_continuity=1;
     struct continuity_result result;uint64_t lo[4]={1190312500,1440312500,1690312500,1940312500};
     if(!context.journal) return -99;
     int rc=continuity_run(&context,&ports,lo,&result);fclose(context.journal);
@@ -193,6 +205,8 @@ def probe(tmp_path_factory):
     lib=c.CDLL(str(out/'visit.so'));lib.exercise_child.argtypes=[c.c_char_p,c.c_char_p]
     lib.inspect_idle_words.argtypes=[c.POINTER(c.c_uint32),c.c_uint32]
     lib.classify_activity.argtypes=[c.c_char_p]
+    lib.classify_retained_activity_score.argtypes=[c.c_char_p]
+    lib.classify_retained_activity_score.restype=c.c_double
     lib.classify_activity_scores.argtypes=[c.c_void_p,c.c_uint]
     lib.invalid_plan.argtypes=[c.c_char_p,c.c_uint,c.c_int]
     lib.exercise_four_children.argtypes=[c.c_char_p]
@@ -300,13 +314,21 @@ def test_retained_activity_can_end_after_first_detected_attempt(probe,tmp_path):
     assert probe.classify_activity(os.fsencode(path))==1
 
 
+def test_retained_activity_score_is_strongest_candidate_not_array_position(probe,tmp_path):
+    row={'kind':'candidate_order','attempt':1,'single_pilot_power':[.003,.052,.004]}
+    path=tmp_path/'worker.jsonl';path.write_text(json.dumps(row,separators=(',',':'))+'\n')
+    assert probe.classify_retained_activity_score(os.fsencode(path))==pytest.approx(.052)
+
+
 @pytest.mark.parametrize('rate',[30000000,60000000,2500000])
 @pytest.mark.parametrize('count',[1,2,3,4])
 @pytest.mark.parametrize('profile',[None,b'1536-selected-observer3-scan64',b'sparse10-after-scout16',
-    b'sparse30-after-scout16',b'sparse100-after-scout16',b'continuity30-after-scout16',b'unknown'])
+    b'sparse30-after-scout16',b'sparse100-after-scout16',b'continuity30-after-scout16',
+    b'continuity30-ranked-after-scout16',b'unknown'])
 def test_explicit_scan64_plan_preserves_legacy_and_rejects_invalid_arguments(probe,rate,count,profile):
     valid=rate in (30000000,60000000) and count in (2,3,4) and profile!=b'unknown'
-    expected=16 if profile in (b'sparse10-after-scout16',b'sparse30-after-scout16',b'sparse100-after-scout16',b'continuity30-after-scout16') else 64 if profile else 8
+    expected=16 if profile in (b'sparse10-after-scout16',b'sparse30-after-scout16',b'sparse100-after-scout16',
+        b'continuity30-after-scout16',b'continuity30-ranked-after-scout16') else 64 if profile else 8
     assert probe.parse_plan(rate,count,profile)==(expected if valid else -1)
 
 
@@ -314,6 +336,7 @@ def test_explicit_scan64_plan_preserves_legacy_and_rejects_invalid_arguments(pro
     (0,[0,4,2,2,1,4,0],[0,1,2,3]),
     (1,[2**32-1,12,3,0,0,12,0],list(range(12))),
     (2,[0,6,3,3,0,6,1],list(range(6))),
+    (3,[1,13,3,1,0,13,0],list(range(13))),
 ])
 def test_continuity_rescans_with_contiguous_evidence_and_stops_on_complete(probe,mode,expected,numbers):
     out=(c.c_uint*7)();seen=(c.c_uint*16)()

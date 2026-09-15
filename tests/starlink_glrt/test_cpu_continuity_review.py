@@ -26,7 +26,8 @@ def evidence():
         if number==2: rows.append(f"segment start 1 3 0 {LOS[0]} native_handoff")
         if number==3: rows.append("segment terminal 1 0")
     rows.append("terminal 0")
-    parent={"rate":30000000,"result":0,"rf_sample_limit":296091648,"scan_rounds":2,
+    parent={"scope":"bounded_arm_scout_segmented_followup","rate":30000000,"result":0,
+            "rf_sample_limit":296091648,"scan_rounds":2,
             "segments_started":2,"visits_executed":4,"track_complete":1,
             "selection":"native_handoff","selected_index":0}
     return "\n".join(rows)+"\n",parent
@@ -36,7 +37,8 @@ def test_review_accepts_contiguous_rescan_and_completed_second_segment():
     text,parent=evidence()
     result=review_continuity(text,parent,serial=SERIAL,los=LOS)
     assert result=={"status":"pass","scope":"bounded_radio_local_continuity_transitions",
-                    "scan_rounds":2,"segments":2,"visits":4,"rf_sample_limit":296091648}
+                    "scan_rounds":2,"segments":2,"visits":4,"rf_sample_limit":296091648,
+                    "activity_selection":"first_qualified"}
 
 
 @pytest.mark.parametrize("damage",["number","selection","outcome","sample_limit","fault","unknown"])
@@ -50,3 +52,32 @@ def test_review_rejects_damaged_transition_or_parent_claim(damage):
     if damage=="unknown": text=text.replace("segment terminal 1 0","mystery")
     with pytest.raises((ValueError,AssertionError)):
         review_continuity(text,parent,serial=SERIAL,los=LOS)
+
+
+def test_ranked_review_requires_full_scan_and_selects_strongest_activity():
+    text,parent=evidence()
+    text=text.replace("continuity30-after-scout16","continuity30-ranked-after-scout16")
+    text=text.replace("segment start 0 1 0 1190312500 retained_activity",
+        "activity candidate 0 0.04\nactivity candidate 1 0.07\n"
+        "segment start 0 4 1 1940312500 retained_activity")
+    # Supply the two extra completed scouts and shift the old follow-ups/second
+    # round out of this single completed ranked round.
+    lines=text.splitlines();kept=[lines[0]]
+    snapshot=next(line for line in lines if line.startswith("snapshot "))
+    for number,lo in enumerate(LOS):
+        kept.append(snapshot)
+        for kind,epoch,latest in (("before_tune",1,100+number*20),("tuned",1,101+number*20),("after_run",2,110+number*20)):
+            kept.append(f"visit {kind} {number} 0 {lo} 30000000 {epoch} {latest} 1 1")
+        if number==0: kept.append("activity candidate 0 0.04")
+        if number==1: kept.append("activity candidate 1 0.07")
+    kept.extend([f"segment start 0 4 1 {LOS[1]} retained_activity",snapshot])
+    for kind,epoch,latest in (("before_tune",2,200),("tuned",2,201),("after_run",3,210)):
+        kept.append(f"visit {kind} 4 {0 if kind!='after_run' else 0} {LOS[1]} 30000000 {epoch} {latest} 1 1")
+    kept.extend(["segment terminal 0 0","terminal 0"]);text="\n".join(kept)+"\n"
+    parent.update(scope="bounded_arm_scout_ranked_segmented_followup",rf_sample_limit=223543296,
+        scan_rounds=1,segments_started=1,visits_executed=5,track_complete=1,
+        selection="retained_activity",selected_index=1,activity_selection="strongest_complete_scan")
+    result=review_continuity(text,parent,serial=SERIAL,los=LOS)
+    assert result["activity_selection"]=="strongest_complete_scan"
+    with pytest.raises(ValueError):
+        review_continuity(text.replace("candidate 1 0.07","candidate 1 0.03"),parent,serial=SERIAL,los=LOS)

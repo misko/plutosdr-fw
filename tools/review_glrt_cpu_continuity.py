@@ -1,4 +1,6 @@
-"""Independent review of the bounded radio-local continuity visit journal."""
+"""Independent review of bounded radio-local continuity visit journals."""
+
+import math
 
 from .starlink_glrt_tracking_abi import TrackingSnapshot
 
@@ -12,12 +14,17 @@ def review_continuity(text, parent, *, serial, los):
     if len(plans)!=1 or len(terminals)!=1 or lines[0] != " ".join(plans[0]) or lines[-1] != " ".join(terminals[0]):
         raise ValueError("visit journal plan or terminal differs")
     plan=plans[0];count=len(los)
-    expected=["plan",str(parent["rate"]),serial,*map(str,los),"continuity30-after-scout16",
+    ranked=parent.get("activity_selection") == "strongest_complete_scan"
+    profile="continuity30-ranked-after-scout16" if ranked else "continuity30-after-scout16"
+    expected_scope="bounded_arm_scout_ranked_segmented_followup" if ranked else "bounded_arm_scout_segmented_followup"
+    if parent.get("scope")!=expected_scope:
+        raise ValueError("continuity scope differs")
+    expected=["plan",str(parent["rate"]),serial,*map(str,los),profile,
               str(count),"400000000000"]
     if plan!=expected or terminals[0] != ["terminal",str(parent["result"])]:
         raise ValueError("visit plan identity differs")
 
-    snapshots=[];visits=[];starts=[];ends=[]
+    snapshots=[];visits=[];starts=[];ends=[];candidates=[]
     for line in lines[1:-1]:
         fields=line.split()
         if line.startswith("snapshot "):
@@ -36,6 +43,11 @@ def review_continuity(text, parent, *, serial, los):
             starts.append((*map(int,fields[2:6]),fields[6]))
         elif fields[:2]==["segment","terminal"] and len(fields)==4:
             ends.append(tuple(map(int,fields[2:])))
+        elif fields[:2]==["activity","candidate"] and len(fields)==4:
+            number=int(fields[2]);score=float(fields[3])
+            if not math.isfinite(score) or not 0.015<=score<=1:
+                raise ValueError("activity score differs")
+            candidates.append((number,score))
         else:
             raise ValueError("unknown visit journal record")
     if not snapshots:
@@ -64,11 +76,17 @@ def review_continuity(text, parent, *, serial, los):
         if round_number!=expected_round or end[0]!=expected_round or followup<=previous_followup:
             raise ValueError("segment order differs")
         round_first=previous_followup+1
-        if not 0<=selected<count or followup!=round_first+selected+1 or lo!=los[selected]:
+        expected_followup=round_first+count if ranked and selection=="retained_activity" else round_first+selected+1
+        if not 0<=selected<count or followup!=expected_followup or lo!=los[selected]:
             raise ValueError("segment scout selection differs")
-        scout=grouped[followup-1][-1];track=grouped[followup][-1]
-        if scout[2]!=2 or scout[3]!=lo or track[3]!=lo or track[2]!=end[1]:
+        scout=grouped[round_first+selected][-1];track=grouped[followup][-1]
+        expected_scout=0 if ranked and selection=="retained_activity" else 2
+        if scout[2]!=expected_scout or scout[3]!=lo or track[3]!=lo or track[2]!=end[1]:
             raise ValueError("segment transition disposition differs")
+        round_candidates=[row for row in candidates if round_first<=row[0]<followup]
+        if ranked and selection=="retained_activity":
+            if not round_candidates or max(round_candidates,key=lambda row:(row[1],-row[0]))[0]!=round_first+selected:
+                raise ValueError("strongest activity selection differs")
         previous_followup=followup
     if parent["segments_started"]:
         if parent["selected_index"]!=starts[-1][2] or parent["selection"]!=starts[-1][4]:
@@ -83,4 +101,5 @@ def review_continuity(text, parent, *, serial, los):
         raise ValueError("parent completion differs")
     return {"status":"pass","scope":"bounded_radio_local_continuity_transitions",
             "scan_rounds":parent["scan_rounds"],"segments":len(starts),
-            "visits":len(grouped),"rf_sample_limit":expected_limit}
+            "visits":len(grouped),"rf_sample_limit":expected_limit,
+            "activity_selection":"strongest_complete_scan" if ranked else "first_qualified"}
