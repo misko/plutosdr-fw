@@ -20,9 +20,10 @@ The first release is deliberately bounded:
 - no RX1 or simultaneous dual-RX operation;
 - no independent pilot/decision stream in this release.
 
-The authorized qualification radio is RX0 on serial
-`1040007c4a94000211000b009186843ef2`. The implementation request authorizes
-bounded qualification and RAM-first deployment on that exact unit; persistent
+The authorized qualification radios are RX0 on serials
+`1040007c4a94000211000b009186843ef2` and
+`104000b29905000e17000800065934759d`. The implementation request authorizes
+bounded qualification and RAM-first deployment on those exact units; persistent
 installation remains gated by the acceptance and rollback checks below. At
 plan review it was reachable at
 `ip:192.168.1.18` and ran `v0.50-plutoplus-spf-counter-rx-v1`, metadata ABI 3,
@@ -107,6 +108,19 @@ As of 2026-09-16:
   The FIT is 13,184,047 bytes, uses MD5 component hashes supported by the
   deployed U-Boot, and is byte-identical to the DFU body; the DFU suffix is
   bound to `0456:b673`. RC3 has no persistent companion.
+- RC3 was downloaded to the first exact radio in volatile DFU mode, but did
+  not return at the exact USB path after detach. Receipt
+  `646c738dc1a14124b051c4df1e8ec968` records the fail-closed unknown result;
+  no QSPI write occurred. The source-built RC3 DTB was not byte-derived from
+  the qualified Rev.C DTB, so RC3 is retired from live use. RC4 preserves the
+  qualified DTB byte graph and changes only the three reviewed topology facts:
+  remove 2R2T, select RX0/TX0, and select the AD9364-width DDS core. Its exact
+  DFU identity is
+  `f03f4b25da2e97fe67946aa4250df7ba6e7d04f844a8c8c3d232e2cd62d204be`
+  and FIT identity is
+  `52f8216403f38e595a5ec8bd8d3509d01a480c5ebc055be5fdd3d836692c2a94`.
+  RC4 is 13,188,343 FIT bytes, RAM-only, and must replace RC3 in every live
+  boot receipt and campaign evidence check.
 - PPU commits `9959935`, `939df83`, and `f0c8f33` add strict whole-stream
   setup/terminal binding, fail-closed truncated-socket tests, exact
   source-counter acceptance metrics, and a scanner adapter whose shadow and
@@ -135,16 +149,22 @@ As of 2026-09-16:
   return as the physical RX0/1R1T layout with topology support `1`. Thus duty,
   feedback transport, and weighting can be qualified independently of ambient
   RF before the energy-detector fidelity lane. The complete focused adaptive
-  and counter-profile suite passes 1,207 tests; targeted Ruff and strict mypy
+  and counter-profile suite passes 1,211 tests; targeted Ruff and strict mypy
   checks are clean.
+- PPU commit `bd0865f` drains ready application acknowledgements while IQ is
+  still streaming. This closes a campaign-length defect in which a 300-second
+  run could exhaust the firmware's 64-entry ACK mailbox even though short
+  tests passed. A 100-feedback bounded-mailbox regression now proves streaming
+  drain, and RC4 is the only candidate accepted by new campaign evidence.
 
-Still required before deployment: physical power-cycle recovery of the exact
+Still required before deployment: physical power-cycle recovery of the first
 qualification radio to its unchanged v0.50 QSPI image, scanner shadow-mode
 integration with the production scanner detector, live mid-session socket
-failure and RF signal-fidelity tests, RC3 exact-radio RAM boot, and the bounded
-hardware campaigns and rollback verification below. The other attached Pluto
-was not touched. Persistent installation remains prohibited until those gates
-pass.
+failure and RF signal-fidelity tests, RC4 RAM boot on both exact radios, and
+the bounded per-radio hardware campaigns and rollback verification below.
+`192.168.1.17` was explicitly excluded after read-only IIOD attestation proved
+it belongs to a third serial. Persistent installation remains prohibited until
+both authorized radios independently pass every applicable gate.
 
 ## Desired behavior
 
