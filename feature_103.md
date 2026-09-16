@@ -38,14 +38,24 @@ closed.
 
 As of 2026-09-16:
 
-- Linux branch `codex/feature-103`, commit `8c2927f1bdb6`, adds descriptor-owner
+- Linux branch `codex/feature-103`, commits `8c2927f1bdb6`, `d20eb1d417d4`, and
+  `5ad4fbc32889`, adds descriptor-owner
   scan capability discovery, setup-time RX fastlock profile/frequency/CRC
-  attestation, source-counter-bracketed recalls, and descriptor-close LO
-  restoration. Ordinary sysfs LO and fastlock mutation remains excluded while
-  the counter lease is owned.
+  attestation, source-counter-bracketed recalls and restoration, plus an
+  owner-only coherent source-counter snapshot for dwell pacing independent of
+  DMA block completion. Descriptor-close remains the crash fallback. Ordinary
+  sysfs LO and fastlock mutation remains excluded while the counter lease is
+  owned.
 - libiio branch `codex/feature-103` contains prerequisite direct-segment rearm
-  commit `737d910`, scheduler/visit/radio core commit `7657d3b`, and deterministic
-  capacity simulation commit `556f8f0`.
+  commit `737d910`, scheduler/visit/radio core commit `7657d3b`, deterministic
+  capacity simulation commit `556f8f0`, strict wire protocol commit `f75838e`,
+  restoration receipt commit `47319ad`, session lifecycle commits `fcb2bfb`,
+  `50579ae`, and `fa34857`, and production iiOD data/control integration commit
+  `23e4edf`.
+- PPU branch `codex/feature-103`, commits `0deb084`, `d5887e8`, and `82310bf`,
+  provides byte-identical Python codecs and a strict iiOD client for capability
+  discovery, setup, visit/IQ streaming, asynchronous feedback, application
+  acknowledgements, terminal validation, and cleanup.
 - The scheduler tests replay 256 activity masks and validate source binding,
   bounded feedback acknowledgements, fairness, and deterministic selection.
 - The visit-queue tests cover 24,000 DMA-boundary combinations, shared leases,
@@ -62,12 +72,18 @@ As of 2026-09-16:
   layout compiles for ARM EABI5, kernel `checkpatch --strict` and `diff --check`
   pass, and the native scheduler, queue, radio-UAPI, lifecycle, and capacity
   sanitizer tests pass.
+- The complete provider-enabled iiOD cross-builds for ARM with the pinned v0.50
+  Buildroot toolchain. The legacy provider-disabled iiOD build also passes,
+  preserving default-off behavior. The production path uses a source-time
+  scheduler thread, scatter/gather visit sends, independent `SCANFEEDBACK` and
+  `SCANACK` commands, explicit terminal records, and restoration before final
+  transport drain.
 
-Still required before deployment: versioned network codecs and golden vectors,
-the iiOD session engine that joins scheduler, owner recall, DMA queue, control
-mailbox, and terminal ledger, PPU/scanner integration, end-to-end failure and
-signal-fidelity tests, a hash-pinned firmware image, exact-radio RAM boot, and
-the bounded hardware campaigns and rollback verification below.
+Still required before deployment: scanner shadow-mode integration, end-to-end
+socket failure and RF signal-fidelity tests, a hash-pinned firmware image,
+exact-radio RAM boot, and the bounded hardware campaigns and rollback
+verification below. Persistent installation remains prohibited until those
+gates pass.
 
 ## Desired behavior
 
