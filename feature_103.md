@@ -161,14 +161,124 @@ As of 2026-09-16:
   receipts from both authorized serials, and provide the deterministic
   receipt-gated `pluto-feature103-qualify` command used below.
 
+### Packaging RCA and RC6 qualification reset
+
+The `.18` disappearance is a firmware boot-transition failure, not evidence of
+an intermittent USB cable, Ethernet saturation, or a damaged radio. Host USB
+logs show the expected runtime-to-DFU transition, a complete download, and the
+DFU detach; they do not show link resets, over-current, or enumeration errors.
+The device returns to its qualified v0.50 QSPI image after a physical power
+cycle. No failed attempt wrote QSPI.
+
+Two independent candidate defects were found:
+
+1. RC3/RC4 accidentally carried an older FPGA bitstream
+   (`5c3c6da4...07e4`) instead of the v0.50-qualified bitstream
+   (`b96891fa...e93c`). This is a real provenance defect and those images are
+   retired.
+2. More decisively, RC5 used every byte-exact qualified payload but rebuilt a
+   simplified FIT with only `fdt@3`/`config@9` and a noncanonical DTB hash
+   node. That image also completed DFU download and failed to return. This
+   isolates the common immediate failure boundary to FIT/container generation,
+   rather than the feature kernel, DTB, FPGA, or userspace.
+
+These findings produce durable release protections, not a one-off local-image
+workaround. `scripts/feature103/package_candidate.py` now hard-pins the
+qualified parent DFU/FIT and FPGA/rootfs identities, extracts all three parent
+DTBs, preserves the canonical `fdt@1..3` and `config@0..10` graph, leaves DTBs
+unhashed like the release FIT, preserves the rootfs inventory, and emits only
+RAM candidates. Its offline invariant suite passes. Host tooling quarantines
+RC1--RC5 from the executable registry and pins each RC6 stage by DFU hash, FIT
+hash, and FIT size.
+
+RC6 must be qualified in this exact fail-fast order:
+
+1. `parent`: the byte-for-byte v0.50 qualified DFU. This proves the USB/DFU/
+   U-Boot RAM-transition path independently of packaging.
+2. `repack`: the same payloads in the full canonical FIT layout. This proves
+   the corrected packager independently of feature code.
+3. `kernel`: change only the kernel.
+4. `rx0`: additionally change only the reviewed RX0/1R1T Rev.C DTB facts.
+5. `full`: additionally replace iiOD, libiio, and `opt/VERSIONS` while
+   preserving every rootfs archive entry.
+
+Every stage requires exact serial and USB-path binding, a private pinned SSH
+host key before mutation, byte/hash validation before DFU transfer, a successful
+return receipt, TX-safe attestation, and no persistent-write capability. Stop
+at the first failed stage, retain its receipt and boot-console log, physically
+recover the unit, and do not try any later stage. RC6 full identities are DFU
+`b7730848...95b6`, FIT `f5283f93...0798`, and FIT size 13,185,399 bytes; the
+complete machine-readable identities are in
+`build/feature103-rc6/feature103-rc6-manifest.json`.
+
 Still required before deployment: physical power-cycle recovery of the first
-qualification radio to its unchanged v0.50 QSPI image, scanner shadow-mode
-integration with the production scanner detector, live mid-session socket
-failure and RF signal-fidelity tests, RC4 RAM boot on both exact radios, and
-the bounded per-radio hardware campaigns and rollback verification below.
+qualification radio to its unchanged v0.50 QSPI image, the final full-stage
+return on both radios, scanner shadow-mode integration with the production
+scanner detector, live mid-session socket failure and RF signal-fidelity tests,
+and the bounded per-radio hardware campaigns and rollback verification below.
 `192.168.1.17` was explicitly excluded after read-only IIOD attestation proved
 it belongs to a third serial. Persistent installation remains prohibited until
 both authorized radios independently pass every applicable gate.
+
+### RC8--RC10 live qualification findings
+
+The canonical RC6/RC7 bisection succeeded on serial
+`104000b29905000e17000800065934759d`: byte-exact parent, canonical repack,
+feature kernel, all-FIT-slot RX0 topology, and full userspace each returned at
+the exact USB path with TX-safe receipts. This proved that the earlier `.18`
+disappearances were candidate boot/container failures rather than Ethernet
+load or random cable loss. The two authorized radios select different FIT
+configs (`config@9`/`fdt@3` and `config@0`/`fdt@1`), so the RX0 transform must
+remain present in every DTB slot.
+
+RC8 adds Linux commit `104af780d1668dfc239804fba62215930d85af2b`.
+Fastlock changes RFPLL registers without updating the clock framework's cached
+rate; setup therefore falsely rejected every profile except the last ordinary
+LO tune. RC8 validates frequency through the driver's register-backed RFPLL
+recalculation instead. Its kernel, RX0, and full stages returned successfully
+on the second radio. Host profile compilation now also accounts for the AD9361
+ALC byte changing during recall: it validates recalls, reloads the immutable
+profile words, and binds the setup to their CRCs. It forces a distinct ordinary
+LO transition before leaving fastlock so a matching cached clock value cannot
+suppress deactivation.
+
+Live transport then exposed two provider defects that simulations had not
+covered. libiio commit `7918bb9b77a99a9630e5625c47f59bc0c5f7c5a5`
+makes the nominal boundary close idempotent when a DMA gap already made that
+dwell terminal; this prevents an explicit `INVALID_GAP` from becoming a fatal
+`EINVAL`. Commit `ee2f40d2616581719f9dd5726d0d6ff8334f3a9c`
+timestamps feedback from the scan session's mutex-protected coherent counter
+watermark instead of issuing a competing owner ioctl from the feedback TCP
+connection. RC10 contains both fixes. Its full DFU is
+`cdd25fcb2fa422d515500f0f144bae0c1d543405e1a0bdbd687b6a939950074a`,
+its FIT is
+`95760da77b70cefaf1ee9bb0d43c2d012846893f8edee8f50645c39c3c4daf5f`,
+and its FIT size is 13,185,287 bytes. The manifest is
+`build/feature103-rc10/feature103-rc10-manifest.json` with SHA-256
+`2892afdef3e8fd4e7f6b4f728c96fd5b3f023157ebc8aac9ef9b34df7e5ea306`.
+
+Hardware also showed that the four-buffer default cannot admit a 240 ms dwell
+at 10 MS/s with one-million-sample provider blocks and two headroom blocks.
+The host now reads the original count, sets 16 buffers for the bounded scan,
+and restores the exact original count afterward. This is 64 MB of CI16 DMA
+storage and admits 10 and 15 MS/s dwell windows without approaching the 200 MB
+queue ceiling. A two-second RC9 no-feedback run delivered seven complete
+visits (67.2 MB) with no skips or gaps and exact restoration; active feedback
+then reproduced the feedback-control failure fixed in RC10.
+
+RC9's iiod crash (`status=139`) caused its supervisor to restart FunctionFS.
+The radio stayed healthy and reachable over Ethernet, but `/sys/class/udc`
+became empty and the host USB device did not re-enumerate. This explains the
+observed dropout mechanism: it is a firmware process/gadget recovery defect,
+not a corrupt QSPI image. A physical power cycle restores the unchanged QSPI
+image. No qualification attempt has written QSPI.
+
+RC10 remains RAM-only and is the sole executable feature-103 candidate.
+RC1--RC9 are quarantined. Before any persistence decision, both authorized
+radios must return RC10 full, independently pass the 10 MS/s `>95%` and
+15 MS/s `>=90%` 30-second controlled-feedback cells, show applied ACKs and an
+increased active-target selection share, restore radio settings and kernel
+buffer count exactly, and pass a power-cycle rollback check.
 
 ## Desired behavior
 
@@ -539,7 +649,7 @@ state, radio settings, active owners, and available storage. Cleanup verifies
 the exact restored state and a fresh ordinary capture.
 
 Use the receipt-gated `pluto-feature103-qualify` command for every cell. It
-accepts only the two authorized serials and an exact successful RC4 RAM-return
+accepts only the two authorized serials and an exact successful RC10 RAM-return
 receipt, requires deterministic session/generation/seed and detector settings,
 performs a dry run unless `--execute` and the serial-specific confirmation are
 both supplied, writes atomic private evidence, and never writes QSPI. For
@@ -547,18 +657,18 @@ example, first inspect a controlled 10 MS/s cell:
 
 ```sh
 uv run pluto-feature103-qualify \
-  --serial SERIAL --uri ip:ADDRESS --ram-receipt RC4_RECEIPT \
+  --serial SERIAL --uri ip:ADDRESS --ram-receipt RC10_RECEIPT \
   --evidence NEW_EVIDENCE_PATH --mode adaptive --detector controlled \
   --session 1 --generation 1 --seed 103 \
   --rate 10000000 --bandwidth 8000000 --duration-ms 30000 --dwell-ms 240 \
-  --frequencies 959687500,1190312500 --weights 1,1 --active-targets 1
+  --frequencies 960000000,1190312500 --weights 1,1 --active-targets 1
 ```
 
 Repeat with `--execute --confirm "QUALIFY FEATURE 103 SERIAL"` only after the
 dry-run JSON binds the intended radio, RC4 hashes, setup, and evidence path.
 Energy-detector cells replace `--active-targets` with the frozen
 `--energy-threshold-dbfs`. Final fleet promotion requires distinct successful
-RC4 boot receipts and independent campaign evidence from both serials.
+RC10 boot receipts and independent campaign evidence from both serials.
 
 ### Campaign A: transport and complete visits
 
