@@ -534,6 +534,28 @@ Preflight records serial, firmware/FIT, kernel, iiOD, capabilities, TX-safe
 state, radio settings, active owners, and available storage. Cleanup verifies
 the exact restored state and a fresh ordinary capture.
 
+Use the receipt-gated `pluto-feature103-qualify` command for every cell. It
+accepts only the two authorized serials and an exact successful RC4 RAM-return
+receipt, requires deterministic session/generation/seed and detector settings,
+performs a dry run unless `--execute` and the serial-specific confirmation are
+both supplied, writes atomic private evidence, and never writes QSPI. For
+example, first inspect a controlled 10 MS/s cell:
+
+```sh
+uv run pluto-feature103-qualify \
+  --serial SERIAL --uri ip:ADDRESS --ram-receipt RC4_RECEIPT \
+  --evidence NEW_EVIDENCE_PATH --mode adaptive --detector controlled \
+  --session 1 --generation 1 --seed 103 \
+  --rate 10000000 --bandwidth 8000000 --duration-ms 30000 --dwell-ms 240 \
+  --frequencies 959687500,1190312500 --weights 1,1 --active-targets 1
+```
+
+Repeat with `--execute --confirm "QUALIFY FEATURE 103 SERIAL"` only after the
+dry-run JSON binds the intended radio, RC4 hashes, setup, and evidence path.
+Energy-detector cells replace `--active-targets` with the frozen
+`--energy-threshold-dbfs`. Final fleet promotion requires distinct successful
+RC4 boot receipts and independent campaign evidence from both serials.
+
 ### Campaign A: transport and complete visits
 
 1. Ten-to-thirty-second smoke cells at 10, 15, 20, and 30 MS/s.
