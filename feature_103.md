@@ -349,9 +349,40 @@ serials, USB paths, and supervisor generation 1. This verifies volatile
 rollback and that qualification did not write QSPI. A true removal-of-power
 cold-return check remains a separate physical gate.
 
-Those RC11 receipts remain diagnostic evidence but cannot qualify the changed
-RC12 bytes. RC12 must repeat the two-radio 10/15 MS/s duty gates and add bounded
-20/30 MS/s integrity cells before promotion.
+Those RC11 receipts remain diagnostic evidence but do not qualify the changed
+RC12 bytes. RC12 therefore repeated the full matrix on both radios. Serial
+`...843ef2` returned exact RC12 at path `3-11` under receipt
+`6583b9ae88904b028fe6c5b540540b99`; serial `...34759d` returned at path `3-8`
+under receipt `3b550e55b00a48d193c21b44d99780a9`. The fleet receipt replay binds both to
+the RC12 DFU/FIT identities above and rejects every earlier candidate.
+
+At 10 MS/s the two radios retained 95.903% and 95.902% full-session duty; at
+15 MS/s they retained 95.892% and 95.897%. Every mandatory cell delivered
+119/119 whole visits with zero skips, invalid gaps, or cancellations. Active
+target selection increased from 66.7% before its first applied-feedback
+boundary to 71.6--78.4% afterward. At 20 MS/s the radios retained 63.92% and
+63.91% duty, each delivering 26/39 visits and explicitly skipping 13. At
+30 MS/s they retained 31.96% each, delivering 13/39 and explicitly skipping
+26. Both upper-rate cells had zero invalid or cancelled visits: overload sheds
+only complete dwells, never partial IQ. Every cell restored the exact original
+RF state and four-buffer count and exited Fast Lock. Both iiOD processes stayed
+at their original RAM-boot PID with supervisor generation 1.
+
+The eight RC12 campaign evidence SHA-256 identities, ordered by radio then
+10/15/20/30 MS/s, are
+`7b8e174daa000beee40b141cbe99b664c886401dd53cf1ac4421688d8f9a4528`,
+`be0c27fa47e81e0e03407ae2715654e683a4adb7c702cec9455b3c7ed9701b28`,
+`66655a07f0c6ae3e009eba95a4383b4f0060d20586e9e4bdf4b2564ad0cee3c8`,
+`e6f1068b3d6ca452f378c1b128cdb036ea3bdc0b315801f1dba47a9406ec15e0`,
+`a10aeaacb670efa768dc927a517a765f0421ed3ae175d51161427b9a0b229861`,
+`f323e3d5e12a73e490d20ea48ba4b1d3b27d02e40750bfd593a5594f29b5134b`,
+`e3773e167a673d28e579fb927497b57fc21a919987588cd8ef16f61dfa140ea3`,
+and `8cf4454e1ea6386e367d59bdb17e8e8f4f1587c5d235d590cea7aabb1efca171`.
+Post-campaign reboots returned `...843ef2` to
+`v0.50-plutoplus-spf-counter-rx-v1` and `...34759d` to
+`v0.51-plutoplus-spf-iq-direct-async-v5`, at their exact USB paths with
+supervisor generation 1. This independently verifies volatile rollback and no
+QSPI write. A true removal-of-power cold-return remains a physical gate.
 
 ## Desired behavior
 
