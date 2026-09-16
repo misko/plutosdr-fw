@@ -382,7 +382,10 @@ Post-campaign reboots returned `...843ef2` to
 `v0.50-plutoplus-spf-counter-rx-v1` and `...34759d` to
 `v0.51-plutoplus-spf-iq-direct-async-v5`, at their exact USB paths with
 supervisor generation 1. This independently verifies volatile rollback and no
-QSPI write. A true removal-of-power cold-return remains a physical gate.
+QSPI write. The post-RC12 host audit passes 4,750 PPU tests, strict mypy over
+122 source files, repository-wide Ruff, 32 firmware packaging/release-oracle
+tests, the focused native and sanitizer C suites, and the provider-enabled ARM
+iiOD build. A true removal-of-power cold-return remains a physical gate.
 
 ## Desired behavior
 
