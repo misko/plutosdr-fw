@@ -211,8 +211,9 @@ recover the unit, and do not try any later stage. RC6 full identities are DFU
 complete machine-readable identities are in
 `build/feature103-rc6/feature103-rc6-manifest.json`.
 
-Still required before deployment: physical power-cycle recovery of the first
-qualification radio to its unchanged v0.50 QSPI image, the final full-stage
+At the RC6 stage, still required before deployment were physical power-cycle
+recovery of the first qualification radio to its unchanged v0.50 QSPI image,
+the final full-stage
 return on both radios, scanner shadow-mode integration with the production
 scanner detector, live mid-session socket failure and RF signal-fidelity tests,
 and the bounded per-radio hardware campaigns and rollback verification below.
@@ -347,7 +348,7 @@ the units to the exact persistent firmware recorded before RAM transition:
 `v0.51-plutoplus-spf-iq-direct-async-v5` on `...34759d`, with their original
 serials, USB paths, and supervisor generation 1. This verifies volatile
 rollback and that qualification did not write QSPI. A true removal-of-power
-cold-return check remains a separate physical gate.
+cold-return check remained a separate physical gate at that point.
 
 Those RC11 receipts remain diagnostic evidence but do not qualify the changed
 RC12 bytes. RC12 therefore repeated the full matrix on both radios. Serial
@@ -396,7 +397,8 @@ supervisor generation 1. This independently verifies volatile rollback and no
 QSPI write. The post-RC12 host audit passes 4,757 PPU tests, strict mypy over
 125 source files, repository-wide Ruff, 32 firmware packaging/release-oracle
 tests, the focused native and sanitizer C suites, and the provider-enabled ARM
-iiOD build. A true removal-of-power cold-return remains a physical gate.
+iiOD build. The later removal-of-power receipt below closes the cold-return
+gate for both radios.
 
 The crash-sensitive live disconnect path also passes RC12. On `...843ef2`, the
 host received one complete 9.6 MB visit and then closed the IQ socket without a
@@ -434,7 +436,18 @@ boot UUID `be2646a3-cbb5-4513-83d5-0670834d7653`, and iiOD PID/start ticks
 of every power source for at least ten seconds; it must retain both exact
 serial/path/firmware/VERSIONS identities while changing both USB device
 instances and boot UUIDs, then pass TX-safe, iiOD, and ordinary-capture checks.
-This paragraph records the challenge only, not a passing cold-return claim.
+The operator then confirmed both radios were power-cycled. They returned as USB
+instances 74 and 73 with new boot UUIDs
+`79e8b566-e4cb-4fa8-928a-fba34a37cf49` and
+`9f44c0a0-8632-4eb7-8434-141142307918`, while both serials, paths, persistent
+firmware versions, and `/opt/VERSIONS` hashes remained exact. USB-anchored SSH
+reenrollment attested each rotated key. Both PHYs had carrier, both passed
+TX-safe checks, and each persistent iiOD delivered exactly 4,000,000 bytes for
+a bounded 1,000,000-sample RX0 CI16 capture, retained its process/start
+identity, and left all IIO buffers disabled. The pinned eight-cell RC12 release
+oracle then replayed successfully. The private cold-return receipt is
+`a03f23216f654107a88b508d62224294.json`, SHA-256
+`be85cbcc13ba1fe22c3a78bbc31517ad65a9c9fb42d3dbd8891cb9f9c79284a7`.
 
 ## Desired behavior
 
