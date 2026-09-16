@@ -74,8 +74,8 @@ def test_release_parent_and_fpga_are_hard_pinned():
 def test_staged_bisection_is_fixed_and_ram_only():
     source = SCRIPT.read_text()
     assert PACKAGE.STAGES == ("parent", "repack", "kernel", "rx0", "full")
-    assert '"candidate": "feature103-rc11"' in source
-    assert "v0.50-plutoplus-feature103-rc11" in source
+    assert '"candidate": "feature103-rc12"' in source
+    assert "v0.50-plutoplus-feature103-rc12" in source
     assert '"persistent_write_allowed": False' in source
     assert 'default = "config@0"' in source
     assert 'config@9 {{ description = "Linux with fpga RevC"' in source

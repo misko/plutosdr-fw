@@ -220,7 +220,7 @@ and the bounded per-radio hardware campaigns and rollback verification below.
 it belongs to a third serial. Persistent installation remains prohibited until
 both authorized radios independently pass every applicable gate.
 
-### RC8--RC11 live qualification findings
+### RC8--RC12 live qualification findings
 
 The canonical RC6/RC7 bisection succeeded on serial
 `104000b29905000e17000800065934759d`: byte-exact parent, canonical repack,
@@ -278,6 +278,29 @@ and its FIT size is 13,185,431 bytes. The exact manifest is
 `build/feature103-rc11/feature103-rc11-manifest.json` with SHA-256
 `e7ba98ced211f9e4cfd02aada94b1183e4be15247238a72a408b5a19bdefb4cc`.
 
+The first 20 MS/s RC11 cell then failed deterministically at visit 1. The
+wire record looked like an admitted visit with zero transition, interval, and
+Fast Lock CRC fields, but consuming the diagnostic stream exposed terminal
+errno `ERANGE`. The owner snapshot was near 3.2 billion samples while the DMA
+timestamp and restoration receipt were near 20.4 billion: session creation had
+extended a coherent 32-bit owner counter against zero before any full-width DMA
+timestamp was available. This loses the counter epoch after a wrap and lets the
+DMA producer advance beyond the scheduler's apparent time.
+
+libiio commit `61fdcc844ef8c78b7c3d2b044295565eb8d01ce4` defers visit zero until the
+first completed DMA block provides the authoritative 64-bit epoch, rebases the
+owner snapshot against that timestamp, discards the pre-retune block from every
+dwell, and only then schedules and recalls the first target. Pre-admission
+failures now serialize coherent `CANCELLED` records rather than zero-filled
+`ADMITTED` placeholders. Native, sanitizer, queue/capacity, transport, and ARM
+provider builds pass. RC12 contains this fix. Its full DFU is
+`9f401b3b1309db28d67e6b5380e6872f310ed1e2c3d9f073ee6d8aad5ac9fa05`,
+its FIT is
+`71b397ae007013b3b8ac6a017a4897f617e7db8be097708f61ff6aa0b15feac7`,
+its FIT size is 13,187,283 bytes, and its manifest is
+`build/feature103-rc12/feature103-rc12-manifest.json` with SHA-256
+`27a23f804115f7bb21565ac26b82b34e48d4f2602e0b3ee5ea6d219e3f5edd5e`.
+
 Hardware also showed that the four-buffer default cannot admit a 240 ms dwell
 at 10 MS/s with one-million-sample provider blocks and two headroom blocks.
 The host now reads the original count, sets 16 buffers for the bounded scan,
@@ -294,14 +317,14 @@ observed dropout mechanism: it is a firmware process/gadget recovery defect,
 not a corrupt QSPI image. A physical power cycle restores the unchanged QSPI
 image. No qualification attempt has written QSPI.
 
-RC11 remains RAM-only and is the sole executable feature-103 candidate.
-RC1--RC10 are quarantined. Before any persistence decision, both authorized
-radios must return RC11 full, independently pass the 10 MS/s `>95%` and
+RC12 remains RAM-only and is the sole executable feature-103 candidate.
+RC1--RC11 are quarantined. Before any persistence decision, both authorized
+radios must return RC12 full, independently pass the 10 MS/s `>95%` and
 15 MS/s `>=90%` 30-second controlled-feedback cells, show applied ACKs and an
 increased active-target selection share, restore radio settings and kernel
 buffer count exactly, and pass a power-cycle rollback check.
 
-Both authorized radios now pass that RAM qualification gate. Serial
+Both authorized radios passed that RAM qualification gate on RC11. Serial
 `1040007c4a94000211000b009186843ef2` returned at USB path `3-11` under receipt
 `9ce11b880100456a958329bc18c296ee`; its 10 and 15 MS/s cells retained
 95.899% and 95.896% duty. Serial `104000b29905000e17000800065934759d`
@@ -325,6 +348,10 @@ the units to the exact persistent firmware recorded before RAM transition:
 serials, USB paths, and supervisor generation 1. This verifies volatile
 rollback and that qualification did not write QSPI. A true removal-of-power
 cold-return check remains a separate physical gate.
+
+Those RC11 receipts remain diagnostic evidence but cannot qualify the changed
+RC12 bytes. RC12 must repeat the two-radio 10/15 MS/s duty gates and add bounded
+20/30 MS/s integrity cells before promotion.
 
 ## Desired behavior
 
@@ -695,7 +722,7 @@ state, radio settings, active owners, and available storage. Cleanup verifies
 the exact restored state and a fresh ordinary capture.
 
 Use the receipt-gated `pluto-feature103-qualify` command for every cell. It
-accepts only the two authorized serials and an exact successful RC11 RAM-return
+accepts only the two authorized serials and an exact successful RC12 RAM-return
 receipt, requires deterministic session/generation/seed and detector settings,
 performs a dry run unless `--execute` and the serial-specific confirmation are
 both supplied, writes atomic private evidence, and never writes QSPI. For
@@ -703,7 +730,7 @@ example, first inspect a controlled 10 MS/s cell:
 
 ```sh
 uv run pluto-feature103-qualify \
-  --serial SERIAL --uri ip:ADDRESS --ram-receipt RC11_RECEIPT \
+  --serial SERIAL --uri ip:ADDRESS --ram-receipt RC12_RECEIPT \
   --evidence NEW_EVIDENCE_PATH --mode adaptive --detector controlled \
   --session 1 --generation 1 --seed 103 \
   --rate 10000000 --bandwidth 8000000 --duration-ms 30000 --dwell-ms 240 \
@@ -711,10 +738,10 @@ uv run pluto-feature103-qualify \
 ```
 
 Repeat with `--execute --confirm "QUALIFY FEATURE 103 SERIAL"` only after the
-dry-run JSON binds the intended radio, RC11 hashes, setup, and evidence path.
+dry-run JSON binds the intended radio, RC12 hashes, setup, and evidence path.
 Energy-detector cells replace `--active-targets` with the frozen
 `--energy-threshold-dbfs`. Final fleet promotion requires distinct successful
-RC11 boot receipts and independent campaign evidence from both serials.
+RC12 boot receipts and independent campaign evidence from both serials.
 
 ### Campaign A: transport and complete visits
 
