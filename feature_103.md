@@ -78,12 +78,27 @@ As of 2026-09-16:
   scheduler thread, scatter/gather visit sends, independent `SCANFEEDBACK` and
   `SCANACK` commands, explicit terminal records, and restoration before final
   transport drain.
+- A RAM-only FIT/DFU candidate was assembled from the unchanged qualified FPGA
+  and Rev.C DTB, kernel `5ad4fbc32889`, iiOD/libiio `23e4edf`, and the v0.50
+  root filesystem. RC1 (`559bc93c…69cbf5`) reached DFU download but did not
+  boot because its FIT component hashes used SHA-256 while the deployed U-Boot
+  has `CONFIG_SHA256` disabled. Receipt
+  `97ab6f9ab7584e7daa9bec90139513b5` records the fail-closed unknown return.
+  RC1 is retained immutably and prohibited from persistence.
+- Corrected RC2 uses the same payloads and the qualified image's MD5 FIT hash
+  algorithm. Its exact identities are DFU
+  `fbc591ecbbeac83f8b24fc169fd675a834aa5e00aa5b779e79c7c097d9c61c81`
+  and FIT
+  `6cf16e9884fc46a362f3fcc9b61ea752c4cac89e69a8b12b3da2dbbe9b602c0e`.
+  PPU commit `a58b8f1` admits RC1/RC2 only through immutable RAM profiles and
+  tests that no persistent profile accepts either artifact.
 
-Still required before deployment: scanner shadow-mode integration, end-to-end
-socket failure and RF signal-fidelity tests, a hash-pinned firmware image,
+Still required before deployment: physical power-cycle recovery of the exact
+qualification radio to its unchanged v0.50 QSPI image, scanner shadow-mode
+integration, end-to-end socket failure and RF signal-fidelity tests, RC2
 exact-radio RAM boot, and the bounded hardware campaigns and rollback
-verification below. Persistent installation remains prohibited until those
-gates pass.
+verification below. The other attached Pluto was not touched. Persistent
+installation remains prohibited until those gates pass.
 
 ## Desired behavior
 
