@@ -98,6 +98,14 @@ As of 2026-09-16:
   adaptive modes run the same detector. Shadow mode never transmits feedback;
   adaptive mode sends periodic source-bound active/quiet observations, while
   `UNKNOWN` remains distinct from quiet.
+- PPU commits `c937a09`, `224ae47`, `a2ed81a`, and `3a4eaf0` add the bounded
+  exact-radio lifecycle: RX0-only factor-one setup through 30 MS/s, independent
+  fixed bandwidth, TX mute, fastlock compilation/double-read/CRC binding,
+  prepare-failure restoration, campaign-final restoration, application-ACK
+  correlation, and a bounded retry for the narrow race between delivery and
+  provider completion. The focused PPU suite now passes 122 tests with Ruff
+  and strict mypy clean; the ASan/UBSan C policy/session/queue suite also
+  remains green.
 
 Still required before deployment: physical power-cycle recovery of the exact
 qualification radio to its unchanged v0.50 QSPI image, scanner shadow-mode
