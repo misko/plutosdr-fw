@@ -38,14 +38,16 @@ closed.
 
 As of 2026-09-16:
 
-- Linux branch `codex/feature-103`, commits `8c2927f1bdb6`, `d20eb1d417d4`, and
-  `5ad4fbc32889`, adds descriptor-owner
+- Linux branch `codex/feature-103`, commits `8c2927f1bdb6`, `d20eb1d417d4`,
+  `5ad4fbc32889`, and `21b0090b491a`, adds descriptor-owner
   scan capability discovery, setup-time RX fastlock profile/frequency/CRC
   attestation, source-counter-bracketed recalls and restoration, plus an
   owner-only coherent source-counter snapshot for dwell pacing independent of
   DMA block completion. Descriptor-close remains the crash fallback. Ordinary
   sysfs LO and fastlock mutation remains excluded while the counter lease is
-  owned.
+  owned. Capability discovery now rejects unsupported physical topologies
+  before advertising adaptive scan, and a dedicated volatile Rev.C device tree
+  removes 2R2T, explicitly selects RX0/TX0, and programs the AXI core for 1R1T.
 - libiio branch `codex/feature-103` contains prerequisite direct-segment rearm
   commit `737d910`, scheduler/visit/radio core commit `7657d3b`, deterministic
   capacity simulation commit `556f8f0`, strict wire protocol commit `f75838e`,
@@ -92,6 +94,19 @@ As of 2026-09-16:
   `6cf16e9884fc46a362f3fcc9b61ea752c4cac89e69a8b12b3da2dbbe9b602c0e`.
   PPU commit `a58b8f1` admits RC1/RC2 only through immutable RAM profiles and
   tests that no persistent profile accepts either artifact.
+- Historical exact-radio evidence then proved its installed Rev.C environment
+  selects physical 2R2T (`iio,buffer-counter-metadata-topology-supported=0`).
+  RC2 is therefore retained as a diagnostic artifact but is not eligible for
+  the live adaptive-scan campaign: it would boot but correctly reject scan
+  acquisition. RC3 narrows only the volatile device tree to physical RX0/1R1T,
+  keeps the qualified FPGA and fixed-bandwidth design, and also gates
+  `GET_SCAN_CAPS` on that topology. Its exact identities are DFU
+  `7e5a551f5cfe9fd3d913527c5d4f3bcfb0b5d544301d5e96ab1ca0bbf2701fae`
+  and FIT
+  `565549cb08a2fe6245bddf863ccc6cfe3516e57a0dba0e2fe77322ca9039e3b2`.
+  The FIT is 13,184,047 bytes, uses MD5 component hashes supported by the
+  deployed U-Boot, and is byte-identical to the DFU body; the DFU suffix is
+  bound to `0456:b673`. RC3 has no persistent companion.
 - PPU commits `9959935`, `939df83`, and `f0c8f33` add strict whole-stream
   setup/terminal binding, fail-closed truncated-socket tests, exact
   source-counter acceptance metrics, and a scanner adapter whose shadow and
@@ -112,18 +127,21 @@ As of 2026-09-16:
   `/usr/lib/libiio.so.0.25` payload hashes are `72d4aafc…dd695` and
   `ce67ffdc…d5780f`; the base symlinks resolve `libiio.so -> libiio.so.0 ->
   libiio.so.0.25`, and every ARM hard-float runtime dependency is present.
-- PPU commits `7955a6d`, `2f60118`, `5b6b577`, `12332a1`, and `895376e`
-  add private atomic campaign evidence, require the exact successful RC2
+- PPU commits `7955a6d`, `2f60118`, `5b6b577`, `12332a1`, `895376e`, and
+  `b4d179d` add private atomic campaign evidence, require the exact successful RC3
   RAM-return receipt, provide an RF-independent controlled-activity detector,
   measure selection-share changes at the firmware-reported application
-  boundary, and build canonical fixed-rate campaign setups. Thus duty,
+  boundary, build canonical fixed-rate campaign setups, and attest the RC3
+  return as the physical RX0/1R1T layout with topology support `1`. Thus duty,
   feedback transport, and weighting can be qualified independently of ambient
-  RF before the energy-detector fidelity lane.
+  RF before the energy-detector fidelity lane. The complete focused adaptive
+  and counter-profile suite passes 1,207 tests; targeted Ruff and strict mypy
+  checks are clean.
 
 Still required before deployment: physical power-cycle recovery of the exact
 qualification radio to its unchanged v0.50 QSPI image, scanner shadow-mode
 integration with the production scanner detector, live mid-session socket
-failure and RF signal-fidelity tests, RC2 exact-radio RAM boot, and the bounded
+failure and RF signal-fidelity tests, RC3 exact-radio RAM boot, and the bounded
 hardware campaigns and rollback verification below. The other attached Pluto
 was not touched. Persistent installation remains prohibited until those gates
 pass.
