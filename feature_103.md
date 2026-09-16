@@ -106,6 +106,12 @@ As of 2026-09-16:
   provider completion. The focused PPU suite now passes 122 tests with Ruff
   and strict mypy clean; the ASan/UBSan C policy/session/queue suite also
   remains green.
+- PPU commit `731e29e` adds a deterministic hash-bound CI16 energy detector
+  with per-visit dBFS evidence for shadow and adaptive runs. A direct newc
+  archive parse proves the candidate's final `/usr/sbin/iiod` and
+  `/usr/lib/libiio.so.0.25` payload hashes are `72d4aafc…dd695` and
+  `ce67ffdc…d5780f`; the base symlinks resolve `libiio.so -> libiio.so.0 ->
+  libiio.so.0.25`, and every ARM hard-float runtime dependency is present.
 
 Still required before deployment: physical power-cycle recovery of the exact
 qualification radio to its unchanged v0.50 QSPI image, scanner shadow-mode
