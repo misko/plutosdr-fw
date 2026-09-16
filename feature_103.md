@@ -220,7 +220,7 @@ and the bounded per-radio hardware campaigns and rollback verification below.
 it belongs to a third serial. Persistent installation remains prohibited until
 both authorized radios independently pass every applicable gate.
 
-### RC8--RC10 live qualification findings
+### RC8--RC11 live qualification findings
 
 The canonical RC6/RC7 bisection succeeded on serial
 `104000b29905000e17000800065934759d`: byte-exact parent, canonical repack,
@@ -242,20 +242,41 @@ profile words, and binds the setup to their CRCs. It forces a distinct ordinary
 LO transition before leaving fastlock so a matching cached clock value cannot
 suppress deactivation.
 
-Live transport then exposed two provider defects that simulations had not
-covered. libiio commit `7918bb9b77a99a9630e5625c47f59bc0c5f7c5a5`
+Live transport then exposed provider defects that simulations had not covered.
+libiio commit `7918bb9b77a99a9630e5625c47f59bc0c5f7c5a5`
 makes the nominal boundary close idempotent when a DMA gap already made that
 dwell terminal; this prevents an explicit `INVALID_GAP` from becoming a fatal
 `EINVAL`. Commit `ee2f40d2616581719f9dd5726d0d6ff8334f3a9c`
 timestamps feedback from the scan session's mutex-protected coherent counter
 watermark instead of issuing a competing owner ioctl from the feedback TCP
-connection. RC10 contains both fixes. Its full DFU is
+connection. RC10 contains both changes. Its full DFU is
 `cdd25fcb2fa422d515500f0f144bae0c1d543405e1a0bdbd687b6a939950074a`,
 its FIT is
 `95760da77b70cefaf1ee9bb0d43c2d012846893f8edee8f50645c39c3c4daf5f`,
 and its FIT size is 13,185,287 bytes. The manifest is
 `build/feature103-rc10/feature103-rc10-manifest.json` with SHA-256
 `2892afdef3e8fd4e7f6b4f728c96fd5b3f023157ebc8aac9ef9b34df7e5ea306`.
+
+RC10 falsified the counter-ioctl crash hypothesis: a two-second adaptive run
+again timed out and produced supervisor `status=139`. A 49 MiB ARM core dump
+resolved the crash to `spf_visit_queue_reap()` calling
+`iio_buffer_block_release()` after the parent buffer had already been
+destroyed. The initiating fault was independent: feedback and ACK lookup took
+`thdlist_lock`, while the scan stream held that same lock across multi-megabyte
+Ethernet writes. Feedback could therefore starve until the host's ten-second
+socket timeout. Cancellation then entered the invalid buffer/block teardown
+order and crashed.
+
+libiio commit `cb6b02ab4b995a370e54fe2f8a4623357e6413b4` closes both ownership
+boundaries. Scan control now uses a dedicated provider-lifetime mutex that is
+never held by IQ transport, and teardown returns all provider-owned DMA blocks
+before destroying their parent libiio buffer. RC11 contains that fix. Its full
+DFU is `d6c129c9562920e671826efeb3d3eebc0cd3cb95ac91d27fa59dadd9e718526c`,
+its FIT is
+`f4563a66b72c832abec4da78dc688c6153926922212c0de6ea5b2e2449d87067`,
+and its FIT size is 13,185,431 bytes. The exact manifest is
+`build/feature103-rc11/feature103-rc11-manifest.json` with SHA-256
+`e7ba98ced211f9e4cfd02aada94b1183e4be15247238a72a408b5a19bdefb4cc`.
 
 Hardware also showed that the four-buffer default cannot admit a 240 ms dwell
 at 10 MS/s with one-million-sample provider blocks and two headroom blocks.
@@ -264,7 +285,7 @@ and restores the exact original count afterward. This is 64 MB of CI16 DMA
 storage and admits 10 and 15 MS/s dwell windows without approaching the 200 MB
 queue ceiling. A two-second RC9 no-feedback run delivered seven complete
 visits (67.2 MB) with no skips or gaps and exact restoration; active feedback
-then reproduced the feedback-control failure fixed in RC10.
+then reproduced the feedback-control failure now addressed in RC11.
 
 RC9's iiod crash (`status=139`) caused its supervisor to restart FunctionFS.
 The radio stayed healthy and reachable over Ethernet, but `/sys/class/udc`
@@ -273,9 +294,9 @@ observed dropout mechanism: it is a firmware process/gadget recovery defect,
 not a corrupt QSPI image. A physical power cycle restores the unchanged QSPI
 image. No qualification attempt has written QSPI.
 
-RC10 remains RAM-only and is the sole executable feature-103 candidate.
-RC1--RC9 are quarantined. Before any persistence decision, both authorized
-radios must return RC10 full, independently pass the 10 MS/s `>95%` and
+RC11 remains RAM-only and is the sole executable feature-103 candidate.
+RC1--RC10 are quarantined. Before any persistence decision, both authorized
+radios must return RC11 full, independently pass the 10 MS/s `>95%` and
 15 MS/s `>=90%` 30-second controlled-feedback cells, show applied ACKs and an
 increased active-target selection share, restore radio settings and kernel
 buffer count exactly, and pass a power-cycle rollback check.
@@ -649,7 +670,7 @@ state, radio settings, active owners, and available storage. Cleanup verifies
 the exact restored state and a fresh ordinary capture.
 
 Use the receipt-gated `pluto-feature103-qualify` command for every cell. It
-accepts only the two authorized serials and an exact successful RC10 RAM-return
+accepts only the two authorized serials and an exact successful RC11 RAM-return
 receipt, requires deterministic session/generation/seed and detector settings,
 performs a dry run unless `--execute` and the serial-specific confirmation are
 both supplied, writes atomic private evidence, and never writes QSPI. For
@@ -657,7 +678,7 @@ example, first inspect a controlled 10 MS/s cell:
 
 ```sh
 uv run pluto-feature103-qualify \
-  --serial SERIAL --uri ip:ADDRESS --ram-receipt RC10_RECEIPT \
+  --serial SERIAL --uri ip:ADDRESS --ram-receipt RC11_RECEIPT \
   --evidence NEW_EVIDENCE_PATH --mode adaptive --detector controlled \
   --session 1 --generation 1 --seed 103 \
   --rate 10000000 --bandwidth 8000000 --duration-ms 30000 --dwell-ms 240 \
@@ -665,10 +686,10 @@ uv run pluto-feature103-qualify \
 ```
 
 Repeat with `--execute --confirm "QUALIFY FEATURE 103 SERIAL"` only after the
-dry-run JSON binds the intended radio, RC4 hashes, setup, and evidence path.
+dry-run JSON binds the intended radio, RC11 hashes, setup, and evidence path.
 Energy-detector cells replace `--active-targets` with the frozen
 `--energy-threshold-dbfs`. Final fleet promotion requires distinct successful
-RC10 boot receipts and independent campaign evidence from both serials.
+RC11 boot receipts and independent campaign evidence from both serials.
 
 ### Campaign A: transport and complete visits
 

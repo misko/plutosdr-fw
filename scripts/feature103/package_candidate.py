@@ -32,7 +32,7 @@ BASE_COMPONENT_SHA256 = {
     "rootfs": "b0b7e5c640d7274da6f93b4e755473184ce79db0cedd710f676563703c4aa498",
 }
 LINUX_SOURCE = "104af780d1668dfc239804fba62215930d85af2b"
-LIBIIO_SOURCE = "ee2f40d2616581719f9dd5726d0d6ff8334f3a9c"
+LIBIIO_SOURCE = "cb6b02ab4b995a370e54fe2f8a4623357e6413b4"
 EPOCH = 1789588800
 STAGES = ("parent", "repack", "kernel", "rx0", "full")
 
@@ -187,7 +187,7 @@ def feature_rootfs(
         raise CandidateError("qualified rootfs lacks opt/VERSIONS")
     fields, original_versions = entries[versions_name]
     lines = original_versions.decode("utf-8").splitlines()
-    lines = replace_version(lines, "device-fw", "v0.50-plutoplus-feature103-rc10")
+    lines = replace_version(lines, "device-fw", "v0.50-plutoplus-feature103-rc11")
     lines = replace_version(lines, "linux", LINUX_SOURCE)
     lines = replace_version(lines, "libiio", LIBIIO_SOURCE)
     new_versions = ("\n".join(lines) + "\n").encode("utf-8")
@@ -321,7 +321,7 @@ def build(args: argparse.Namespace) -> dict[str, object]:
             stage_dir = output / stage
             stage_dir.mkdir(parents=True, exist_ok=True)
             if stage == "parent":
-                dfu = stage_dir / "feature103-rc10-parent.dfu"
+                dfu = stage_dir / "feature103-rc11-parent.dfu"
                 dfu.write_bytes(parent_bytes)
                 stages[stage] = {
                     "dfu_path": str(dfu),
@@ -347,11 +347,11 @@ def build(args: argparse.Namespace) -> dict[str, object]:
                 "fpga.bit",
             ):
                 shutil.copyfile(work / filename, stage_dir / filename)
-            its = stage_dir / "feature103-rc10.its"
+            its = stage_dir / "feature103-rc11.its"
             its.write_text(
                 its_text(stage, fdt1_name, fdt2_name, fdt3_name, kernel_name, rootfs_name)
             )
-            itb = stage_dir / f"feature103-rc10-{stage}.itb"
+            itb = stage_dir / f"feature103-rc11-{stage}.itb"
             run(
                 "mkimage",
                 "-f",
@@ -361,7 +361,7 @@ def build(args: argparse.Namespace) -> dict[str, object]:
                 env=os.environ | {"SOURCE_DATE_EPOCH": str(EPOCH)},
             )
             fit = itb.read_bytes()
-            dfu = stage_dir / f"feature103-rc10-{stage}.dfu"
+            dfu = stage_dir / f"feature103-rc11-{stage}.dfu"
             dfu.write_bytes(add_dfu_suffix(fit))
             stages[stage] = {
                 "dfu_path": str(dfu),
@@ -389,7 +389,7 @@ def build(args: argparse.Namespace) -> dict[str, object]:
         manifest = {
             "schema": "plutosdr-fw.feature103-provenance-closed-candidate",
             "schema_version": 1,
-            "candidate": "feature103-rc10",
+            "candidate": "feature103-rc11",
             "persistent_write_allowed": False,
             "qualified_parent": {
                 "dfu_sha256": BASE_DFU_SHA256,
@@ -413,7 +413,7 @@ def build(args: argparse.Namespace) -> dict[str, object]:
             },
             "stages": stages,
         }
-        manifest_path = output / "feature103-rc10-manifest.json"
+        manifest_path = output / "feature103-rc11-manifest.json"
         manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
         return manifest
 
