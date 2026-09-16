@@ -409,6 +409,18 @@ exact restoration; its evidence SHA-256 is
 The subsequent reboot again returned the exact persistent
 `v0.50-plutoplus-spf-counter-rx-v1` image at USB path `3-11`.
 
+A later apparent `.18` dropout had a different signature and must not be
+conflated with the RC9 iiOD/FunctionFS failure. USB path `3-11` remained fully
+enumerated, the serial and persistent v0.50 image were exact, iiOD remained PID
+213, and the USB network path answered normally. The physical Ethernet PHY was
+up at 1 Gb/s/full duplex with carrier, but the host's neighbor entry was
+`FAILED`; after the radio originated one ping to the host, the host learned its
+current MAC and `.18` immediately answered at sub-millisecond latency. This is
+an asymmetric Ethernet neighbor/startup condition, not an adaptive-scan crash
+or corrupt image. The observation does not by itself identify the lower-level
+MAC/ARP cause, so future reachability checks should retain USB-path health and
+neighbor state instead of classifying every lost LAN ping as a firmware crash.
+
 ## Desired behavior
 
 The host defines the legal scan at setup. Firmware then owns all dwell-boundary
