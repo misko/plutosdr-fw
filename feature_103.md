@@ -149,13 +149,17 @@ As of 2026-09-16:
   return as the physical RX0/1R1T layout with topology support `1`. Thus duty,
   feedback transport, and weighting can be qualified independently of ambient
   RF before the energy-detector fidelity lane. The complete focused adaptive
-  and counter-profile suite passes 1,211 tests; targeted Ruff and strict mypy
+  and deployment-safety suite passes 1,252 tests; targeted Ruff and strict mypy
   checks are clean.
 - PPU commit `bd0865f` drains ready application acknowledgements while IQ is
   still streaming. This closes a campaign-length defect in which a 300-second
   run could exhaust the firmware's 64-entry ACK mailbox even though short
   tests passed. A 100-feedback bounded-mailbox regression now proves streaming
   drain, and RC4 is the only candidate accepted by new campaign evidence.
+- PPU commits `ee040b2`, `c7d5fe8`, and `8c387c6` move pinned SSH attestation
+  before the RAM-transition mutation receipt, require distinct successful RC4
+  receipts from both authorized serials, and provide the deterministic
+  receipt-gated `pluto-feature103-qualify` command used below.
 
 Still required before deployment: physical power-cycle recovery of the first
 qualification radio to its unchanged v0.50 QSPI image, scanner shadow-mode
