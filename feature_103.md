@@ -387,6 +387,17 @@ QSPI write. The post-RC12 host audit passes 4,750 PPU tests, strict mypy over
 tests, the focused native and sanitizer C suites, and the provider-enabled ARM
 iiOD build. A true removal-of-power cold-return remains a physical gate.
 
+The crash-sensitive live disconnect path also passes RC12. On `...843ef2`, the
+host received one complete 9.6 MB visit and then closed the IQ socket without a
+protocol close. Provider ownership became available immediately; the first
+restoration attempt exactly restored RF state and the four-buffer count and
+left Fast Lock inactive. iiOD remained PID 213 with supervisor generation 1.
+An immediate fresh 10 MS/s adaptive session then passed at 95.938% duty with
+exact restoration; its evidence SHA-256 is
+`3ae0254adeec1fdd960ff8424f88660be8cb218e71943caa838896182b096953`.
+The subsequent reboot again returned the exact persistent
+`v0.50-plutoplus-spf-counter-rx-v1` image at USB path `3-11`.
+
 ## Desired behavior
 
 The host defines the legal scan at setup. Firmware then owns all dwell-boundary
