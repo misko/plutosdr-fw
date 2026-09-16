@@ -421,6 +421,21 @@ or corrupt image. The observation does not by itself identify the lower-level
 MAC/ARP cause, so future reachability checks should retain USB-path health and
 neighbor state instead of classifying every lost LAN ping as a firmware crash.
 
+The physical cold-return gate has a frozen pre-cycle challenge from
+2026-09-16T22:36:29Z. At `3-11`, serial `...843ef2` was USB device instance 72,
+ran persistent `v0.50-plutoplus-spf-counter-rx-v1`, had `/opt/VERSIONS`
+SHA-256 `e6313dcc0e94b121d37b271d72ad621bf2b86936a926f9c4eaea8b2e44e29032`,
+boot UUID `804472fc-4ea7-4b12-b071-8450e8e55393`, and iiOD PID/start ticks
+213/354. At `3-8`, serial `...34759d` was USB device instance 69, ran
+persistent `v0.51-plutoplus-spf-iq-direct-async-v5`, had `/opt/VERSIONS`
+SHA-256 `43a3876e0793a632e8b6234e64d9fa3cd38aecc73c5f3af8c2e827234b00992f`,
+boot UUID `be2646a3-cbb5-4513-83d5-0670834d7653`, and iiOD PID/start ticks
+218/353. A passing post-cycle record must follow an operator-confirmed removal
+of every power source for at least ten seconds; it must retain both exact
+serial/path/firmware/VERSIONS identities while changing both USB device
+instances and boot UUIDs, then pass TX-safe, iiOD, and ordinary-capture checks.
+This paragraph records the challenge only, not a passing cold-return claim.
+
 ## Desired behavior
 
 The host defines the legal scan at setup. Firmware then owns all dwell-boundary
