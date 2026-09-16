@@ -22,7 +22,7 @@ def test_direct_async_v5_release_route_and_locks():
             ["git", "ls-files", "--stage", component], cwd=ROOT, text=True
         ).split()[1]
         assert manifest["submodule_" + component.replace("-", "_")] == pin
-    assert manifest["libiio_0_25_source"] == "0de80c0ed05fed86da58ff5afadfdda83dadd0e1"
-    assert manifest["libiio_0_25_archive_sha256"] == "7dddda42e75231797a59933958d2c34a9abc2c6943fa0161d98e9aa38d64c056"
+    assert manifest["libiio_0_25_source"] == "1d75119e897a2e571ca460a72b4b31e17113c49e"
+    assert manifest["libiio_0_25_archive_sha256"] == "5094ef4403d51e690dda6f0e9cc34546074cec1c8c88e948fab9449672d189ca"
     for script in ("scripts/build_gain_series_candidate.sh", "scripts/ci/package_main_firmware.sh"):
         assert "iq-direct-async-v5-source.yaml |" in (ROOT / script).read_text()

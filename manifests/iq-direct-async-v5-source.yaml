@@ -7,10 +7,10 @@ release_state: candidate
 
 firmware_repo: https://github.com/misko/plutosdr-fw.git
 
-libiio_0_25_source: 0de80c0ed05fed86da58ff5afadfdda83dadd0e1
+libiio_0_25_source: 1d75119e897a2e571ca460a72b4b31e17113c49e
 libiio_0_25_repo: https://github.com/misko/libiio.git
-libiio_0_25_ref: refs/tags/iq-direct-async-v5-source/libiio-v3
-libiio_0_25_archive_sha256: 7dddda42e75231797a59933958d2c34a9abc2c6943fa0161d98e9aa38d64c056
+libiio_0_25_ref: refs/tags/iq-direct-async-v5-source/libiio-v4
+libiio_0_25_archive_sha256: 5094ef4403d51e690dda6f0e9cc34546074cec1c8c88e948fab9449672d189ca
 
 metadata_source: 3294365ff44da26b261be4a2ccb241b7896d23ad
 metadata_repo: https://github.com/misko/plutosdr-fw.git
@@ -24,9 +24,9 @@ ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
 ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
 ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
 
-submodule_buildroot: 95388f1dc920e9a8901ea3ccee05d2dbafcf7f12
+submodule_buildroot: 2a3fac7c1d57b0fcffa4e3ef861fdf535d7ed211
 submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
-submodule_buildroot_ref: refs/tags/iq-direct-async-v5-source/buildroot-v3
+submodule_buildroot_ref: refs/tags/iq-direct-async-v5-source/buildroot-v4
 
 submodule_hdl: 145bd47e55d5c5537e0ba49d53cb25a5393f66ba
 submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
@@ -45,6 +45,6 @@ submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
 submodule_u_boot_xlnx_ref: refs/tags/gain-series-v4-rc2-source/u-boot-xlnx
 
 versions_hdl: ddr-burst-v1-rc4-source/hdl-v1
-versions_buildroot: iq-direct-async-v5-source/buildroot-v3
+versions_buildroot: iq-direct-async-v5-source/buildroot-v4
 versions_linux: counter-rx-v1-source/linux-v1
 versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx
