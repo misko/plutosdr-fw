@@ -74,8 +74,8 @@ def test_release_parent_and_fpga_are_hard_pinned():
 def test_staged_bisection_is_fixed_and_ram_only():
     source = SCRIPT.read_text()
     assert PACKAGE.STAGES == ("parent", "repack", "kernel", "rx0", "full")
-    assert '"candidate": "feature103-rc12"' in source
-    assert "v0.50-plutoplus-feature103-rc12" in source
+    assert PACKAGE.CANDIDATE == "feature103-rc13"
+    assert "v0.50-plutoplus-feature103-rc13" in source
     assert '"persistent_write_allowed": False' in source
     assert 'default = "config@0"' in source
     assert 'config@9 {{ description = "Linux with fpga RevC"' in source
@@ -105,3 +105,11 @@ def test_rx0_stages_transform_every_fit_device_tree_slot():
     assert 'work / f"rx0-{revision}.dtb"' in source
     for revision in ("reva", "revb", "revc"):
         assert f'"rx0-{revision}.dtb"' in source
+
+
+def test_rc13_maps_logical_tx0_to_the_wired_physical_tx2() -> None:
+    source = SCRIPT.read_text()
+    assert '"adi,1rx-1tx-mode-use-rx-num", "1"' in source
+    assert '"adi,1rx-1tx-mode-use-tx-num", "2"' in source
+    assert '"select physical RX1 and TX2"' in source
+    assert '"adi,1rx-1tx-mode-use-tx-num", "1"' not in source

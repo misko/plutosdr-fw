@@ -31,10 +31,11 @@ BASE_COMPONENT_SHA256 = {
     "fpga": "b96891fa1bb4fe8053089dc3fa76812d3e046e624810b333808354958c26e93c",
     "rootfs": "b0b7e5c640d7274da6f93b4e755473184ce79db0cedd710f676563703c4aa498",
 }
-LINUX_SOURCE = "104af780d1668dfc239804fba62215930d85af2b"
+LINUX_SOURCE = "eeefe8c6228eede6206197e941aa7024d5ac60d2"
 LIBIIO_SOURCE = "61fdcc844ef8c78b7c3d2b044295565eb8d01ce4"
 EPOCH = 1789588800
 STAGES = ("parent", "repack", "kernel", "rx0", "full")
+CANDIDATE = "feature103-rc13"
 
 
 class CandidateError(RuntimeError):
@@ -187,7 +188,7 @@ def feature_rootfs(
         raise CandidateError("qualified rootfs lacks opt/VERSIONS")
     fields, original_versions = entries[versions_name]
     lines = original_versions.decode("utf-8").splitlines()
-    lines = replace_version(lines, "device-fw", "v0.50-plutoplus-feature103-rc12")
+    lines = replace_version(lines, "device-fw", "v0.50-plutoplus-feature103-rc13")
     lines = replace_version(lines, "linux", LINUX_SOURCE)
     lines = replace_version(lines, "libiio", LIBIIO_SOURCE)
     new_versions = ("\n".join(lines) + "\n").encode("utf-8")
@@ -212,7 +213,7 @@ def rx0_dtb(base: Path, destination: Path) -> bytes:
     if "adi,2rx-2tx-mode-enable" in properties:
         run("fdtput", "-d", str(destination), phy, "adi,2rx-2tx-mode-enable")
     run("fdtput", "-t", "x", str(destination), phy, "adi,1rx-1tx-mode-use-rx-num", "1")
-    run("fdtput", "-t", "x", str(destination), phy, "adi,1rx-1tx-mode-use-tx-num", "1")
+    run("fdtput", "-t", "x", str(destination), phy, "adi,1rx-1tx-mode-use-tx-num", "2")
     run("fdtput", "-t", "s", str(destination), dds, "compatible", "adi,axi-ad9364-dds-6.00.a")
     return destination.read_bytes()
 
@@ -321,7 +322,7 @@ def build(args: argparse.Namespace) -> dict[str, object]:
             stage_dir = output / stage
             stage_dir.mkdir(parents=True, exist_ok=True)
             if stage == "parent":
-                dfu = stage_dir / "feature103-rc12-parent.dfu"
+                dfu = stage_dir / f"{CANDIDATE}-parent.dfu"
                 dfu.write_bytes(parent_bytes)
                 stages[stage] = {
                     "dfu_path": str(dfu),
@@ -347,11 +348,11 @@ def build(args: argparse.Namespace) -> dict[str, object]:
                 "fpga.bit",
             ):
                 shutil.copyfile(work / filename, stage_dir / filename)
-            its = stage_dir / "feature103-rc12.its"
+            its = stage_dir / f"{CANDIDATE}.its"
             its.write_text(
                 its_text(stage, fdt1_name, fdt2_name, fdt3_name, kernel_name, rootfs_name)
             )
-            itb = stage_dir / f"feature103-rc12-{stage}.itb"
+            itb = stage_dir / f"{CANDIDATE}-{stage}.itb"
             run(
                 "mkimage",
                 "-f",
@@ -361,7 +362,7 @@ def build(args: argparse.Namespace) -> dict[str, object]:
                 env=os.environ | {"SOURCE_DATE_EPOCH": str(EPOCH)},
             )
             fit = itb.read_bytes()
-            dfu = stage_dir / f"feature103-rc12-{stage}.dfu"
+            dfu = stage_dir / f"{CANDIDATE}-{stage}.dfu"
             dfu.write_bytes(add_dfu_suffix(fit))
             stages[stage] = {
                 "dfu_path": str(dfu),
@@ -389,7 +390,7 @@ def build(args: argparse.Namespace) -> dict[str, object]:
         manifest = {
             "schema": "plutosdr-fw.feature103-provenance-closed-candidate",
             "schema_version": 1,
-            "candidate": "feature103-rc12",
+            "candidate": CANDIDATE,
             "persistent_write_allowed": False,
             "qualified_parent": {
                 "dfu_sha256": BASE_DFU_SHA256,
@@ -403,7 +404,7 @@ def build(args: argparse.Namespace) -> dict[str, object]:
                 },
                 "allowed_changes": [
                     "remove adi,2rx-2tx-mode-enable",
-                    "select RX1/TX1 physical pair",
+                    "select physical RX1 and TX2",
                     "select adi,axi-ad9364-dds-6.00.a",
                 ],
             },
@@ -413,7 +414,7 @@ def build(args: argparse.Namespace) -> dict[str, object]:
             },
             "stages": stages,
         }
-        manifest_path = output / "feature103-rc12-manifest.json"
+        manifest_path = output / f"{CANDIDATE}-manifest.json"
         manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
         return manifest
 
