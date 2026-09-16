@@ -318,8 +318,9 @@ observed dropout mechanism: it is a firmware process/gadget recovery defect,
 not a corrupt QSPI image. A physical power cycle restores the unchanged QSPI
 image. No qualification attempt has written QSPI.
 
-RC12 remains RAM-only and is the sole executable feature-103 candidate.
-RC1--RC11 are quarantined. Before any persistence decision, both authorized
+At completion of the adaptive-scan matrix, RC12 was the sole executable
+feature-103 candidate and remained RAM-only. RC1--RC11 are quarantined. Before
+any persistence decision, both authorized
 radios must return RC12 full, independently pass the 10 MS/s `>95%` and
 15 MS/s `>=90%` 30-second controlled-feedback cells, show applied ACKs and an
 increased active-target selection share, restore radio settings and kernel
@@ -448,6 +449,58 @@ identity, and left all IIO buffers disabled. The pinned eight-cell RC12 release
 oracle then replayed successfully. The private cold-return receipt is
 `a03f23216f654107a88b508d62224294.json`, SHA-256
 `be85cbcc13ba1fe22c3a78bbc31517ad65a9c9fb42d3dbd8891cb9f9c79284a7`.
+
+### TX2 fixture and RC13 qualification reset
+
+The conducted-RF fixture on each authorized radio is physical TX2 through a
+30 dB attenuator and a passive tee into RX0 and RX1. The feature image still
+scans one physical receiver, RX0, but its qualification DDS must therefore use
+physical TX2 rather than TX1. Linux commit
+`eeefe8c6228eede6206197e941aa7024d5ac60d2` makes that one device-tree change:
+the volatile feature topology is RX0/1R1T with
+`adi,1rx-1tx-mode-use-tx-num = <2>`. It does not enable dual-RX adaptive scan,
+change bandwidth during a session, or widen the 30 MS/s release boundary.
+
+RC13 contains that topology correction. Its exact identities are DFU
+`1554cc43e2af0efe494eae570140adb57a2162b3cc7aa531e6f00dd9ca9b23f2`,
+FIT `a836a026f9e49572805c402ce24886b88beb23dbf12bbad5e7a1cb921f253c25`,
+and manifest
+`f0b2ceaab0822709e093ca70b51b1b4b28f519f40d613684971dca531f614201`.
+The FIT is 13,187,271 bytes. All three DTB slots independently read back RX
+selector 1 and TX selector 2. Firmware commit
+`3154d637b50e79d9d751c0c83ade0037ad99c293` binds those facts in the package
+manifest and static packaging oracle. RC13 is RAM-only and has no persistent
+profile.
+
+PPU commits `c857c900945359adb3f5124b9021848bc61e4835` and
+`81d01297a267cad1d52bcb2bc0f832aefc87969e` add a fail-closed fixture oracle
+and an opt-in exact-serial hardware test. The oracle requires one stable tone
+on both receiver legs; it checks frequency/alias, SNR, level, clipping,
+cross-leg coherence and balance, plus early/middle/late stability. Synthetic
+tests reject either missing leg, the wrong or negative alias, excess imbalance,
+settling or fading, and clipping. Hardware initialization calibrates while
+muted, applies a bounded TX2 attenuation while DDS is off, enables DDS only
+after the two-RX topology is proven, and always disables DDS and returns both
+TX gains to -80 dB in cleanup.
+
+Both persistent images were deliberately placed in verified 2R2T mode only to
+test the physical fixture. With TX2 gain -10 dB and the 30 dB attenuator
+(40 dB effective attenuation), serial `...843ef2` measured a 100,020.926 Hz
+tone at -16.570/-17.190 dBFS with 34.655/34.729 dB SNR, zero clipping, and
+0.999951 coherence. TX1 produced only the rejected noise floor. Serial
+`...34759d` measured 100,020.926 Hz at -27.391/-25.653 dBFS with
+32.383/33.121 dB SNR, zero clipping, and 0.999745 coherence. The combined
+exact-serial hardware test passed, and both radios finished with TX1/TX2 at
+-80 dB and DDS disabled. A subsequent read-only check found four RX scan
+channels on each persistent 2R2T image and both TX gains still at -80 dB.
+
+This evidence validates the fixture, the TX2 port choice, and the host-side
+signal oracle; it does **not** transfer RC12's adaptive-scan qualification to
+changed RC13 bytes. RC12 remains the fully matrix-qualified historical
+candidate. RC13 becomes promotable only after it repeats, on both radios, the
+10/15/20/30 MS/s matrix, feedback weighting, exact restoration, abrupt-client
+cleanup, volatile rollback, and removal-of-power cold-return checks. The
+10 MS/s `>95%` and 15 MS/s `>=90%` full-session duty gates remain unchanged.
 
 ## Desired behavior
 
@@ -816,6 +869,26 @@ identical channel/dwell geometry unless the named factor is under test.
 Preflight records serial, firmware/FIT, kernel, iiOD, capabilities, TX-safe
 state, radio settings, active owners, and available storage. Cleanup verifies
 the exact restored state and a fresh ordinary capture.
+
+Before an RC13 adaptive campaign, prove the conducted fixture independently on
+the persistent 2R2T image:
+
+```sh
+PLUTO_TX2_LOOPBACK_SERIALS="SERIAL_1,SERIAL_2" \
+PLUTO_TX2_LOOPBACK_ATTENUATION_DB=30 \
+PLUTO_TX2_LOOPBACK_TX_GAIN_DB=-10 \
+LD_PRELOAD=.venv/lib/libiio.so.0.25 \
+.venv/bin/pytest -q -s tests/hardware/test_tx2_splitter_hardware.py
+```
+
+This is an intentional RF-transmission test and therefore requires all three
+environment variables. It must resolve both exact serials, prove 2R2T before
+transmission, use only physical TX2, observe the tone on both RX legs, and
+verify mute/cleanup even on failure. Run the synthetic oracle tests without
+hardware first. After the fixture passes, RAM-boot exact RC13 and repeat the
+release matrix with new RC13-bound receipts and evidence; the RC12 oracle must
+continue rejecting those records until the new matrix identities are reviewed
+and pinned.
 
 Use the receipt-gated `pluto-feature103-qualify` command for every cell. It
 accepts only the two authorized serials and an exact successful RC12 RAM-return
