@@ -40,3 +40,4 @@ sha256 102900208eef27b766380135906d431dba87edaa7ec6aa72e6ebd3dd67f3a97b  COPYING
 
 # Issue-97 local candidate archive (scripts/issue97/build.sh stages this exact archive).
 sha256 a6676eee9318a38d25e098ce7dce78c3af7df3f8e357f40efdf7f059e8ef2d50  libiio-47a75cbc5e7d24a063b8b54eb531fdba6602b85c.tar.gz
+sha256 a5b643525e5c8762481a685cb57c70c498d230d300c3e070cd70579b14f8cb0b  libiio-b37eafbf2a2b0e6c4e51622544717574f52c11dc.tar.gz
