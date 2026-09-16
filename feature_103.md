@@ -301,6 +301,31 @@ radios must return RC11 full, independently pass the 10 MS/s `>95%` and
 increased active-target selection share, restore radio settings and kernel
 buffer count exactly, and pass a power-cycle rollback check.
 
+Both authorized radios now pass that RAM qualification gate. Serial
+`1040007c4a94000211000b009186843ef2` returned at USB path `3-11` under receipt
+`9ce11b880100456a958329bc18c296ee`; its 10 and 15 MS/s cells retained
+95.899% and 95.896% duty. Serial `104000b29905000e17000800065934759d`
+returned at `3-8` under receipt `51c45eefcc764a648fc8f09515354b2d`;
+its cells retained 95.892% and 95.897% duty. Every cell delivered 119/119
+whole visits with zero skips, gaps, or cancellations. The active target's
+selection share increased from 66.7% at the first applied-feedback boundary to
+73.3--78.4% afterward. Both units retained iiOD PID 213, supervisor generation
+1/restart 0, reconciled all accepted feedback with terminal ACKs, restored the
+original RF settings and four-buffer count, and exited Fast Lock.
+
+The four private campaign receipts have SHA-256 identities
+`852d5357889758561cf1e8616907571bb8264b0d0970aae3fc1300cea34282d1`,
+`6b43d03e69b14e69bd661c5915755dc53c590d92714c40eadb04914af7a0b416`,
+`90e96e4359c31e65c2a4465474cc7564cfe86d318885112215ca78f015e619ae`,
+and `6fefcc6a5b5ebd5d2515a4eef2a63921c4d68f68681ea2d9055ccb91a2ddfeeb`.
+A post-campaign reboot returned
+the units to the exact persistent firmware recorded before RAM transition:
+`v0.50-plutoplus-spf-counter-rx-v1` on `...843ef2` and
+`v0.51-plutoplus-spf-iq-direct-async-v5` on `...34759d`, with their original
+serials, USB paths, and supervisor generation 1. This verifies volatile
+rollback and that qualification did not write QSPI. A true removal-of-power
+cold-return check remains a separate physical gate.
+
 ## Desired behavior
 
 The host defines the legal scan at setup. Firmware then owns all dwell-boundary
