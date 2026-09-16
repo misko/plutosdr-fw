@@ -92,13 +92,20 @@ As of 2026-09-16:
   `6cf16e9884fc46a362f3fcc9b61ea752c4cac89e69a8b12b3da2dbbe9b602c0e`.
   PPU commit `a58b8f1` admits RC1/RC2 only through immutable RAM profiles and
   tests that no persistent profile accepts either artifact.
+- PPU commits `9959935`, `939df83`, and `f0c8f33` add strict whole-stream
+  setup/terminal binding, fail-closed truncated-socket tests, exact
+  source-counter acceptance metrics, and a scanner adapter whose shadow and
+  adaptive modes run the same detector. Shadow mode never transmits feedback;
+  adaptive mode sends periodic source-bound active/quiet observations, while
+  `UNKNOWN` remains distinct from quiet.
 
 Still required before deployment: physical power-cycle recovery of the exact
 qualification radio to its unchanged v0.50 QSPI image, scanner shadow-mode
-integration, end-to-end socket failure and RF signal-fidelity tests, RC2
-exact-radio RAM boot, and the bounded hardware campaigns and rollback
-verification below. The other attached Pluto was not touched. Persistent
-installation remains prohibited until those gates pass.
+integration with the production scanner detector, live mid-session socket
+failure and RF signal-fidelity tests, RC2 exact-radio RAM boot, and the bounded
+hardware campaigns and rollback verification below. The other attached Pluto
+was not touched. Persistent installation remains prohibited until those gates
+pass.
 
 ## Desired behavior
 
