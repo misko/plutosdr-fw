@@ -378,12 +378,23 @@ The eight RC12 campaign evidence SHA-256 identities, ordered by radio then
 `f323e3d5e12a73e490d20ea48ba4b1d3b27d02e40750bfd593a5594f29b5134b`,
 `e3773e167a673d28e579fb927497b57fc21a919987588cd8ef16f61dfa140ea3`,
 and `8cf4454e1ea6386e367d59bdb17e8e8f4f1587c5d235d590cea7aabb1efca171`.
+The `pluto-feature103-verify` release oracle now pins those eight identities and
+replays the two named RC12 RAM-boot receipts. It rejects non-private or
+non-canonical evidence, duplicate/missing cells, any earlier candidate,
+changed scheduler or queue geometry, inconsistent source-counter accounting,
+unreconciled accepted feedback, absent applied active feedback, a
+non-increasing active-target share, a failed duty/integrity gate, or inexact
+RF/buffer/Fast-Lock restoration. It derives all results from the records rather
+than trusting their stored `passed` flags. The exact live replay passes schema
+`pluto-plus-utils.feature-103-release-matrix.v1` with both boot receipts and
+all eight cells.
+
 Post-campaign reboots returned `...843ef2` to
 `v0.50-plutoplus-spf-counter-rx-v1` and `...34759d` to
 `v0.51-plutoplus-spf-iq-direct-async-v5`, at their exact USB paths with
 supervisor generation 1. This independently verifies volatile rollback and no
-QSPI write. The post-RC12 host audit passes 4,750 PPU tests, strict mypy over
-122 source files, repository-wide Ruff, 32 firmware packaging/release-oracle
+QSPI write. The post-RC12 host audit passes 4,757 PPU tests, strict mypy over
+125 source files, repository-wide Ruff, 32 firmware packaging/release-oracle
 tests, the focused native and sanitizer C suites, and the provider-enabled ARM
 iiOD build. A true removal-of-power cold-return remains a physical gate.
 
@@ -787,6 +798,18 @@ dry-run JSON binds the intended radio, RC12 hashes, setup, and evidence path.
 Energy-detector cells replace `--active-targets` with the frozen
 `--energy-threshold-dbfs`. Final fleet promotion requires distinct successful
 RC12 boot receipts and independent campaign evidence from both serials.
+Replay the complete release matrix with the fail-closed oracle; each option is
+required, and the command itself pins the approved evidence identities:
+
+```sh
+uv run pluto-feature103-verify \
+  --ram-receipt "SERIAL_1=RC12_RECEIPT_1" \
+  --ram-receipt "SERIAL_2=RC12_RECEIPT_2" \
+  --evidence RADIO1_10M.json --evidence RADIO1_15M.json \
+  --evidence RADIO1_20M.json --evidence RADIO1_30M.json \
+  --evidence RADIO2_10M.json --evidence RADIO2_15M.json \
+  --evidence RADIO2_20M.json --evidence RADIO2_30M.json
+```
 
 ### Campaign A: transport and complete visits
 
