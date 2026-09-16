@@ -103,7 +103,7 @@ As of 2026-09-16:
   fixed bandwidth, TX mute, fastlock compilation/double-read/CRC binding,
   prepare-failure restoration, campaign-final restoration, application-ACK
   correlation, and a bounded retry for the narrow race between delivery and
-  provider completion. The focused PPU suite now passes 122 tests with Ruff
+  provider completion. The focused PPU suite now passes 124 tests with Ruff
   and strict mypy clean; the ASan/UBSan C policy/session/queue suite also
   remains green.
 - PPU commit `731e29e` adds a deterministic hash-bound CI16 energy detector
