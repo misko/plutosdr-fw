@@ -32,10 +32,10 @@ BASE_COMPONENT_SHA256 = {
     "rootfs": "b0b7e5c640d7274da6f93b4e755473184ce79db0cedd710f676563703c4aa498",
 }
 LINUX_SOURCE = "eeefe8c6228eede6206197e941aa7024d5ac60d2"
-LIBIIO_SOURCE = "61fdcc844ef8c78b7c3d2b044295565eb8d01ce4"
+LIBIIO_SOURCE = "d249dd280dda480f524f37adc9157a24dae2b6d1"
 EPOCH = 1789588800
 STAGES = ("parent", "repack", "kernel", "rx0", "full")
-CANDIDATE = "feature103-rc13"
+CANDIDATE = "feature103-rc14"
 
 
 class CandidateError(RuntimeError):
@@ -188,7 +188,7 @@ def feature_rootfs(
         raise CandidateError("qualified rootfs lacks opt/VERSIONS")
     fields, original_versions = entries[versions_name]
     lines = original_versions.decode("utf-8").splitlines()
-    lines = replace_version(lines, "device-fw", "v0.50-plutoplus-feature103-rc13")
+    lines = replace_version(lines, "device-fw", "v0.50-plutoplus-feature103-rc14")
     lines = replace_version(lines, "linux", LINUX_SOURCE)
     lines = replace_version(lines, "libiio", LIBIIO_SOURCE)
     new_versions = ("\n".join(lines) + "\n").encode("utf-8")
