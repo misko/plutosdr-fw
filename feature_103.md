@@ -103,7 +103,7 @@ As of 2026-09-16:
   fixed bandwidth, TX mute, fastlock compilation/double-read/CRC binding,
   prepare-failure restoration, campaign-final restoration, application-ACK
   correlation, and a bounded retry for the narrow race between delivery and
-  provider completion. The focused PPU suite now passes 124 tests with Ruff
+  provider completion. The focused PPU suite now passes 134 tests with Ruff
   and strict mypy clean; the ASan/UBSan C policy/session/queue suite also
   remains green.
 - PPU commit `731e29e` adds a deterministic hash-bound CI16 energy detector
@@ -112,6 +112,13 @@ As of 2026-09-16:
   `/usr/lib/libiio.so.0.25` payload hashes are `72d4aafc…dd695` and
   `ce67ffdc…d5780f`; the base symlinks resolve `libiio.so -> libiio.so.0 ->
   libiio.so.0.25`, and every ARM hard-float runtime dependency is present.
+- PPU commits `7955a6d`, `2f60118`, `5b6b577`, `12332a1`, and `895376e`
+  add private atomic campaign evidence, require the exact successful RC2
+  RAM-return receipt, provide an RF-independent controlled-activity detector,
+  measure selection-share changes at the firmware-reported application
+  boundary, and build canonical fixed-rate campaign setups. Thus duty,
+  feedback transport, and weighting can be qualified independently of ambient
+  RF before the energy-detector fidelity lane.
 
 Still required before deployment: physical power-cycle recovery of the exact
 qualification radio to its unchanged v0.50 QSPI image, scanner shadow-mode
