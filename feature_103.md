@@ -577,13 +577,26 @@ exact transition produced successful TX-safe receipts
 `v0.51-plutoplus-spf-iq-direct-async-v5`. Both returned with four RX scan
 channels and tandem AGC present.
 
-The pre-cold-return boot identities are
+The pre-cold-return boot identities were
 `e967484e-91ea-4564-8e4e-fde97676bb35` and
-`2a953b5d-0530-4b18-a7ae-560eade0e97e`, respectively. The only remaining RC14
-release gate is an operator-performed removal-of-power cycle of both radios,
-followed by exact USB identity, changed boot identity, persistent firmware,
-2R2T topology, TX-safe, and ordinary-capture verification. This gate may not
-be substituted by a software reboot or by RC12 evidence.
+`2a953b5d-0530-4b18-a7ae-560eade0e97e`, respectively. The operator then removed
+power from both radios. They re-enumerated on the same physical USB paths as
+new device instances `usb:3.99.5` and `usb:3.98.5`, with changed boot identities
+`387f7b41-16c8-4452-842e-2095f6a58846` and
+`b9ccbbaa-5f97-425b-abde-e16236afdc8e`. Exact-USB and pinned-SSH inspection
+confirmed the same serials, exact persistent firmware versions, AD9361, four RX
+scan channels, tandem AGC, the live-qualified `ad9361-2r2t-set-attr-pair`
+persistent U-Boot tuple, TX-safe readback, and successful 5.8 GHz LO
+set/readback/restoration. Fresh bounded dual-RX refills delivered 65,536 samples
+per channel and 524,288 wire bytes on each radio in 87 ms and 244 ms. This
+closes the operator-confirmed removal-of-power cold-return gate; no RC12
+evidence or software reboot was substituted.
+
+The host doctor still reports historical disconnect counters from the deliberate
+DFU, reboot, and power-removal transitions. Radio 1 also has two older port-log
+errors from the previously investigated bad-image episode. They are not new
+post-cold data-plane failures: both fresh post-cold refills, exact identities,
+firmware inspections, route restorations, and RF restoration checks passed.
 
 ## Desired behavior
 
