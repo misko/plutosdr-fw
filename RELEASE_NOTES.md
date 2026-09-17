@@ -88,6 +88,10 @@ RC14 passed the pinned two-radio matrix. Both radios retained more than 95.8%
 full-session duty at 10 and 15 MS/s, applied controlled feedback, restored exact
 RF state, recovered immediately after abrupt client loss, returned safely to
 their persistent images, and passed operator-confirmed removal-of-power checks.
+The protected release build also narrows every FIT device-tree slot to RC14's
+qualified RX0/TX2 topology and validates those bytes again after extracting
+them from the packaged DFU; other firmware build routes retain their normal
+topology.
 The final protected build must preserve the source graph and repeat exact-byte
 RAM and persistent qualification before publication. Complete evidence and
 artifact hashes are recorded in `feature_103.md`.

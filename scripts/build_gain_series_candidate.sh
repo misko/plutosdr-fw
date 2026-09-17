@@ -59,6 +59,7 @@ esac
 cd "$ROOT"
 [[ -f "$MANIFEST" ]] || fail "manifest not found: ${MANIFEST}"
 manifest_name="$(basename -- "$MANIFEST")"
+candidate_make_args=()
 case "$manifest_name" in
 adaptive-scan-v1-source.yaml | iq-direct-async-v5-source.yaml | counter-rx-v1-source.yaml | iq-direct-async-v4-source.yaml | iq-direct-async-v3-source.yaml | iq-direct-async-v2-source.yaml | iq-direct-async-ring-v1-rc1-source.yaml | iio-throughput-coverage-window-v6-rc1-source.yaml | \
 ddr-capacity-test-rc1-source.yaml | iio-throughput-sampler-wake-v5-rc1-source.yaml | iio-throughput-refill-sampler-v4-rc1-source.yaml | iio-throughput-sampler-poll-v3-rc1-source.yaml | iio-throughput-rw-affinity-v2-rc1-source.yaml | iio-throughput-affinity-v1-rc1-source.yaml | iio-throughput-timing-v1-rc1-source.yaml | iio-throughput-hold-v2-rc1-source.yaml | iio-throughput-hold-v1-rc1-source.yaml | ddr-ring-prefill-v1-rc1-source.yaml | ddr-ring-v1-rc2-source.yaml | ddr-ring-v1-rc1-source.yaml | ddr-burst-v2-rc3-source.yaml | ddr-burst-v2-rc2-source.yaml | ddr-burst-v2-rc1-source.yaml | ddr-burst-v1-rc5-source.yaml | ddr-burst-v1-rc4-source.yaml | ddr-burst-v1-rc3-source.yaml | \
@@ -71,6 +72,9 @@ tandem-agc-v8-rc5-source.yaml | tandem-agc-v8-rc6-source.yaml | tandem-agc-v8-rc
         fail "protected manifest differs from its committed HEAD blob"
     ;;
 esac
+if [[ "$manifest_name" == adaptive-scan-v1-source.yaml ]]; then
+    candidate_make_args+=(FEATURE103_RX0_TX2_TOPOLOGY=1)
+fi
 scripts/check_source_graph.sh "$MANIFEST"
 [[ "$MODE" == source-check ]] && exit 0
 
@@ -154,6 +158,7 @@ sha256sum "$ROOT/build/system_top.xsa"
 # means "derive it from git describe", which is what every development build
 # wants; a release build sets it. See the RELEASE_VERSION comment in Makefile.
 exec make "${buildroot_make_args[@]}" \
+    "${candidate_make_args[@]}" \
     RELEASE_VERSION="${RELEASE_VERSION:-}" \
     VIVADO_SETTINGS="$VIVADO_SETTINGS" \
     build/pluto.dfu build/pluto.frm

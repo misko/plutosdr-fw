@@ -598,6 +598,17 @@ errors from the previously investigated bad-image episode. They are not new
 post-cold data-plane failures: both fresh post-cold refills, exact identities,
 firmware inspections, route restorations, and RF restoration checks passed.
 
+The first v0.52 trusted-build attempt was stopped before publication or radio
+deployment when release review found that the generic image path still packed
+the ordinary Rev.C device trees. Those bytes would boot, but a radio retaining
+its 2R2T environment would correctly omit adaptive-scan capability. The
+protected adaptive-scan route now applies RC14's byte-proven RX0/TX2 narrowing
+to all three FIT device-tree slots before `mkimage`, and packaging extracts and
+revalidates all three DTBs from the final DFU. A regression check confirmed the
+transform produces the exact RC14 DTB hashes for RevA, RevB, and RevC, while an
+ordinary 2R2T DTB fails the new packaging check. Generic firmware routes remain
+unchanged. Only an artifact built after this correction is release-eligible.
+
 ## Desired behavior
 
 The host defines the legal scan at setup. Firmware then owns all dwell-boundary

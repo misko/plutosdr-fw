@@ -144,6 +144,20 @@ ramdisk_count="$(awk '$1 == "Image" && $3 == "(ramdisk@1)" {count++} END {print 
    "$ramdisk_count" == 1 ]] ||
     fail "unexpected FIT layout: fdt=$fdt_count fpga=$fpga_count kernel=$kernel_count ramdisk=$ramdisk_count"
 
+# Adaptive scan is admitted only on the proven one-RX/TX2 topology. Validate
+# the bytes extracted from the final DFU, not merely the intermediate DTBs, so
+# no generic Rev.C image can be mislabeled and uploaded as the v0.52 release.
+if [[ "$(basename "$MANIFEST")" == adaptive-scan-v1-source.yaml ]]; then
+    adaptive_dtbs=()
+    for fdt_index in 0 1 2; do
+        packed_dtb="$ARTIFACT_ROOT/packed-fdt-${fdt_index}.dtb"
+        dumpimage -T flat_dt -p "$fdt_index" -o "$packed_dtb" "$dfu"
+        adaptive_dtbs+=("$packed_dtb")
+    done
+    scripts/feature103/apply_rx0_tx2_topology.sh --check "${adaptive_dtbs[@]}"
+    printf 'Adaptive-scan RX0/TX2 topology verified in all three FIT slots.\n'
+fi
+
 ramdisk_index="$(awk '$1 == "Image" && $3 == "(ramdisk@1)" {print $2}' \
     "$ARTIFACT_ROOT/fit-layout.txt")"
 fpga_index="$(awk '$1 == "Image" && $3 == "(fpga@1)" {print $2}' \

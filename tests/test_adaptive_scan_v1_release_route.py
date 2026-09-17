@@ -54,3 +54,20 @@ def test_adaptive_scan_v1_release_route_and_locks() -> None:
         "./scripts/check_source_graph.sh manifests/adaptive-scan-v1-source.yaml"
         in (ROOT / "scripts/check_tandem_release_offline.sh").read_text()
     )
+
+
+def test_adaptive_scan_v1_build_applies_qualified_topology_to_every_fit_slot() -> None:
+    build = (ROOT / "scripts/build_gain_series_candidate.sh").read_text()
+    makefile = (ROOT / "Makefile").read_text()
+    topology = (ROOT / "scripts/feature103/apply_rx0_tx2_topology.sh").read_text()
+
+    assert "candidate_make_args+=(FEATURE103_RX0_TX2_TOPOLOGY=1)" in build
+    assert "$(FEATURE103_TOPOLOGY_STAMP)" in makefile
+    assert "apply_rx0_tx2_topology.sh $(TARGET_DTS_FILES)" in makefile
+    assert "apply_rx0_tx2_topology.sh --check" in (
+        ROOT / "scripts/ci/package_main_firmware.sh"
+    ).read_text()
+    assert "adi,2rx-2tx-mode-enable" in topology
+    assert "adi,1rx-1tx-mode-use-rx-num 1" in topology
+    assert "adi,1rx-1tx-mode-use-tx-num 2" in topology
+    assert "adi,axi-ad9364-dds-6.00.a" in topology

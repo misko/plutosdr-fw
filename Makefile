@@ -73,6 +73,19 @@ endif
 
 TARGET_DTS_FILES:=$(foreach dts,$(TARGET_DTS_FILES),build/$(dts))
 
+# Feature 103 is intentionally a one-RX release. Its qualification fixture uses
+# physical TX2, and RC14 proved the same narrowed topology in every FIT slot.
+# Keep the generic build unchanged unless the protected adaptive-scan manifest
+# explicitly enables this input.
+FEATURE103_RX0_TX2_TOPOLOGY ?= 0
+ifeq (1,$(FEATURE103_RX0_TX2_TOPOLOGY))
+FEATURE103_TOPOLOGY_STAMP := build/.feature103-rx0-tx2-topology
+
+$(FEATURE103_TOPOLOGY_STAMP): $(TARGET_DTS_FILES) scripts/feature103/apply_rx0_tx2_topology.sh
+	scripts/feature103/apply_rx0_tx2_topology.sh $(TARGET_DTS_FILES)
+	touch $@
+endif
+
 TOOLCHAIN:
 	make -C buildroot ARCH=arm zynq_$(TARGET)_defconfig
 	make -C buildroot toolchain
@@ -141,7 +154,7 @@ endif
 build/rootfs.cpio.gz: buildroot/output/images/rootfs.cpio.gz | build
 	cp $< $@
 
-build/$(TARGET).itb: u-boot-xlnx/tools/mkimage build/zImage build/rootfs.cpio.gz $(TARGET_DTS_FILES) build/system_top.bit
+build/$(TARGET).itb: u-boot-xlnx/tools/mkimage build/zImage build/rootfs.cpio.gz $(TARGET_DTS_FILES) $(FEATURE103_TOPOLOGY_STAMP) build/system_top.bit
 	u-boot-xlnx/tools/mkimage -f scripts/$(TARGET).its $@
 
 build/system_top.xsa:  | build
