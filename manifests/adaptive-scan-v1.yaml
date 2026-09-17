@@ -1,0 +1,34 @@
+# Immutable build and hardware-qualification manifest for adaptive scan v1.
+schema: plutosdr-fw.build-manifest
+schema_version: 1
+release_state: hardware-qualified-release
+
+release_tag: v0.52-plutoplus-spf-adaptive-scan-v1
+release_url: https://github.com/misko/plutosdr-fw/releases/tag/v0.52-plutoplus-spf-adaptive-scan-v1
+device_fw: v0.52-plutoplus-spf-adaptive-scan-v1
+firmware_source: 2da11edf69bba3e193b816da037da13e41c51a4d
+ci_run_id: 35168772895
+
+asset_name: plutoplus-spf-adaptive-scan-v1-2da11edf69bb-pluto.dfu
+image_sha256: f88c5fe44160f0a09031fb8b68f92b2280022e0f38174845b7edc3a37c26eea2
+image_size: 13007039
+fit_body_sha256: 1f3ec2b6937e09a349e952a7bcc499a2902043f09f35c51fb0a5d50eb34d5403
+fit_body_size: 13007023
+
+frm_asset_name: plutoplus-spf-adaptive-scan-v1-2da11edf69bb-pluto.frm
+frm_sha256: 35bca4f5cfb6f9ec8a32692ceb2b55a20238a38bbff3e40fcd76789b765002a9
+frm_size: 13007056
+bundle_asset_name: plutoplus-spf-adaptive-scan-v1-2da11edf69bb.tar.gz
+bundle_sha256: c788e9f198d3b6d0904c0c8a8d7a87892f22ce5bcd29fb61d8b332c5bd874295
+bundle_size: 134952750
+
+source_manifest: adaptive-scan-v1-source.yaml
+source_manifest_sha256: f0b929b1a7285c5919ff02ada9d1a95048b2f9df7b73ee8b1a9d1ae95ee913b5
+integrated_verdict_sha256: 953c7bfe144ede409b732ce52ebf292725a279a5b05809ae5a2be62c93d3aead
+qualification_verdict_sha256: f67d538dc9b3f9c1a202faee2b5ebc747e9cc1d05c964c9717ad8f2c049f63b0
+cold_boot_receipt_sha256: 8638dc46d0e3e4a6f4d2f05711b881078e26c658e8f88209d16788020c41c192
+
+qualified_serials: 1040007c4a94000211000b009186843ef2,104000b29905000e17000800065934759d
+qualified_rates_sps: 10000000,15000000,20000000,30000000
+qualified_rx: RX0
+qualified_tx: TX2

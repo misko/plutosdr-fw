@@ -65,6 +65,7 @@
 | `v0.47-plutoplus-spf-iq-direct-async-v2` | 2026-08-31 | superseded hardware-qualified full release; rollback target | keeps a whole host target in one DMA session and adds default drop-backlog plus preserve-backlog overrun policies for ringless and RAM-extended queues |
 | `v0.48-plutoplus-spf-iq-direct-async-v3` | 2026-09-01 | superseded hardware-qualified full release; rollback target | recovers stale gain/RSSI metadata in drop-backlog mode and completes long finite sessions |
 | **`v0.49-plutoplus-spf-iq-direct-async-v4`** | 2026-09-01 | **current hardware-qualified full release** | authoritative requested/allocated DMA admission, real 50-buffer/200 MB DMA profile, 216 MiB CMA, and persistent return qualification |
+| **`v0.52-plutoplus-spf-adaptive-scan-v1`** | 2026-09-17 | **current hardware-qualified full release** | fixed-bandwidth autonomous frequency selection through 30 MS/s, complete-visit admission, and asynchronous source-bound host feedback |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -72,6 +73,29 @@ across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
 work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
+
+## v0.52-plutoplus-spf-adaptive-scan-v1 — 2026-09-17 — **hardware-qualified full release**
+
+V1 lets a host define a fixed-bandwidth frequency set at session start while
+firmware owns subsequent dwell selection. Source-bound activity feedback raises
+the corresponding channel's sampling weight without interrupting the active
+dwell. Complete visits are admitted only when bounded queue capacity exists;
+overload therefore produces explicit whole-visit skips instead of fragmented IQ.
+This release is limited to one RX and rates through 30 MS/s. Per-visit bandwidth
+or AD9361 clock changes and 60 MS/s operation remain deferred.
+
+Trusted run 35168772895 built source `2da11edf69bb`; its DFU is
+`f88c5fe4…6eea2` and its 13,007,023-byte FIT is `1f3ec2b6…d5403`. The
+protected build narrows every FIT device-tree slot to the qualified RX0/TX2
+topology and validates those bytes after extracting them from the packaged DFU.
+
+Those exact bytes passed the full two-radio RAM matrix, rollback, persistent
+installation, removal-of-power cold return, and post-cold adaptive smoke gates.
+Full-session duty was 95.89–95.90% at 10 MS/s and 95.90–95.90% at 15 MS/s;
+20 and 30 MS/s overload runs retained complete-visit integrity with explicit
+accounting. Abrupt-client ownership released in 145 ms and 188 ms, followed by
+fresh 95.93% and 95.95% recovery runs. Complete evidence and immutable hashes
+are recorded in `feature_103.md` and `manifests/adaptive-scan-v1.yaml`.
 
 ## v0.49-plutoplus-spf-iq-direct-async-v4 — 2026-09-01 — **current hardware-qualified full release**
 
