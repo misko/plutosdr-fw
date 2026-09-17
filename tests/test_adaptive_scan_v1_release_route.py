@@ -33,10 +33,10 @@ def test_adaptive_scan_v1_release_route_and_locks() -> None:
         assert manifest["submodule_" + component.replace("-", "_")] == pin
 
     assert manifest["libiio_0_25_source"] == (
-        "d249dd280dda480f524f37adc9157a24dae2b6d1"
+        "5518228d9181b95de7b7f3e2fdfe1fee438fbbf0"
     )
     assert manifest["libiio_0_25_archive_sha256"] == (
-        "a6d9c9563790a5cbab7236332346ab211afc290a17fe906441b4ac2b0907b94d"
+        "3fca3c443626736716907baee722a462b5fc20587707a6b5deaa4e085624454a"
     )
     assert manifest["release_state"] == "candidate"
     assert "release_tag" not in manifest

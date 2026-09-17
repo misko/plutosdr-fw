@@ -609,6 +609,15 @@ transform produces the exact RC14 DTB hashes for RevA, RevB, and RevC, while an
 ordinary 2R2T DTB fails the new packaging check. Generic firmware routes remain
 unchanged. Only an artifact built after this correction is release-eligible.
 
+That corrected trusted-build attempt then exposed a separate integration-test
+link defect before rootfs completion: Buildroot enables
+`test_spf_counter_metadata`, but the target did not link the adaptive scheduler,
+radio, protocol, policy, and visit-queue objects now called by the provider.
+Production `iiod` linked, but the release correctly stopped. libiio commit
+`5518228d9181` adds those exact test dependencies; its ARM provider target links
+and passes under qemu-arm. Buildroot source lock `e2de8a933b36` pins that commit
+and its verified GitHub archive. No failed-build bytes were packaged or loaded.
+
 ## Desired behavior
 
 The host defines the legal scan at setup. Firmware then owns all dwell-boundary
