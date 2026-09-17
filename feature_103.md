@@ -502,6 +502,89 @@ candidate. RC13 becomes promotable only after it repeats, on both radios, the
 cleanup, volatile rollback, and removal-of-power cold-return checks. The
 10 MS/s `>95%` and 15 MS/s `>=90%` full-session duty gates remain unchanged.
 
+### RC14 main synchronization and live matrix
+
+Before release, the feature branches were refreshed from their current
+upstreams. Firmware merge `250b3e2a7` incorporates `origin/main` through PR
+#104. PPU merge `159fccd` incorporates `origin/main` through PR #117. libiio
+merge `d249dd280dda480f524f37adc9157a24dae2b6d1` incorporates its compatible
+`origin/master`, including negotiated direct-async peer limits and synchronous
+USB-pipe teardown while retaining the adaptive provider. The Linux repository
+has no `main`; its `master` is a 95,293-commit kernel-generation migration from
+the qualified Pluto base, so that unrelated migration was inspected, rejected
+from this release, and cleanly aborted rather than folded into feature 103.
+
+The merged userspace source changes the release bytes, so RC13 evidence was not
+reused. RC14 is the new RAM-only candidate: DFU
+`99ae82e5e6a5eb4f02394463112e9d41fd90ff8343cbfbf95a4ec15e97853db1`,
+FIT `26db9c700ad5b2cf01a3a9fc841f847bc0d06f7a1660cbbd3f181dcc4bdf048e`,
+and manifest
+`bd787fe59e7fa6627b4438376e2d8dc00268f5afb5ee5cb8c6d55d3f854d1c22`.
+The FIT is 13,200,115 bytes; all three DTB slots independently retain RX
+selector 1 and TX selector 2. Firmware commit `b4626fae0` packages this exact
+source graph. PPU commits `01a5d36`, `971ac83`, and `d351011` bind the RAM
+profile, require RC14 receipts for new campaigns, and pin the resulting release
+matrix without changing the historical RC12 receipt verifier.
+
+Both authorized radios returned exact RC14 at their exact USB paths with
+TX-safe receipts `03ec88632d854ec68282358f89cdb8d0` and
+`c9bad49b41d6423ba2d23eb923182b33`. The eight-cell controlled-feedback matrix
+then passed on both radios. At 10 MS/s they retained 95.888% and 95.900% duty;
+at 15 MS/s they retained 95.887% and 95.899%. Every mandatory cell delivered
+119/119 complete visits with zero skips. At 20 MS/s each delivered 26/39 and
+skipped 13 whole visits, retaining 63.921% and 63.906%; at 30 MS/s each
+delivered 13/39 and skipped 26 whole visits, retaining 31.960% and 31.957%.
+Every cell had zero invalid or cancelled visits, reconciled accepted feedback,
+increased the active target's post-application selection share, restored the
+exact RF state and four-buffer count, and left Fast Lock inactive.
+
+The pinned evidence SHA-256 identities, ordered by radio then 10/15/20/30
+MS/s, are
+`114beef6e7bc43ea0b0500335e2e57f2dab169ad60f7bdb17b53698cfdf6b0da`,
+`4ca0173b179d6457067be3052bb9da3b04671401a944085056ccdfb4711dd7d9`,
+`fba438897f03066d0e8a87731348aad99ef818df78ce9d746dcd462f05d86747`,
+`270861e218d728ea7740948069d2c9385485237e27066c4581a979cc4638b82f`,
+`85fb3e5f2cbf8ac134ae28ba60660ddf00b942a022881c327ba10a3744a9c35e`,
+`27974eeaed663d963d28e52faf8c28e3c34488076a84c9034c97a9b3bbdcfb86`,
+`953784c24338ecc120f2308d60f499da0135a5005fddb19635df2e71e80a3c49`,
+and `b5578716a78b523ec6af078ff963dec356e4ec6c2fd8332eb7503aeda4696039`.
+The RC14 fleet oracle replays these exact private records successfully. One
+initial `.18` campaign connection encountered the already-diagnosed stale LAN
+neighbor condition; USB and iiOD stayed healthy, a bounded ping restored the
+neighbor, and the unchanged cell then passed. `.15` required the same
+radio-originated neighbor seed after RAM return.
+
+The matrix closes RC14's performance, integrity, weighting, and restoration
+gates. Abrupt-client cleanup also passed on both radios: each transport was
+closed after its first complete 9,600,000-byte visit and before the terminal
+record, capabilities reopened immediately, the exact RF and four-buffer state
+was restored, and Fast Lock was inactive. Fresh three-second recovery campaigns
+then retained 95.876% and 95.959% duty. Their evidence SHA-256 identities are
+`798d5ac025d475475ec9c526efec968aee2314055160db8fb6d00abc82a8b757`
+and `7990deea36bfc74bfb70fe5ae4f9428e42afc74d4c2a7c03bef493c848301609`.
+
+Both volatile rollbacks now pass as well. The first radio initially exposed a
+PPU attestation defect: the correct persistent 2R2T return was compared with
+the temporary RC14 1R1T topology and was conservatively reported `unknown`.
+PPU commit `926b04a` binds the expected return layout from the named qualified
+profile and tests both SSH and independent USB/iiOD return paths. Repeating the
+exact transition produced successful TX-safe receipts
+`ad4e21d24b6b4d01b12c0867a446d919` for serial
+`1040007c4a94000211000b009186843ef2` returning to
+`v0.50-plutoplus-spf-counter-rx-v1`, and
+`0e0ffa2c3a064615a046380219dc3b6e` for serial
+`104000b29905000e17000800065934759d` returning to
+`v0.51-plutoplus-spf-iq-direct-async-v5`. Both returned with four RX scan
+channels and tandem AGC present.
+
+The pre-cold-return boot identities are
+`e967484e-91ea-4564-8e4e-fde97676bb35` and
+`2a953b5d-0530-4b18-a7ae-560eade0e97e`, respectively. The only remaining RC14
+release gate is an operator-performed removal-of-power cycle of both radios,
+followed by exact USB identity, changed boot identity, persistent firmware,
+2R2T topology, TX-safe, and ordinary-capture verification. This gate may not
+be substituted by a software reboot or by RC12 evidence.
+
 ## Desired behavior
 
 The host defines the legal scan at setup. Firmware then owns all dwell-boundary
