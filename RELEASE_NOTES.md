@@ -65,6 +65,7 @@
 | `v0.47-plutoplus-spf-iq-direct-async-v2` | 2026-08-31 | superseded hardware-qualified full release; rollback target | keeps a whole host target in one DMA session and adds default drop-backlog plus preserve-backlog overrun policies for ringless and RAM-extended queues |
 | `v0.48-plutoplus-spf-iq-direct-async-v3` | 2026-09-01 | superseded hardware-qualified full release; rollback target | recovers stale gain/RSSI metadata in drop-backlog mode and completes long finite sessions |
 | **`v0.49-plutoplus-spf-iq-direct-async-v4`** | 2026-09-01 | **current hardware-qualified full release** | authoritative requested/allocated DMA admission, real 50-buffer/200 MB DMA profile, 216 MiB CMA, and persistent return qualification |
+| `v0.52-plutoplus-spf-adaptive-scan-v1` | 2026-09-17 | **candidate release route; RC14 hardware-qualified** | fixed-bandwidth autonomous frequency selection through 30 MS/s, complete-visit admission, and asynchronous source-bound host feedback |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -72,6 +73,24 @@ across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
 work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
+
+## v0.52-plutoplus-spf-adaptive-scan-v1 — 2026-09-17 — **candidate release route; RC14 hardware-qualified**
+
+V1 lets a host define a fixed-bandwidth frequency set at session start while
+firmware owns subsequent dwell selection. Source-bound activity feedback raises
+the corresponding channel's sampling weight without interrupting the active
+dwell. Complete visits are admitted only when bounded queue capacity exists;
+overload therefore produces explicit whole-visit skips instead of fragmented IQ.
+This release is limited to one RX and rates through 30 MS/s. Per-visit bandwidth
+or AD9361 clock changes and 60 MS/s operation remain deferred.
+
+RC14 passed the pinned two-radio matrix. Both radios retained more than 95.8%
+full-session duty at 10 and 15 MS/s, applied controlled feedback, restored exact
+RF state, recovered immediately after abrupt client loss, returned safely to
+their persistent images, and passed operator-confirmed removal-of-power checks.
+The final protected build must preserve the source graph and repeat exact-byte
+RAM and persistent qualification before publication. Complete evidence and
+artifact hashes are recorded in `feature_103.md`.
 
 ## v0.49-plutoplus-spf-iq-direct-async-v4 — 2026-09-01 — **current hardware-qualified full release**
 

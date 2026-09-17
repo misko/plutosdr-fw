@@ -1,0 +1,56 @@
+"""Keep the v0.52 adaptive-scan route and source locks consistent."""
+
+from pathlib import Path
+import subprocess
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def _manifest() -> dict[str, str]:
+    return dict(
+        line.split(": ", 1)
+        for line in (ROOT / "manifests/adaptive-scan-v1-source.yaml")
+        .read_text()
+        .splitlines()
+        if ": " in line and not line.startswith("#")
+    )
+
+
+def test_adaptive_scan_v1_release_route_and_locks() -> None:
+    workflow = (ROOT / ".github/workflows/firmware-main.yml").read_text()
+    branch = "refs/heads/codex/feature-103"
+    assert workflow.count(branch) == 4
+    assert workflow.count("'v0.52-plutoplus-spf-adaptive-scan-v1'") == 1
+    assert workflow.count("'adaptive-scan-v1-source.yaml'") == 1
+    assert workflow.count("'plutoplus-spf-adaptive-scan-v1'") == 1
+
+    manifest = _manifest()
+    for component in ("buildroot", "linux", "hdl", "hdl-quantulum", "u-boot-xlnx"):
+        pin = subprocess.check_output(
+            ["git", "ls-files", "--stage", component], cwd=ROOT, text=True
+        ).split()[1]
+        assert manifest["submodule_" + component.replace("-", "_")] == pin
+
+    assert manifest["libiio_0_25_source"] == (
+        "d249dd280dda480f524f37adc9157a24dae2b6d1"
+    )
+    assert manifest["libiio_0_25_archive_sha256"] == (
+        "a6d9c9563790a5cbab7236332346ab211afc290a17fe906441b4ac2b0907b94d"
+    )
+    assert manifest["release_state"] == "candidate"
+    assert "release_tag" not in manifest
+
+    protected = (
+        ROOT / "scripts/build_gain_series_candidate.sh"
+    ).read_text(), (ROOT / "scripts/ci/package_main_firmware.sh").read_text()
+    for source in protected:
+        assert "adaptive-scan-v1-source.yaml |" in source
+    assert (
+        "adaptive-scan-v1-source.yaml:*)"
+        in (ROOT / "scripts/ci/package_main_firmware.sh").read_text()
+    )
+    assert (
+        "./scripts/check_source_graph.sh manifests/adaptive-scan-v1-source.yaml"
+        in (ROOT / "scripts/check_tandem_release_offline.sh").read_text()
+    )

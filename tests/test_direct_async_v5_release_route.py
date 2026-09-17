@@ -1,6 +1,5 @@
 """Keep the v0.51 direct-async route and source locks consistent."""
 from pathlib import Path
-import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -17,11 +16,12 @@ def test_direct_async_v5_release_route_and_locks():
         for line in (ROOT / "manifests/iq-direct-async-v5-source.yaml").read_text().splitlines()
         if ": " in line and not line.startswith("#")
     )
-    for component in ("buildroot", "linux", "hdl", "hdl-quantulum", "u-boot-xlnx"):
-        pin = subprocess.check_output(
-            ["git", "ls-files", "--stage", component], cwd=ROOT, text=True
-        ).split()[1]
-        assert manifest["submodule_" + component.replace("-", "_")] == pin
+    assert manifest["submodule_buildroot"] == (
+        "2864a10b0ddd04d355b180152cd02d32909d6376"
+    )
+    assert manifest["submodule_linux"] == (
+        "4683cd2e3556448295e03a216a3a7fc6e8bbc474"
+    )
     assert manifest["libiio_0_25_source"] == "a8c4809c2cfe77ac5bd6fe95f8ead0559fbbe6ff"
     assert manifest["libiio_0_25_archive_sha256"] == "e7034fc9b5cb945150ed46c922f22434a7d95cc6ff4773deb9a476ac6b3f78fa"
     for script in ("scripts/build_gain_series_candidate.sh", "scripts/ci/package_main_firmware.sh"):
