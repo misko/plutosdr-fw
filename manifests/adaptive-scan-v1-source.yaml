@@ -4,8 +4,10 @@
 
 schema: plutosdr-fw.source-manifest
 schema_version: 1
-release_state: candidate
+release_state: hardware-qualified-release
+release_tag: v0.52-plutoplus-spf-adaptive-scan-v1
 
+firmware_source: 2da11edf69bba3e193b816da037da13e41c51a4d
 firmware_repo: https://github.com/misko/plutosdr-fw.git
 
 libiio_0_25_source: 5518228d9181b95de7b7f3e2fdfe1fee438fbbf0

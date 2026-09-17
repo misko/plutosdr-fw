@@ -38,8 +38,11 @@ def test_adaptive_scan_v1_release_route_and_locks() -> None:
     assert manifest["libiio_0_25_archive_sha256"] == (
         "3fca3c443626736716907baee722a462b5fc20587707a6b5deaa4e085624454a"
     )
-    assert manifest["release_state"] == "candidate"
-    assert "release_tag" not in manifest
+    assert manifest["release_state"] == "hardware-qualified-release"
+    assert manifest["release_tag"] == "v0.52-plutoplus-spf-adaptive-scan-v1"
+    assert manifest["firmware_source"] == (
+        "2da11edf69bba3e193b816da037da13e41c51a4d"
+    )
 
     protected = (
         ROOT / "scripts/build_gain_series_candidate.sh"
