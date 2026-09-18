@@ -1,0 +1,5 @@
+config BR2_PACKAGE_SPF_METADATA_SOURCE
+	bool
+	help
+	  Staging-only source files and headers used by the Pluto iiOD metadata
+	  provider. This is selected by the iiOD-enabled libiio package.
