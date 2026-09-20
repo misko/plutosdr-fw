@@ -25,6 +25,7 @@ from typing import Any
 EXPECTED_FIRMWARE = "v0.52-plutoplus-spf-counter-utc-v1-rc1"
 SUPPORTED_RATES = (10_000_000, 15_000_000, 20_000_000)
 DEFAULT_FREQUENCIES_HZ = (959_687_498, 1_209_687_498, 1_459_687_498, 1_709_687_500)
+MAX_COUNTER_ANCHOR_GAP_NS = 10_000_000_000
 
 
 def _json(value: Any) -> Any:
@@ -87,6 +88,60 @@ def counter_continuity_passed(visits: list[dict[str, Any]]) -> bool:
             return False
         previous_end = end
     return True
+
+
+def timing_anchor_coverage_passed(
+    anchors: list[dict[str, Any]],
+    *,
+    first_valid_sample: int | None,
+    last_valid_sample: int | None,
+    sample_rate_hz: int,
+) -> bool:
+    """Require consistent anchors to cover both capture endpoints and gaps."""
+
+    if (
+        len(anchors) < 2
+        or first_valid_sample is None
+        or last_valid_sample is None
+        or sample_rate_hz <= 0
+    ):
+        return False
+    observations = [anchor["observation"] for anchor in anchors]
+    origin = observations[0]
+    identity = (
+        origin["boot_id"], origin["session"], origin["generation"],
+        origin["sample_rate_hz"], origin["epoch"],
+    )
+    if origin["sample_rate_hz"] != sample_rate_hz:
+        return False
+    if any(
+        (
+            observation["boot_id"],
+            observation["session"],
+            observation["generation"],
+            observation["sample_rate_hz"],
+            observation["epoch"],
+        )
+        != identity
+        for observation in observations[1:]
+    ):
+        return False
+    counters = [observation["counter"] for observation in observations]
+    if any(right <= left for left, right in pairwise(counters)):
+        return False
+    inclusive_gaps = [
+        anchors[index + 1]["receive_monotonic_ns"]
+        - anchors[index]["send_monotonic_ns"]
+        for index in range(len(anchors) - 1)
+    ]
+    maximum_samples = (
+        sample_rate_hz * MAX_COUNTER_ANCHOR_GAP_NS // 1_000_000_000
+    )
+    return (
+        all(0 <= gap <= MAX_COUNTER_ANCHOR_GAP_NS for gap in inclusive_gaps)
+        and abs(counters[0] - first_valid_sample) <= maximum_samples
+        and abs(counters[-1] - last_valid_sample) <= maximum_samples
+    )
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -198,6 +253,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "functional_pass": False,
         "counter_continuity_passed": False,
         "timing_query_pass": False,
+        "timing_anchor_coverage_pass": False,
         "utc_accuracy_qualified": False,
         "errors": [],
     }
@@ -331,6 +387,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             anchors[i]["send_monotonic_ns"] - anchors[i - 1]["receive_monotonic_ns"]
             for i in range(1, len(anchors))
         ]
+        inclusive_anchor_spans = [
+            anchors[i + 1]["receive_monotonic_ns"] - anchors[i]["send_monotonic_ns"]
+            for i in range(len(anchors) - 1)
+        ]
         counters = [anchor["observation"]["counter"] for anchor in anchors]
         boot_ids = sorted({anchor["observation"]["boot_id"] for anchor in anchors})
         sessions = sorted({anchor["observation"]["session"] for anchor in anchors})
@@ -345,6 +405,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "query_width_max_ns": max(widths) if widths else None,
             "query_width_over_50ms_count": sum(w > 50_000_000 for w in widths),
             "maximum_anchor_gap_ns": max(gaps) if gaps else None,
+            "maximum_inclusive_anchor_span_ns": (
+                max(inclusive_anchor_spans) if inclusive_anchor_spans else None
+            ),
             "first_counter": counters[0] if counters else None,
             "last_counter": counters[-1] if counters else None,
             "low_word_wrap_count": (
@@ -383,14 +446,21 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             sample_gaps, default=0
         )
         valid_visits = [item for item in visits if item["valid_sample_count"] > 0]
-        result["counter_timing"]["first_valid_sample"] = (
-            valid_visits[0]["first_sample"] if valid_visits else None
-        )
-        result["counter_timing"]["last_valid_sample"] = (
+        first_valid_sample = valid_visits[0]["first_sample"] if valid_visits else None
+        last_valid_sample = (
             valid_visits[-1]["end_sample_exclusive"] - 1 if valid_visits else None
         )
+        result["counter_timing"]["first_valid_sample"] = first_valid_sample
+        result["counter_timing"]["last_valid_sample"] = last_valid_sample
         continuity_passed = counter_continuity_passed(visits)
         result["counter_continuity_passed"] = continuity_passed
+        anchor_coverage_passed = timing_anchor_coverage_passed(
+            anchors,
+            first_valid_sample=first_valid_sample,
+            last_valid_sample=last_valid_sample,
+            sample_rate_hz=args.rate,
+        )
+        result["timing_anchor_coverage_pass"] = anchor_coverage_passed
         anchors_consistent = (
             len(boot_ids)
             == len(sessions)
@@ -457,6 +527,7 @@ def main() -> int:
                 "functional_pass": result["functional_pass"],
                 "counter_continuity_passed": result["counter_continuity_passed"],
                 "timing_query_pass": result["timing_query_pass"],
+                "timing_anchor_coverage_pass": result["timing_anchor_coverage_pass"],
                 "utc_accuracy_qualified": result["utc_accuracy_qualified"],
                 "error_count": len(result["errors"]),
             },
@@ -464,7 +535,13 @@ def main() -> int:
             sort_keys=True,
         )
     )
-    return 0 if result["functional_pass"] and result["timing_query_pass"] else 5
+    return (
+        0
+        if result["functional_pass"]
+        and result["timing_query_pass"]
+        and result["timing_anchor_coverage_pass"]
+        else 5
+    )
 
 
 if __name__ == "__main__":
