@@ -67,6 +67,7 @@
 | `v0.49-plutoplus-spf-iq-direct-async-v4` | 2026-09-01 | superseded hardware-qualified full release | authoritative requested/allocated DMA admission, real 50-buffer/200 MB DMA profile, 216 MiB CMA, and persistent return qualification |
 | **`v0.52-plutoplus-spf-adaptive-scan-v1`** | 2026-09-17 | **current hardware-qualified full release** | fixed-bandwidth autonomous frequency selection through 30 MS/s, complete-visit admission, and asynchronous source-bound host feedback |
 | `v0.53-plutoplus-spf-adaptive-scan-v2-rc1` | 2026-09-20 | **exact-byte RAM-qualified; final promotion source** | near-zero repeated-target retune gaps plus shared-LO paired-RX capture on Pluto+ Rev.C |
+| `v0.54-plutoplus-spf-counter-utc-v1-rc1` | 2026-09-20 | **published two-radio functional prerelease; UTC accuracy unqualified** | adds the UTC counter observation provider while preserving v0.53 manual gain, repeated-target fast path, and paired RX |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -74,6 +75,23 @@ across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
 work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
+
+## v0.54-plutoplus-spf-counter-utc-v1-rc1 — 2026-09-20 — **published two-radio functional prerelease; UTC accuracy unqualified**
+
+Adds counter-based UTC observation to the adaptive-scan-v2 release route without
+changing its manual-gain, repeated-target fast-path, or paired-RX behavior. The
+trusted build produced firmware source `0ffdfe964247c63945aa6d0e4a159ee09f241396`
+in run 35536057445. Both local radios passed 300-second single-RX captures at
+10/15/20 MS/s and paired-RX captures at 2.5 MS/s, followed by checked persistent
+deployment and matching 10-second single/paired smoke captures. All 24 published
+assets match the locally tested package and its evidence checksums pass.
+
+Absolute UTC remains unqualified because no independent UTC-timed RF reference
+was used. Persistent checks followed software reboots, not physical power cycles.
+Paired-RX tracker import is unsupported, and full-IQ import remains on the older
+v0.52 contract. See
+[`reports/2026_09_20_counter_utc_v054_release.md`](reports/2026_09_20_counter_utc_v054_release.md)
+for artifact hashes, source pins, radio results, and limitations.
 
 ## v0.53-plutoplus-spf-adaptive-scan-v2-rc1 — 2026-09-20 — **exact-byte RAM-qualified; final promotion source**
 
