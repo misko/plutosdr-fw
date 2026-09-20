@@ -6,7 +6,7 @@ schema_version: 1
 release_state: candidate
 release_tag: counter-utc-v1-rc1-source/firmware-v1
 
-firmware_source: 6814607258fd4a1ef3068035dbd756d055f404de
+firmware_source: f0650dc0bdbae49150787658e9b82f8a8658d2ba
 firmware_repo: https://github.com/misko/plutosdr-fw.git
 
 libiio_0_25_source: 7aa544742e2718ff2f553dc35cb873510e02fbc4
