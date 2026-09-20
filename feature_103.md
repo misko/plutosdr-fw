@@ -618,6 +618,43 @@ Production `iiod` linked, but the release correctly stopped. libiio commit
 and passes under qemu-arm. Buildroot source lock `e2de8a933b36` pins that commit
 and its verified GitHub archive. No failed-build bytes were packaged or loaded.
 
+### Final v0.52 release qualification
+
+Trusted run
+[35168772895](https://github.com/misko/plutosdr-fw/actions/runs/35168772895)
+built commit `2da11edf69bba3e193b816da037da13e41c51a4d`. The immutable
+release identities are DFU `f88c5fe4…6eea2`, 13,007,023-byte FIT
+`1f3ec2b6…d5403`, FRM `35bca4f5…002a9`, and bundle `c788e9f1…74295`.
+The integrated route verdict is `PASS`; all three packed DTBs reproduce the
+qualified RX0/TX2 selectors and hashes.
+
+The exact DFU passed on both authorized radios:
+
+| Radio suffix | 10 MS/s duty | 15 MS/s duty | 20 MS/s integrity | 30 MS/s integrity |
+|---|---:|---:|---:|---:|
+| `…843ef2` | 95.8962% | 95.8962% | 63.9103% | 31.9633% |
+| `…34759d` | 95.8894% | 95.8974% | 63.9150% | 31.9604% |
+
+Every run had zero invalid or cancelled visits, applied source-bound feedback,
+and restored exact RF and four-buffer state with Fast Lock inactive. The 20 and
+30 MS/s rows are integrity/overload qualifications, not duty promises.
+
+An abrupt TCP client loss released scan ownership in 144.8 ms and 187.5 ms;
+iiOD remained alive and fresh recovery sessions retained 95.93% and 95.95%
+duty. Volatile rollback returned each radio to its unchanged persistent v0.50
+or v0.51 2R2T image. Guarded persistent promotion then preserved protected
+regions and produced exact `/dev/mtdblock3` FIT readback on both radios.
+
+After operator-confirmed removal of power, both radios re-enumerated at their
+original physical USB paths with new boot identities, exact v0.52 identity,
+AD9361, metadata ABI 3, adaptive-scan protocol 1, RX0/TX2 topology, exact
+`/opt/VERSIONS`, and exact FIT readback. Fresh post-cold 10 MS/s sessions
+retained 95.91% and 95.97% duty with complete integrity and restoration. The
+post-cold receipt SHA-256 is `8638dc46…c192`; the final matrix verdict is
+`f67d538d…63b0`. Radio `…34759d` briefly showed the already-understood
+asymmetric neighbor startup and recovered after a radio-originated ping; no
+firmware process restarted and no data-plane failure followed.
+
 ## Desired behavior
 
 The host defines the legal scan at setup. Firmware then owns all dwell-boundary
