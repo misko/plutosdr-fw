@@ -294,6 +294,11 @@ def _read_boot_id(*, host: str, known_hosts: Path) -> str:
     return value.replace("-", "")
 
 
+def _require_report_boot_id(report: dict[str, Any], live_boot_id: str) -> None:
+    if report.get("boot_id") != live_boot_id:
+        raise ValueError("functional report boot UUID differs from the live radio")
+
+
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(path.parent, 0o700)
@@ -310,7 +315,7 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def main() -> int:
+def _argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--serial", required=True, choices=sorted(EXPECTED_SERIALS))
     parser.add_argument("--host", required=True)
@@ -323,6 +328,11 @@ def main() -> int:
     parser.add_argument("--ram-receipt", type=Path)
     parser.add_argument("--functional-report", type=Path)
     parser.add_argument("--ssh-known-hosts-file", type=Path)
+    return parser
+
+
+def main() -> int:
+    parser = _argument_parser()
     args = parser.parse_args()
 
     if args.phase == "persist" and args.ram_receipt is None:
@@ -458,10 +468,7 @@ def main() -> int:
             )
             _read_private(known_hosts, label="pinned SSH known_hosts file")
             live_boot_id = _read_boot_id(host=str(host_ip), known_hosts=known_hosts)
-            if live_boot_id != functional_report["boot_id"]:
-                raise RuntimeError(
-                    "functional report boot UUID differs from the live radio"
-                )
+            _require_report_boot_id(functional_report, live_boot_id)
             attempt_dir = _new_attempt(evidence_dir, "persistent")
             plan, frm = prepare_usb_flash_plan(
                 image,
