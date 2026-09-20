@@ -64,6 +64,31 @@ def _write_new(path: Path, value: dict[str, Any]) -> None:
         os.close(descriptor)
 
 
+def counter_continuity_passed(visits: list[dict[str, Any]]) -> bool:
+    """Require nonempty sample ranges without DMA loss or overlap.
+
+    Positive gaps between adjacent visits are valid: retuning intentionally
+    leaves samples outside each visit's admitted interval. DMA loss reported
+    inside a visit and overlapping visit ranges remain continuity failures.
+    """
+
+    if not visits:
+        return False
+    previous_end: int | None = None
+    for visit in visits:
+        first = visit["first_sample"]
+        end = visit["end_sample_exclusive"]
+        if (
+            visit["valid_sample_count"] <= 0
+            or end <= first
+            or visit["missing_samples_before"] != 0
+            or (previous_end is not None and first < previous_end)
+        ):
+            return False
+        previous_end = end
+    return True
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -171,6 +196,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "counter_timing": {},
         "campaign": None,
         "functional_pass": False,
+        "counter_continuity_passed": False,
         "timing_query_pass": False,
         "utc_accuracy_qualified": False,
         "errors": [],
@@ -363,6 +389,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         result["counter_timing"]["last_valid_sample"] = (
             valid_visits[-1]["end_sample_exclusive"] - 1 if valid_visits else None
         )
+        continuity_passed = counter_continuity_passed(visits)
+        result["counter_continuity_passed"] = continuity_passed
         anchors_consistent = (
             len(boot_ids)
             == len(sessions)
@@ -391,6 +419,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             == restoration["expected_kernel_buffers"]
             and restoration["fastlock_inactive"]
             and anchors_consistent
+            and continuity_passed
             and not result["errors"]
         )
         result["functional_pass"] = functional
@@ -426,6 +455,7 @@ def main() -> int:
             {
                 "output": str(args.output.expanduser().absolute()),
                 "functional_pass": result["functional_pass"],
+                "counter_continuity_passed": result["counter_continuity_passed"],
                 "timing_query_pass": result["timing_query_pass"],
                 "utc_accuracy_qualified": result["utc_accuracy_qualified"],
                 "error_count": len(result["errors"]),
