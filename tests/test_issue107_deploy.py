@@ -86,6 +86,49 @@ def test_functional_report_rejects_live_boot_id_mismatch() -> None:
         deploy._require_report_boot_id(report, "fedcba9876543210fedcba9876543210")
 
 
+def test_read_boot_id_ignores_ssh_pty_banner_and_prompt(tmp_path: Path, monkeypatch) -> None:
+    expected = "d27cdcb9-f0a9-4c90-8295-59c6fc012812"
+
+    class StubTransport:
+        def __init__(self, **kwargs: object) -> None:
+            pass
+
+        def run(self, command: str, *, timeout_s: int) -> str:
+            assert "ISSUE107_BOOT_ID=" in command
+            assert "/proc/sys/kernel/random/boot_id" in command
+            assert timeout_s == 15
+            return (
+                "** WARNING: SSH PTY banner **\n"
+                "root@192.168.1.18's password:\n"
+                "ISSUE107_BOOT_ID=" + expected + "\n"
+            )
+
+    monkeypatch.setattr(deploy, "BoundSshBootstrapTransport", StubTransport)
+    monkeypatch.setattr(deploy, "_password", lambda: "unused-test-secret")
+    assert deploy._read_boot_id(host="192.168.1.18", known_hosts=tmp_path / "known_hosts") == (
+        expected.replace("-", "")
+    )
+
+
+@pytest.mark.parametrize(
+    "transcript",
+    [
+        "SSH warning only\n01234567-89ab-cdef-0123-456789abcdef\n",
+        (
+            "ISSUE107_BOOT_ID=01234567-89ab-cdef-0123-456789abcdef\n"
+            "ISSUE107_BOOT_ID=01234567-89ab-cdef-0123-456789abcdef\n"
+        ),
+        "ISSUE107_BOOT_ID=not-a-uuid\n",
+        "ISSUE107_BOOT_ID=01234567-89ab-cdef-0123-456789abcdeF\n",
+    ],
+)
+def test_marked_boot_id_parser_rejects_missing_duplicate_or_malformed(
+    transcript: str,
+) -> None:
+    with pytest.raises(RuntimeError, match="boot-ID response|boot UUID"):
+        deploy._parse_marked_boot_id(transcript)
+
+
 @pytest.mark.parametrize("receipt_kind", ["missing", "wrong-serial", "wrong-image"])
 def test_persistence_requires_matching_successful_ram_receipt(
     tmp_path: Path, receipt_kind: str

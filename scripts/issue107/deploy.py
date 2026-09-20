@@ -279,6 +279,24 @@ def _new_attempt(evidence_dir: Path, phase: str) -> Path:
     return attempt
 
 
+def _parse_marked_boot_id(transcript: str) -> str:
+    marker = "ISSUE107_BOOT_ID="
+    marked_lines = [
+        line.strip()
+        for line in transcript.splitlines()
+        if line.strip().startswith(marker)
+    ]
+    if len(marked_lines) != 1:
+        raise RuntimeError("radio boot-ID response must contain exactly one marked value")
+    value = marked_lines[0][len(marker) :]
+    if not re.fullmatch(
+        r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+        value,
+    ):
+        raise RuntimeError("radio returned a malformed marked boot UUID")
+    return value.replace("-", "")
+
+
 def _read_boot_id(*, host: str, known_hosts: Path) -> str:
     transport = BoundSshBootstrapTransport(
         host=host,
@@ -286,12 +304,12 @@ def _read_boot_id(*, host: str, known_hosts: Path) -> str:
         password=_password(),
         known_hosts_file=known_hosts,
     )
-    value = transport.run("cat /proc/sys/kernel/random/boot_id", timeout_s=15).strip()
-    if not re.fullmatch(
-        r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", value
-    ):
-        raise RuntimeError("radio returned a malformed boot UUID")
-    return value.replace("-", "")
+    command = (
+        "printf '\\nISSUE107_BOOT_ID=%s\\n' "
+        '"$(cat /proc/sys/kernel/random/boot_id)"'
+    )
+    transcript = transport.run(command, timeout_s=15)
+    return _parse_marked_boot_id(transcript)
 
 
 def _require_report_boot_id(report: dict[str, Any], live_boot_id: str) -> None:
