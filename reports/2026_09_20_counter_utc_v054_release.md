@@ -30,6 +30,6 @@ Both radios then passed 10-second post-persistent single-RX 10 MS/s and paired-R
 
 `utc_hardware_qualified` remains **false**. No independent UTC-timed RF reference was used, so this release makes no absolute UTC error or ±100 ms claim. Counter coherence and low query latency cannot substitute for RF-reference calibration.
 
-The accepted paired-RX captures are functional evidence; the tracker importer does not support paired-RX input. Full-IQ import remains on the older v0.52 contract and has not been validated for this v0.54 release. This campaign retained capture summaries, visit metadata, and timing anchors rather than archived full-IQ payloads. No physical power-cycle qualification was performed.
+The single-RX importer remains compatible; its 336-test suite passed. The accepted paired-RX captures are functional evidence, but the tracker importer does not support paired-RX input. Full real-IQ import was validated using the v0.52 image; it was not repeated on v0.54. This campaign retained capture summaries, visit metadata, and timing anchors rather than archived full-IQ payloads. No physical power-cycle qualification was performed.
 
 Raw hardware reports, accepted summaries, environment comparisons, persistent receipts, and the replay validator are in the release asset `hardware-captures.tar.gz` and companion release files. The archive excludes credentials and private flash backups.

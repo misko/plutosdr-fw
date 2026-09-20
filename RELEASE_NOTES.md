@@ -88,8 +88,8 @@ assets match the locally tested package and its evidence checksums pass.
 
 Absolute UTC remains unqualified because no independent UTC-timed RF reference
 was used. Persistent checks followed software reboots, not physical power cycles.
-Paired-RX tracker import is unsupported, and full-IQ import remains on the older
-v0.52 contract. See
+Paired-RX tracker import is unsupported. Full real-IQ import was validated using
+the v0.52 image; it was not repeated on v0.54. See
 [`reports/2026_09_20_counter_utc_v054_release.md`](reports/2026_09_20_counter_utc_v054_release.md)
 for artifact hashes, source pins, radio results, and limitations.
 
