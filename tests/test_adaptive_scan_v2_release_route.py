@@ -27,9 +27,14 @@ def test_adaptive_scan_v2_release_route_and_locks() -> None:
 
     manifest = _manifest()
     for component in ("buildroot", "linux", "hdl", "hdl-quantulum", "u-boot-xlnx"):
-        pin = subprocess.check_output(
-            ["git", "ls-files", "--stage", component], cwd=ROOT, text=True
-        ).split()[1]
+        # This is a historical release. Later firmware may intentionally advance
+        # its gitlinks while the published v0.53 source lock remains immutable.
+        entry = subprocess.check_output(
+            ["git", "ls-tree", "5cd4cf3e91f1cfd26dd7c75e9678c32e4c6f8090", "--", component],
+            cwd=ROOT, text=True,
+        ).split()
+        assert (entry[0], entry[1], entry[3]) == ("160000", "commit", component)
+        pin = entry[2]
         assert manifest["submodule_" + component.replace("-", "_")] == pin
 
     assert manifest["libiio_0_25_source"] == (
