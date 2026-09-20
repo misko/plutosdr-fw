@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -127,6 +128,42 @@ def test_marked_boot_id_parser_rejects_missing_duplicate_or_malformed(
 ) -> None:
     with pytest.raises(RuntimeError, match="boot-ID response|boot UUID"):
         deploy._parse_marked_boot_id(transcript)
+
+
+def test_ssh_flash_plan_requires_controlled_flash_safety(monkeypatch, tmp_path: Path) -> None:
+    transport = object()
+    observed: dict[str, object] = {}
+
+    def prepare(*args: object, **kwargs: object):
+        observed["args"] = args
+        observed.update(kwargs)
+        return SimpleNamespace(flash_safety=object()), b"canonical FRM"
+
+    monkeypatch.setattr(deploy, "prepare_usb_flash_plan", prepare)
+    plan, frm = deploy._prepare_ssh_usb_flash_plan(
+        tmp_path / "candidate.dfu",
+        tmp_path / "usb-device",
+        mutation_profile_id="counter-utc-test",
+        transport=transport,
+    )
+    assert plan.flash_safety is not None
+    assert frm == b"canonical FRM"
+    assert observed["flash_transport"] is transport
+
+
+def test_ssh_flash_plan_refuses_missing_flash_safety(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        deploy,
+        "prepare_usb_flash_plan",
+        lambda *args, **kwargs: (SimpleNamespace(flash_safety=None), b"frm"),
+    )
+    with pytest.raises(RuntimeError, match="controlled flash-safety"):
+        deploy._prepare_ssh_usb_flash_plan(
+            tmp_path / "candidate.dfu",
+            tmp_path / "usb-device",
+            mutation_profile_id="counter-utc-test",
+            transport=object(),
+        )
 
 
 @pytest.mark.parametrize("receipt_kind", ["missing", "wrong-serial", "wrong-image"])

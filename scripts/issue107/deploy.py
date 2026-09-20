@@ -28,7 +28,7 @@ from pluto_plus.bootstrap_firmware import (
     SINGLE_RX_TX_CAPABLE_LAYOUT,
     STANDALONE_FLASH_PROFILES,
     BoundSshBootstrapTransport,
-    execute_usb_flash_plan,
+    execute_usb_flash_plan_ssh,
     prepare_usb_flash_plan,
 )
 from pluto_plus.doctor import FEATURE_103_V1_RELEASE_RAM_POLICY
@@ -297,19 +297,43 @@ def _parse_marked_boot_id(transcript: str) -> str:
     return value.replace("-", "")
 
 
-def _read_boot_id(*, host: str, known_hosts: Path) -> str:
-    transport = BoundSshBootstrapTransport(
-        host=host,
-        interface=None,
-        password=_password(),
-        known_hosts_file=known_hosts,
-    )
+def _read_boot_id(
+    *,
+    host: str,
+    known_hosts: Path,
+    transport: BoundSshBootstrapTransport | None = None,
+) -> str:
+    if transport is None:
+        transport = BoundSshBootstrapTransport(
+            host=host,
+            interface=None,
+            password=_password(),
+            known_hosts_file=known_hosts,
+        )
     command = (
         "printf '\\nISSUE107_BOOT_ID=%s\\n' "
         '"$(cat /proc/sys/kernel/random/boot_id)"'
     )
     transcript = transport.run(command, timeout_s=15)
     return _parse_marked_boot_id(transcript)
+
+
+def _prepare_ssh_usb_flash_plan(
+    image: Path,
+    usb_sysfs_path: Path,
+    *,
+    mutation_profile_id: str,
+    transport: BoundSshBootstrapTransport,
+) -> tuple[Any, bytes]:
+    plan, frm = prepare_usb_flash_plan(
+        image,
+        usb_sysfs_path,
+        mutation_profile_id=mutation_profile_id,
+        flash_transport=transport,
+    )
+    if plan.flash_safety is None:
+        raise RuntimeError("persistent SSH flash plan lacks a controlled flash-safety decision")
+    return plan, frm
 
 
 def _require_report_boot_id(report: dict[str, Any], live_boot_id: str) -> None:
@@ -485,13 +509,24 @@ def main() -> int:
                 else evidence_dir / "known_hosts"
             )
             _read_private(known_hosts, label="pinned SSH known_hosts file")
-            live_boot_id = _read_boot_id(host=str(host_ip), known_hosts=known_hosts)
+            flash_transport = BoundSshBootstrapTransport(
+                host=str(host_ip),
+                interface=None,
+                password=_password(),
+                known_hosts_file=known_hosts,
+            )
+            live_boot_id = _read_boot_id(
+                host=str(host_ip),
+                known_hosts=known_hosts,
+                transport=flash_transport,
+            )
             _require_report_boot_id(functional_report, live_boot_id)
             attempt_dir = _new_attempt(evidence_dir, "persistent")
-            plan, frm = prepare_usb_flash_plan(
+            plan, frm = _prepare_ssh_usb_flash_plan(
                 image,
                 Path(device.usb_path),
                 mutation_profile_id=persistent_profile,
+                transport=flash_transport,
             )
             payload = {
                 "operation": "local USB persistent canary",
@@ -512,11 +547,12 @@ def main() -> int:
             _write_json(plan_path, payload)
             print(json.dumps({"plan": str(plan_path), "will_write_qspi": True}))
             if args.execute:
-                result = execute_usb_flash_plan(
+                result = execute_usb_flash_plan_ssh(
                     plan,
                     frm,
                     confirmation=args.confirm or "",
                     receipt_directory=attempt_dir / "receipts",
+                    transport=flash_transport,
                 )
                 if result.outcome != "success":
                     raise RuntimeError(
