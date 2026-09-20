@@ -310,6 +310,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "counter_timing": {},
         "campaign": None,
         "functional_pass": False,
+        "iq_geometry_passed": False,
         "counter_continuity_passed": False,
         "timing_query_pass": False,
         "timing_anchor_coverage_pass": False,
