@@ -66,7 +66,7 @@
 | `v0.48-plutoplus-spf-iq-direct-async-v3` | 2026-09-01 | superseded hardware-qualified full release; rollback target | recovers stale gain/RSSI metadata in drop-backlog mode and completes long finite sessions |
 | **`v0.49-plutoplus-spf-iq-direct-async-v4`** | 2026-09-01 | **current hardware-qualified full release** | authoritative requested/allocated DMA admission, real 50-buffer/200 MB DMA profile, 216 MiB CMA, and persistent return qualification |
 | `v0.52-plutoplus-spf-adaptive-scan-v1` | 2026-09-17 | **candidate release route; RC14 hardware-qualified** | fixed-bandwidth autonomous frequency selection through 30 MS/s, complete-visit admission, and asynchronous source-bound host feedback |
-| `v0.53-plutoplus-spf-adaptive-scan-v2-rc1` | 2026-09-20 | **release candidate; exact-byte qualification pending** | near-zero repeated-target retune gaps plus shared-LO paired-RX capture on Pluto+ Rev.C |
+| `v0.53-plutoplus-spf-adaptive-scan-v2-rc1` | 2026-09-20 | **exact-byte RAM-qualified; final promotion source** | near-zero repeated-target retune gaps plus shared-LO paired-RX capture on Pluto+ Rev.C |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -75,7 +75,7 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.53-plutoplus-spf-adaptive-scan-v2-rc1 — 2026-09-20 — **release candidate; exact-byte qualification pending**
+## v0.53-plutoplus-spf-adaptive-scan-v2-rc1 — 2026-09-20 — **exact-byte RAM-qualified; final promotion source**
 
 V2 retains the asynchronous scheduler/classifier contract and manual-gain
 admission while avoiding redundant Fast Lock recalls for repeated targets. It
@@ -84,12 +84,15 @@ AD9361 LO, the classifier consumes RX1, and each completed visit returns both
 CI16 streams. Single RX is qualified at 15 MS/s and paired RX at 2.5 MS/s;
 higher paired-RX rates are not guaranteed.
 
-The engineering candidate averaged 88.35% single-RX duty across two radios,
-up from 85.52% on v1, and reduced the repeated-target off-air interval from
-about 20.3 ms to about 0.32 ms. Two 300-second paired-RX runs delivered every
-visit with 88.63% and 88.87% duty and no transport or classifier drops. The
-protected RC1 rebuild must pass exact-byte RAM and persistent qualification
-before promotion to `v0.53-plutoplus-spf-adaptive-scan-v2`.
+Trusted run 35523930824 built commit `c4dfcd236e3e` and DFU SHA-256
+`2a1fa3a6…9372c`. The exact RC1 bytes passed 20 consecutive single-RX sessions
+per radio without a timeout or lost visit. Four 300-second Gigabit-LAN soaks
+then delivered every visit with zero transport/classifier drops and exact state
+restoration. Single-RX duty was 88.525% and 88.548%; paired-RX duty was 88.525%
+and 88.699%. Repeated-target median gaps were 0.258–0.347 ms. Both radios
+returned to persistent v0.52 with their original QSPI hashes. The final stamped
+bytes require an abbreviated exact-byte confirmation before publication as
+`v0.53-plutoplus-spf-adaptive-scan-v2`.
 
 ## v0.52-plutoplus-spf-adaptive-scan-v1 — 2026-09-17 — **candidate release route; RC14 hardware-qualified**
 

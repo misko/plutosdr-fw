@@ -21,7 +21,7 @@ def test_adaptive_scan_v2_release_route_and_locks() -> None:
     workflow = (ROOT / ".github/workflows/firmware-main.yml").read_text()
     branch = "refs/heads/codex/issue-108-manual-dual-rx-fw"
     assert workflow.count(branch) == 4
-    assert workflow.count("'v0.53-plutoplus-spf-adaptive-scan-v2-rc1'") == 1
+    assert workflow.count("'v0.53-plutoplus-spf-adaptive-scan-v2'") == 1
     assert workflow.count("'adaptive-scan-v2-source.yaml'") == 1
     assert workflow.count("'plutoplus-spf-adaptive-scan-v2'") == 1
 
@@ -50,6 +50,11 @@ def test_adaptive_scan_v2_release_route_and_locks() -> None:
     assert "adaptive-scan-v2-source.yaml:final-release)" in package
     assert "v0.53-plutoplus-spf-adaptive-scan-v2-rc1" in package
     assert "v0.53-plutoplus-spf-adaptive-scan-v2'" in package
+    assert (
+        "github.ref == 'refs/heads/codex/issue-108-manual-dual-rx-fw' &&\n"
+        "          'final-release'"
+        in workflow
+    )
     assert "check_dual_rx_topology.sh" in package
     assert (
         "./scripts/check_source_graph.sh manifests/adaptive-scan-v2-source.yaml"

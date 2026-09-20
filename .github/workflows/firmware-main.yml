@@ -317,7 +317,9 @@ jobs:
           'plutoplus-spf-tandem-agc-v2' ||
           'plutoplus-spf-libiio-metadata-v6-rc4' }}
       SPF_RELEASE_STATE: >-
-        ${{ github.ref == 'refs/heads/main' &&
+        ${{ github.ref == 'refs/heads/codex/issue-108-manual-dual-rx-fw' &&
+          'final-release' ||
+          github.ref == 'refs/heads/main' &&
           github.event_name == 'workflow_dispatch' && 'final-release' ||
           github.ref == 'refs/heads/main' && 'main-ci' || 'candidate' }}
     steps:
@@ -477,13 +479,13 @@ jobs:
           test "$REQUESTED_RELEASE_VERSION" = \
             'v0.52-plutoplus-spf-adaptive-scan-v1'
 
-      - name: Require the exact adaptive scan v2 RC1 identity
+      - name: Require the exact adaptive scan v2 final identity
         if: github.ref == 'refs/heads/codex/issue-108-manual-dual-rx-fw'
         env:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
-            'v0.53-plutoplus-spf-adaptive-scan-v2-rc1'
+            'v0.53-plutoplus-spf-adaptive-scan-v2'
 
       - name: Require the exact direct-async IQ v4 candidate identity
         if: github.ref == 'refs/heads/codex/iq-direct-async-v4-exact-200m'
