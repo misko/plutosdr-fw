@@ -24,6 +24,7 @@ def test_v057_branch_route_is_versioned_and_source_locked() -> None:
         "0132fc62945f52d5c1fc0273c26b059d16bc42e1"
     )
     assert manifest["ppu_source"] == "036cf821997a0c1a8c60055de432a8021d662a5f"
+    assert manifest["leo_source"] == "0608cc9bb9e941c46ba557f878598d69527dc711"
     for component in ("buildroot", "linux", "hdl", "hdl-quantulum", "u-boot-xlnx"):
         entry = subprocess.check_output(
             ["git", "ls-files", "--stage", "--", component], cwd=ROOT, text=True

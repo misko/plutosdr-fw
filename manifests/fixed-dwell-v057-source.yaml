@@ -15,6 +15,10 @@ ppu_source: 036cf821997a0c1a8c60055de432a8021d662a5f
 ppu_repo: https://github.com/misko/pluto-plus-utils.git
 ppu_ref: refs/tags/fixed-dwell-v4-source/ppu-v1
 
+leo_source: 0608cc9bb9e941c46ba557f878598d69527dc711
+leo_repo: https://github.com/misko/leo-tracker-reduxredux.git
+leo_ref: refs/tags/fixed-dwell-v4-source/leo-v1
+
 metadata_source: 3294365ff44da26b261be4a2ccb241b7896d23ad
 metadata_repo: https://github.com/misko/plutosdr-fw.git
 metadata_ref: refs/tags/iio-throughput-sampler-wake-v5-source/metadata-v1

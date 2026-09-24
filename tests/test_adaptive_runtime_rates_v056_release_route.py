@@ -23,10 +23,18 @@ def test_v056_main_route_is_versioned_and_source_locked() -> None:
     assert "release_tag" not in manifest
     for component in ("buildroot", "linux", "hdl", "hdl-quantulum", "u-boot-xlnx"):
         entry = subprocess.check_output(
-            ["git", "ls-files", "--stage", "--", component], cwd=ROOT, text=True
+            [
+                "git",
+                "ls-tree",
+                "e39162c7cee17136b2575aadfa4c6802d7cdebed",
+                "--",
+                component,
+            ],
+            cwd=ROOT,
+            text=True,
         ).split()
         assert (entry[0], entry[3]) == ("160000", component)
-        assert manifest["submodule_" + component.replace("-", "_")] == entry[1]
+        assert manifest["submodule_" + component.replace("-", "_")] == entry[2]
 
     workflow = (ROOT / ".github/workflows/firmware-main.yml").read_text()
     assert (
