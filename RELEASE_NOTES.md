@@ -64,8 +64,10 @@
 | `v0.46-plutoplus-spf-iq-direct-async-ring-v1` | 2026-08-31 | superseded hardware-qualified full release | first non-RC direct/RAM release; exact final image passed guarded persistent installation and cold-boot qualification |
 | `v0.47-plutoplus-spf-iq-direct-async-v2` | 2026-08-31 | superseded hardware-qualified full release; rollback target | keeps a whole host target in one DMA session and adds default drop-backlog plus preserve-backlog overrun policies for ringless and RAM-extended queues |
 | `v0.48-plutoplus-spf-iq-direct-async-v3` | 2026-09-01 | superseded hardware-qualified full release; rollback target | recovers stale gain/RSSI metadata in drop-backlog mode and completes long finite sessions |
-| **`v0.49-plutoplus-spf-iq-direct-async-v4`** | 2026-09-01 | **current hardware-qualified full release** | authoritative requested/allocated DMA admission, real 50-buffer/200 MB DMA profile, 216 MiB CMA, and persistent return qualification |
+| `v0.49-plutoplus-spf-iq-direct-async-v4` | 2026-09-01 | superseded hardware-qualified full release | authoritative requested/allocated DMA admission, real 50-buffer/200 MB DMA profile, 216 MiB CMA, and persistent return qualification |
 | **`v0.52-plutoplus-spf-adaptive-scan-v1`** | 2026-09-17 | **current hardware-qualified full release** | fixed-bandwidth autonomous frequency selection through 30 MS/s, complete-visit admission, and asynchronous source-bound host feedback |
+| `v0.53-plutoplus-spf-adaptive-scan-v2-rc1` | 2026-09-20 | **exact-byte RAM-qualified; final promotion source** | near-zero repeated-target retune gaps plus shared-LO paired-RX capture on Pluto+ Rev.C |
+| `v0.54-plutoplus-spf-counter-utc-v1-rc1` | 2026-09-20 | **published two-radio functional prerelease; UTC accuracy unqualified** | adds the UTC counter observation provider while preserving v0.53 manual gain, repeated-target fast path, and paired RX |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -74,7 +76,43 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.52-plutoplus-spf-adaptive-scan-v1 — 2026-09-17 — **hardware-qualified full release**
+## v0.54-plutoplus-spf-counter-utc-v1-rc1 — 2026-09-20 — **published two-radio functional prerelease; UTC accuracy unqualified**
+
+Adds counter-based UTC observation to the adaptive-scan-v2 release route without
+changing its manual-gain, repeated-target fast-path, or paired-RX behavior. The
+trusted build produced firmware source `0ffdfe964247c63945aa6d0e4a159ee09f241396`
+in run 35536057445. Both local radios passed 300-second single-RX captures at
+10/15/20 MS/s and paired-RX captures at 2.5 MS/s, followed by checked persistent
+deployment and matching 10-second single/paired smoke captures. All 24 published
+assets match the locally tested package and its evidence checksums pass.
+
+Absolute UTC remains unqualified because no independent UTC-timed RF reference
+was used. Persistent checks followed software reboots, not physical power cycles.
+Paired-RX tracker import is unsupported. Full real-IQ import was validated using
+the v0.52 image; it was not repeated on v0.54. See
+[`reports/2026_09_20_counter_utc_v054_release.md`](reports/2026_09_20_counter_utc_v054_release.md)
+for artifact hashes, source pins, radio results, and limitations.
+
+## v0.53-plutoplus-spf-adaptive-scan-v2-rc1 — 2026-09-20 — **exact-byte RAM-qualified; final promotion source**
+
+V2 retains the asynchronous scheduler/classifier contract and manual-gain
+admission while avoiding redundant Fast Lock recalls for repeated targets. It
+also adds an atomic paired-RX layout for Pluto+ Rev.C: RX1 and RX2 share the
+AD9361 LO, the classifier consumes RX1, and each completed visit returns both
+CI16 streams. Single RX is qualified at 15 MS/s and paired RX at 2.5 MS/s;
+higher paired-RX rates are not guaranteed.
+
+Trusted run 35523930824 built commit `c4dfcd236e3e` and DFU SHA-256
+`2a1fa3a6…9372c`. The exact RC1 bytes passed 20 consecutive single-RX sessions
+per radio without a timeout or lost visit. Four 300-second Gigabit-LAN soaks
+then delivered every visit with zero transport/classifier drops and exact state
+restoration. Single-RX duty was 88.525% and 88.548%; paired-RX duty was 88.525%
+and 88.699%. Repeated-target median gaps were 0.258–0.347 ms. Both radios
+returned to persistent v0.52 with their original QSPI hashes. The final stamped
+bytes require an abbreviated exact-byte confirmation before publication as
+`v0.53-plutoplus-spf-adaptive-scan-v2`.
+
+## v0.52-plutoplus-spf-adaptive-scan-v1 — 2026-09-17 — **current hardware-qualified full release**
 
 V1 lets a host define a fixed-bandwidth frequency set at session start while
 firmware owns subsequent dwell selection. Source-bound activity feedback raises
@@ -97,7 +135,7 @@ accounting. Abrupt-client ownership released in 145 ms and 188 ms, followed by
 fresh 95.93% and 95.95% recovery runs. Complete evidence and immutable hashes
 are recorded in `feature_103.md` and `manifests/adaptive-scan-v1.yaml`.
 
-## v0.49-plutoplus-spf-iq-direct-async-v4 — 2026-09-01 — **current hardware-qualified full release**
+## v0.49-plutoplus-spf-iq-direct-async-v4 — 2026-09-01 — **superseded hardware-qualified full release**
 
 V4 fixes the silent partial-DMA-allocation ambiguity. Local libiio exposes the
 real mapped block count, iiOD refuses direct async unless allocated equals

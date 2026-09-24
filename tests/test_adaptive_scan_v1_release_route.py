@@ -32,13 +32,11 @@ def _historical_source_commit(manifest: dict[str, str]) -> str:
     )
     if available.returncode != 0:
         # CI checkouts may be shallow. Fetch only the manifest's immutable
-        # release tag into FETCH_HEAD, then verify that it resolves to the
-        # separately pinned commit before trusting its tree.
+        # release tag, then verify that it resolves to the pinned source commit.
         tag = manifest["release_tag"]
         assert re.fullmatch(r"[A-Za-z0-9._/-]+", tag)
-        tag_ref = f"refs/tags/{tag}"
         subprocess.run(
-            ["git", "fetch", "--no-tags", "origin", tag_ref],
+            ["git", "fetch", "--no-tags", "origin", f"refs/tags/{tag}"],
             cwd=ROOT,
             check=True,
             stdout=subprocess.DEVNULL,
@@ -97,7 +95,7 @@ def test_adaptive_scan_v1_release_route_and_locks() -> None:
         in (ROOT / "scripts/ci/package_main_firmware.sh").read_text()
     )
     assert (
-        "./scripts/check_source_graph.sh manifests/adaptive-scan-v1-source.yaml"
+        "SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/adaptive-scan-v1-source.yaml"
         in (ROOT / "scripts/check_tandem_release_offline.sh").read_text()
     )
 

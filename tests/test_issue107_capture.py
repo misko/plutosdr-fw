@@ -1,9 +1,14 @@
 """Pure continuity checks for the issue-107 receive-only capture harness."""
 
 from scripts.issue107.capture import (
+    DUAL_RX_RATE_HZ,
+    SUPPORTED_RATES,
+    _validate_rx_mode,
     counter_continuity_passed,
+    iq_geometry_passed,
     timing_anchor_coverage_passed,
 )
+import pytest
 
 
 def _visit(first: int, end: int, *, missing: int = 0) -> dict[str, int]:
@@ -81,3 +86,84 @@ def test_five_second_anchor_cadence_covers_both_endpoints() -> None:
         _anchor(76_000_000, 5_000_000_000, 5_001_000_000),
     ]
     assert _covered_capture(anchors)
+
+
+@pytest.mark.parametrize("rate", SUPPORTED_RATES)
+def test_single_rx_rates_keep_the_single_channel_mask(rate: int) -> None:
+    _validate_rx_mode(rate, 1)
+
+
+def test_paired_rx_uses_its_supported_25_msps_rate() -> None:
+    _validate_rx_mode(DUAL_RX_RATE_HZ, 3)
+
+
+@pytest.mark.parametrize(
+    ("rate", "rx_mask"),
+    [(DUAL_RX_RATE_HZ, 1), (15_000_000, 3), (20_000_000, 3)],
+)
+def test_mismatched_single_and_paired_rx_modes_fail_closed(
+    rate: int, rx_mask: int
+) -> None:
+    with pytest.raises(ValueError, match="RX"):
+        _validate_rx_mode(rate, rx_mask)
+
+
+def test_dual_rx_counter_coverage_uses_complex_sample_rate_without_channel_scaling() -> None:
+    anchors = [
+        {
+            "send_monotonic_ns": 0,
+            "receive_monotonic_ns": 1_000_000,
+            "observation": {
+                "counter": 1_000_000,
+                "boot_id": "1" * 32,
+                "session": 101,
+                "generation": 7,
+                "sample_rate_hz": DUAL_RX_RATE_HZ,
+                "epoch": 1234,
+            },
+        },
+        {
+            "send_monotonic_ns": 5_000_000_000,
+            "receive_monotonic_ns": 5_001_000_000,
+            "observation": {
+                "counter": 13_500_000,
+                "boot_id": "1" * 32,
+                "session": 101,
+                "generation": 7,
+                "sample_rate_hz": DUAL_RX_RATE_HZ,
+                "epoch": 1234,
+            },
+        },
+    ]
+    assert timing_anchor_coverage_passed(
+        anchors,
+        first_valid_sample=1_000_000,
+        last_valid_sample=13_500_000,
+        sample_rate_hz=DUAL_RX_RATE_HZ,
+    )
+
+
+def test_dual_rx_iq_bytes_count_both_channels_without_scaling_counter_samples() -> None:
+    passed, counter_samples, payload_bytes = iq_geometry_passed(
+        [
+            {"valid_sample_count": 120, "iq_bytes_received": 960},
+            {"valid_sample_count": 80, "iq_bytes_received": 640},
+        ],
+        rx_mask=3,
+        terminal_iq_bytes=1600,
+    )
+
+    assert passed
+    assert counter_samples == 200
+    assert payload_bytes == 8 * counter_samples
+
+
+def test_dual_rx_iq_geometry_rejects_single_channel_or_byte_scaled_payload() -> None:
+    passed, counter_samples, _payload_bytes = iq_geometry_passed(
+        [{"valid_sample_count": 120, "iq_bytes_received": 480}],
+        rx_mask=3,
+        terminal_iq_bytes=480,
+    )
+
+    assert not passed
+    assert counter_samples == 0

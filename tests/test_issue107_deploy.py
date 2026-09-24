@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -24,7 +25,7 @@ def _functional_report(**overrides: object) -> dict[str, object]:
     report: dict[str, object] = {
         "schema": "issue107.functional-capture/v1",
         "radio_serial": "104000b29905000e17000800065934759d",
-        "firmware": "v0.52-plutoplus-spf-counter-utc-v1-rc1",
+        "firmware": deploy.CANDIDATE_FIRMWARE,
         "boot_id": "0123456789abcdef0123456789abcdef",
         "image_sha256": "a" * 64,
         "rates_hz": [10_000_000, 15_000_000, 20_000_000],
@@ -38,13 +39,55 @@ def _functional_report(**overrides: object) -> dict[str, object]:
     return report
 
 
+def _dual_functional_report(**overrides: object) -> dict[str, object]:
+    report: dict[str, object] = {
+        "schema": "issue107.dual-rx-functional-capture/v1",
+        "radio_serial": "104000b29905000e17000800065934759d",
+        "firmware": deploy.CANDIDATE_FIRMWARE,
+        "image_sha256": "a" * 64,
+        "candidate_manifest_sha256": "c" * 64,
+        "capture_evidence_sha256": "d" * 64,
+        "boot_id": "0123456789abcdef0123456789abcdef",
+        "rate_hz": deploy.DUAL_RX_RATE_HZ,
+        "rx_mask": 3,
+        "rx_channels": [0, 1],
+        "duration_seconds": 300,
+        "counter_sample_unit": "shared-complex-sample-time-index",
+        "scan_session": 101,
+        "scan_generation": 7,
+        "counter_session": 101,
+        "counter_generation": 7,
+        "timing_sample_rate_hz": deploy.DUAL_RX_RATE_HZ,
+        "anchor_count": 61,
+        "maximum_query_width_ns": 3_000_000,
+        "maximum_inclusive_anchor_span_ns": 5_001_000_000,
+        "functional_pass": True,
+        "all_visits_passed": True,
+        "counter_continuity_passed": True,
+        "iq_geometry_passed": True,
+        "timing_query_pass": True,
+        "timing_anchor_coverage_pass": True,
+        "utc_accuracy_qualified": False,
+        "valid_sample_count": 750_000_000,
+        "iq_bytes_received": 6_000_000_000,
+        "planned_visits": 2_100,
+        "delivered_visits": 2_100,
+        "skipped_visits": 0,
+        "invalid_visits": 0,
+        "cancelled_visits": 0,
+        "missing_samples_reported": 0,
+    }
+    report.update(overrides)
+    return report
+
+
 def test_manifest_rejects_image_hash_mismatch(tmp_path: Path, monkeypatch) -> None:
     image = tmp_path / "candidate.dfu"
     image.write_bytes(b"candidate bytes")
     manifest = _private_json(
         tmp_path / "manifest.json",
         {
-            "firmware": "v0.52-plutoplus-spf-counter-utc-v1-rc1",
+            "firmware": deploy.CANDIDATE_FIRMWARE,
             "asset_sha256": "0" * 64,
             "fit_sha256": "1" * 64,
             "fit_size": 3,
@@ -55,6 +98,103 @@ def test_manifest_rejects_image_hash_mismatch(tmp_path: Path, monkeypatch) -> No
 
     with pytest.raises(ValueError, match="DFU SHA-256"):
         deploy._manifest(image, manifest)
+
+
+def test_manifest_requires_new_v054_candidate_tag(tmp_path: Path, monkeypatch) -> None:
+    image = tmp_path / "candidate.dfu"
+    image.write_bytes(b"candidate bytes")
+    manifest = _private_json(
+        tmp_path / "manifest.json",
+        {
+            "firmware": "v0.53-plutoplus-spf-adaptive-scan-v2",
+            "asset_sha256": "0" * 64,
+            "fit_sha256": "1" * 64,
+            "fit_size": 3,
+            "sources": {"firmware_base": "c" * 40},
+        },
+    )
+
+    with pytest.raises(ValueError, match="candidate v0.54"):
+        deploy._manifest(image, manifest)
+
+
+def test_candidate_profiles_use_paired_rev_c_layout_on_both_sides(
+    monkeypatch, tmp_path: Path
+) -> None:
+    image = tmp_path / "candidate.dfu"
+    image.write_bytes(b"candidate bytes")
+    monkeypatch.setattr(deploy, "validate_dfu", lambda _payload: b"fit body")
+    manifest = {
+        "firmware": deploy.CANDIDATE_FIRMWARE,
+        "firmware_source_commit": "c" * 40,
+        "release_url": "https://example.invalid/candidate",
+    }
+
+    ram_id, persistent_id = deploy._candidate_profiles(
+        manifest, image, image.read_bytes()
+    )
+    ram = deploy.STANDALONE_FLASH_PROFILES[ram_id]
+    persistent = deploy.STANDALONE_FLASH_PROFILES[persistent_id]
+
+    assert ram.source_iio_layout is deploy.SINGLE_RX_TX_CAPABLE_LAYOUT
+    assert ram.return_iio_layout is deploy.PAIRED_RX_TX_CAPABLE_LAYOUT
+    assert persistent.source_iio_layout is deploy.PAIRED_RX_TX_CAPABLE_LAYOUT
+    assert persistent.return_iio_layout is deploy.PAIRED_RX_TX_CAPABLE_LAYOUT
+    assert deploy.CURRENT_FIRMWARE == "v0.52-plutoplus-spf-counter-utc-v1-rc1"
+    assert ram.allowed_before_firmwares == (deploy.CURRENT_FIRMWARE,)
+    assert persistent.allowed_before_firmwares == (deploy.CANDIDATE_FIRMWARE,)
+
+
+def test_dual_report_requires_exact_manifest_and_pair_sample_accounting(
+    tmp_path: Path,
+) -> None:
+    report_path = _private_json(
+        tmp_path / "dual.json", _dual_functional_report()
+    )
+
+    report, digest = deploy._load_dual_functional_report(
+        report_path,
+        serial="104000b29905000e17000800065934759d",
+        firmware=deploy.CANDIDATE_FIRMWARE,
+        image_sha="a" * 64,
+        manifest_sha="c" * 64,
+    )
+
+    assert report["valid_sample_count"] == 750_000_000
+    assert report["iq_bytes_received"] == 8 * report["valid_sample_count"]
+    assert digest == hashlib.sha256(report_path.read_bytes()).hexdigest()
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"rate_hz": 15_000_000},
+        {"rx_mask": 1},
+        {"duration_seconds": 30},
+        {"candidate_manifest_sha256": "e" * 64},
+        {"iq_bytes_received": 12_000_000_000},
+        {"counter_session": 102},
+        {"counter_sample_unit": "bytes"},
+        {"maximum_query_width_ns": -1},
+        {"maximum_inclusive_anchor_span_ns": -1},
+        {"maximum_query_width_ns": 50_000_001},
+    ],
+)
+def test_dual_report_rejects_unqualified_capture_shape(
+    tmp_path: Path, changes: dict[str, object]
+) -> None:
+    report_path = _private_json(
+        tmp_path / "dual.json", _dual_functional_report(**changes)
+    )
+
+    with pytest.raises(ValueError, match="paired-RX report"):
+        deploy._load_dual_functional_report(
+            report_path,
+            serial="104000b29905000e17000800065934759d",
+            firmware=deploy.CANDIDATE_FIRMWARE,
+            image_sha="a" * 64,
+            manifest_sha="c" * 64,
+        )
 
 
 @pytest.mark.parametrize(
@@ -75,7 +215,7 @@ def test_functional_report_rejects_wrong_radio_or_image(
         deploy._load_functional_report(
             report_path,
             serial="104000b29905000e17000800065934759d",
-            firmware="v0.52-plutoplus-spf-counter-utc-v1-rc1",
+            firmware=deploy.CANDIDATE_FIRMWARE,
             image_sha="a" * 64,
         )
 
@@ -177,7 +317,7 @@ def test_persistence_requires_matching_successful_ram_receipt(
                 receipt_path,
                 serial="104000b29905000e17000800065934759d",
                 image_sha="a" * 64,
-                firmware="v0.52-plutoplus-spf-counter-utc-v1-rc1",
+                firmware=deploy.CANDIDATE_FIRMWARE,
                 usb_path="/sys/bus/usb/devices/1-2",
             )
         return
@@ -185,7 +325,7 @@ def test_persistence_requires_matching_successful_ram_receipt(
         "serial": "104000b29905000e17000800065934759d",
         "usb_sysfs_path": "/sys/bus/usb/devices/1-2",
         "image_sha256": "a" * 64,
-        "expected_firmware": "v0.52-plutoplus-spf-counter-utc-v1-rc1",
+        "expected_firmware": deploy.CANDIDATE_FIRMWARE,
     }
     if receipt_kind == "wrong-serial":
         plan["serial"] = "1040007c4a94000211000b009186843ef2"
@@ -199,7 +339,7 @@ def test_persistence_requires_matching_successful_ram_receipt(
             "phases": sorted(deploy.RAM_PHASES),
             "plan": plan,
             "returned_serial": "104000b29905000e17000800065934759d",
-            "returned_firmware": "v0.52-plutoplus-spf-counter-utc-v1-rc1",
+            "returned_firmware": deploy.CANDIDATE_FIRMWARE,
         },
     )
 
@@ -208,7 +348,7 @@ def test_persistence_requires_matching_successful_ram_receipt(
             receipt_path,
             serial="104000b29905000e17000800065934759d",
             image_sha="a" * 64,
-            firmware="v0.52-plutoplus-spf-counter-utc-v1-rc1",
+            firmware=deploy.CANDIDATE_FIRMWARE,
             usb_path="/sys/bus/usb/devices/1-2",
         )
 

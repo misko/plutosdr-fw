@@ -22,8 +22,9 @@ from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
-EXPECTED_FIRMWARE = "v0.52-plutoplus-spf-counter-utc-v1-rc1"
+EXPECTED_FIRMWARE = "v0.54-plutoplus-spf-counter-utc-v1-rc1"
 SUPPORTED_RATES = (10_000_000, 15_000_000, 20_000_000)
+DUAL_RX_RATE_HZ = 2_500_000
 DEFAULT_FREQUENCIES_HZ = (959_687_498, 1_209_687_498, 1_459_687_498, 1_709_687_500)
 MAX_COUNTER_ANCHOR_GAP_NS = 10_000_000_000
 
@@ -90,6 +91,41 @@ def counter_continuity_passed(visits: list[dict[str, Any]]) -> bool:
     return True
 
 
+def iq_geometry_passed(
+    visits: list[dict[str, Any]], *, rx_mask: int, terminal_iq_bytes: int | None
+) -> tuple[bool, int, int]:
+    """Check payload bytes against the shared per-channel sample counter.
+
+    The source counter advances once per complex sample time index. With paired
+    RX, that index contains one sample from each enabled receiver; it is not
+    multiplied by the channel count when calculating continuity or anchors.
+    """
+
+    receiver_count = rx_mask.bit_count()
+    if rx_mask not in (1, 3) or not visits or type(terminal_iq_bytes) is not int:
+        return False, 0, 0
+    sample_count = 0
+    iq_bytes = 0
+    for visit in visits:
+        samples = visit.get("valid_sample_count")
+        payload_bytes = visit.get("iq_bytes_received")
+        if (
+            type(samples) is not int
+            or samples <= 0
+            or type(payload_bytes) is not int
+            or payload_bytes != samples * 4 * receiver_count
+        ):
+            return False, sample_count, iq_bytes
+        sample_count += samples
+        iq_bytes += payload_bytes
+    return (
+        terminal_iq_bytes == iq_bytes
+        and terminal_iq_bytes == sample_count * 4 * receiver_count,
+        sample_count,
+        iq_bytes,
+    )
+
+
 def timing_anchor_coverage_passed(
     anchors: list[dict[str, Any]],
     *,
@@ -152,7 +188,16 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--uri", required=True, help="physical LAN URI, for example ip:192.168.1.18"
     )
-    parser.add_argument("--rate", type=int, required=True, choices=SUPPORTED_RATES)
+    parser.add_argument(
+        "--rate", type=int, required=True, choices=(*SUPPORTED_RATES, DUAL_RX_RATE_HZ)
+    )
+    parser.add_argument(
+        "--rx-mask",
+        type=int,
+        choices=(1, 3),
+        default=1,
+        help="1 for single RX; 3 for shared-LO dual RX at 2.5 MS/s",
+    )
     parser.add_argument("--duration-seconds", type=int, required=True)
     parser.add_argument(
         "--output",
@@ -175,6 +220,7 @@ def _validate(args: argparse.Namespace) -> None:
         raise ValueError("serial must be nonempty")
     if not args.uri.startswith("ip:") or not args.uri[3:]:
         raise ValueError("URI must be a physical LAN URI in ip:host form")
+    _validate_rx_mode(args.rate, args.rx_mask)
     if not 1 <= args.duration_seconds <= 300:
         raise ValueError("duration must be in 1..300 seconds")
     if not 20 <= args.dwell_ms <= 240:
@@ -193,6 +239,15 @@ def _validate(args: argparse.Namespace) -> None:
         raise FileExistsError(
             f"immutable evidence output already exists: {args.output}"
         )
+
+
+def _validate_rx_mode(rate_hz: int, rx_mask: int) -> None:
+    if rx_mask == 3 and rate_hz != DUAL_RX_RATE_HZ:
+        raise ValueError("paired RX validation is supported only at 2.5 MS/s")
+    if rx_mask == 1 and rate_hz == DUAL_RX_RATE_HZ:
+        raise ValueError("2.5 MS/s capture requires the paired-RX mask")
+    if rx_mask not in (1, 3) or rate_hz not in (*SUPPORTED_RATES, DUAL_RX_RATE_HZ):
+        raise ValueError("unsupported rate/RX-mask pair")
 
 
 def _preflight(serial: str, uri: str) -> dict[str, Any]:
@@ -239,6 +294,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "uri": args.uri,
             "firmware": EXPECTED_FIRMWARE,
             "rate_hz": args.rate,
+            "rx_mask": args.rx_mask,
+            "rx_channels": [0, 1] if args.rx_mask == 3 else [0],
+            "capture_mode": "dual-rx" if args.rx_mask == 3 else "single-rx",
             "duration_seconds": args.duration_seconds,
             "frequencies_hz": args.frequencies_hz,
             "dwell_ms": args.dwell_ms,
@@ -248,9 +306,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "radio_identity": None,
         "visits": [],
         "counter_utc_evidence": None,
+        "counter_sample_unit": "shared-complex-sample-time-index",
         "counter_timing": {},
         "campaign": None,
         "functional_pass": False,
+        "iq_geometry_passed": False,
         "counter_continuity_passed": False,
         "timing_query_pass": False,
         "timing_anchor_coverage_pass": False,
@@ -298,6 +358,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             baseline_weights=(1,) * len(args.frequencies_hz),
             transition_budget_ms=20,
             analysis_digest=detector.config.analysis_digest,
+            rx_mask=args.rx_mask,
         )
         timing_documents: list[dict[str, Any]] = []
 
@@ -310,8 +371,14 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "first_sample": record.valid_start,
                 "end_sample_exclusive": record.valid_end,
                 "valid_sample_count": record.valid_end - record.valid_start,
+                "sample_counter_channel_count": args.rx_mask.bit_count(),
                 "missing_samples_before": record.missing_samples_before,
                 "iq_bytes_received": record.iq_bytes,
+                "iq_bytes_per_counter_sample": (
+                    record.iq_bytes // (record.valid_end - record.valid_start)
+                    if record.valid_end > record.valid_start
+                    else None
+                ),
                 "iq_payload_retained": False,
             }
             if result["visits"]:
@@ -454,6 +521,15 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         result["counter_timing"]["last_valid_sample"] = last_valid_sample
         continuity_passed = counter_continuity_passed(visits)
         result["counter_continuity_passed"] = continuity_passed
+        terminal_iq_bytes = terminal["iq_bytes"] if terminal else None
+        iq_geometry, sample_count_per_receiver, total_iq_bytes = iq_geometry_passed(
+            visits, rx_mask=args.rx_mask, terminal_iq_bytes=terminal_iq_bytes
+        )
+        result["iq_geometry_passed"] = iq_geometry
+        result["counter_timing"]["valid_sample_count_per_receiver"] = (
+            sample_count_per_receiver
+        )
+        result["counter_timing"]["iq_bytes_received"] = total_iq_bytes
         anchor_coverage_passed = timing_anchor_coverage_passed(
             anchors,
             first_valid_sample=first_valid_sample,
@@ -490,6 +566,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             and restoration["fastlock_inactive"]
             and anchors_consistent
             and continuity_passed
+            and iq_geometry
             and not result["errors"]
         )
         result["functional_pass"] = functional
@@ -525,6 +602,7 @@ def main() -> int:
             {
                 "output": str(args.output.expanduser().absolute()),
                 "functional_pass": result["functional_pass"],
+                "iq_geometry_passed": result["iq_geometry_passed"],
                 "counter_continuity_passed": result["counter_continuity_passed"],
                 "timing_query_pass": result["timing_query_pass"],
                 "timing_anchor_coverage_pass": result["timing_anchor_coverage_pass"],
