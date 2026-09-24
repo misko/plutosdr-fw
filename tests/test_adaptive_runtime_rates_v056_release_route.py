@@ -1,5 +1,6 @@
 """Bind the v0.56 main release route to its immutable source graph."""
 from pathlib import Path
+import re
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,7 +37,24 @@ def test_v056_main_route_is_versioned_and_source_locked() -> None:
         "github.ref == 'refs/heads/main' &&\n"
         "          'plutoplus-spf-adaptive-runtime-rates'"
     ) in workflow
-    assert f"'{VERSION}'" in workflow
+    final_gate = re.search(
+        r"- name: Require the exact final release identity\n"
+        r"(?P<body>.*?)(?=\n      - name:)",
+        workflow,
+        re.DOTALL,
+    )
+    assert final_gate is not None
+    assert "github.ref == 'refs/heads/main'" in final_gate["body"]
+    assert f"'{VERSION}'" in final_gate["body"]
+
+    counter_rx_gate = re.search(
+        r"- name: Require the exact counter RX v1 candidate identity\n"
+        r"(?P<body>.*?)(?=\n      - name:)",
+        workflow,
+        re.DOTALL,
+    )
+    assert counter_rx_gate is not None
+    assert "'v0.50-plutoplus-spf-counter-rx-v1'" in counter_rx_gate["body"]
 
     builder = (ROOT / "scripts/build_gain_series_candidate.sh").read_text()
     package = (ROOT / "scripts/ci/package_main_firmware.sh").read_text()

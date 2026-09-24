@@ -480,7 +480,7 @@ jobs:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
-            'v0.56-plutoplus-spf-adaptive-runtime-rates'
+            'v0.50-plutoplus-spf-counter-rx-v1'
 
       - name: Require the exact direct-async IQ v5 candidate identity
         if: github.ref == 'refs/heads/codex/issue-102-fw-release'
@@ -778,7 +778,7 @@ jobs:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
-            'v0.50-plutoplus-spf-counter-rx-v1'
+            'v0.56-plutoplus-spf-adaptive-runtime-rates'
 
       - name: Build, validate, and package
         id: build
