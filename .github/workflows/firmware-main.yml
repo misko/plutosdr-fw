@@ -102,6 +102,8 @@ jobs:
       # usable only for reproducing independently locked candidates.
       SPF_GAIN_SERIES_MANIFEST: >-
         ${{ format('{0}/manifests/{1}', github.workspace,
+          github.ref == 'refs/heads/main' &&
+          'adaptive-runtime-rates-v056-source.yaml' ||
           github.ref == 'refs/heads/codex/issue-111-runtime-rates' &&
           'adaptive-runtime-rates-source.yaml' ||
           github.ref == 'refs/heads/codex/counter-utc-release' &&
@@ -114,8 +116,7 @@ jobs:
           'counter-utc-v1-source.yaml' ||
           github.ref == 'refs/heads/codex/issue-102-fw-release' &&
           'iq-direct-async-v5-source.yaml' ||
-          (github.ref == 'refs/heads/main' ||
-          github.ref == 'refs/heads/codex/issue-97-counter-metadata') &&
+          github.ref == 'refs/heads/codex/issue-97-counter-metadata' &&
           'counter-rx-v1-source.yaml' ||
           github.ref == 'refs/heads/codex/iq-direct-async-v4-exact-200m' &&
           'iq-direct-async-v4-source.yaml' ||
@@ -217,7 +218,9 @@ jobs:
           'tandem-agc-v2-source.yaml' ||
           'libiio-frame-metadata-v6-rc4-source.yaml') }}
       SPF_PACKAGE_STEM_PREFIX: >-
-        ${{ github.ref == 'refs/heads/codex/issue-111-runtime-rates' &&
+        ${{ github.ref == 'refs/heads/main' &&
+          'plutoplus-spf-adaptive-runtime-rates' ||
+          github.ref == 'refs/heads/codex/issue-111-runtime-rates' &&
           'plutoplus-spf-adaptive-runtime-rates' ||
           github.ref == 'refs/heads/codex/counter-utc-release' &&
           'plutoplus-spf-counter-utc-v1-rc1' ||
@@ -229,8 +232,7 @@ jobs:
           'plutoplus-spf-counter-utc-v1-rc1' ||
           github.ref == 'refs/heads/codex/issue-102-fw-release' &&
           'plutoplus-spf-iq-direct-async-v5' ||
-          (github.ref == 'refs/heads/main' ||
-          github.ref == 'refs/heads/codex/issue-97-counter-metadata') &&
+          github.ref == 'refs/heads/codex/issue-97-counter-metadata' &&
           'plutoplus-spf-counter-rx-v1' ||
           github.ref == 'refs/heads/codex/iq-direct-async-v4-exact-200m' &&
           'plutoplus-spf-iq-direct-async-v4' ||
@@ -478,7 +480,7 @@ jobs:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
-            'v0.50-plutoplus-spf-counter-rx-v1'
+            'v0.56-plutoplus-spf-adaptive-runtime-rates'
 
       - name: Require the exact direct-async IQ v5 candidate identity
         if: github.ref == 'refs/heads/codex/issue-102-fw-release'
