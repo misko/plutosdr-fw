@@ -1,5 +1,6 @@
 """Keep the counter release's trusted route and component locks consistent."""
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -8,7 +9,15 @@ def test_counter_release_route_and_locks():
     workflow = (ROOT / '.github/workflows/firmware-main.yml').read_text()
     branch = 'refs/heads/codex/issue-97-counter-metadata'
     assert workflow.count(branch) == 4
-    assert workflow.count("'v0.50-plutoplus-spf-counter-rx-v1'") == 2
+    counter_gate = re.search(
+        r"- name: Require the exact counter RX v1 candidate identity\n"
+        r"(?P<body>.*?)(?=\n      - name:)",
+        workflow,
+        re.DOTALL,
+    )
+    assert counter_gate is not None
+    assert branch in counter_gate["body"]
+    assert "'v0.50-plutoplus-spf-counter-rx-v1'" in counter_gate["body"]
     assert workflow.count("'counter-rx-v1-source.yaml'") == 1
     assert workflow.count("'plutoplus-spf-counter-rx-v1'") == 1
     manifest = dict(

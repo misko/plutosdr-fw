@@ -1,5 +1,12 @@
 # Release notes
 
+## v0.56-plutoplus-spf-adaptive-runtime-rates — qualification pending
+
+The integrated main release route includes the v0.52/v0.54 UTC evidence and
+v0.55 runtime-rate support. A new trusted build and hardware qualification,
+including physical cold return, are required before official publication.
+Absolute UTC accuracy remains unqualified.
+
 ## Version history at a glance
 
 | Release | Date | Status | What it added |

@@ -13,10 +13,18 @@ def test_runtime_rate_source_and_route() -> None:
     )
     for component in ("buildroot", "linux", "hdl", "hdl-quantulum", "u-boot-xlnx"):
         entry = subprocess.check_output(
-            ["git", "ls-files", "--stage", "--", component], cwd=ROOT, text=True
+            [
+                "git",
+                "ls-tree",
+                "55f93fd79c93fa41c8ec67457e12d35f2c389f00",
+                "--",
+                component,
+            ],
+            cwd=ROOT,
+            text=True,
         ).split()
         assert entry[0] == "160000"
-        assert manifest["submodule_" + component.replace("-", "_")] == entry[1]
+        assert manifest["submodule_" + component.replace("-", "_")] == entry[2]
     assert manifest["libiio_0_25_source"] == "c93db89b27fd46faf5479ceb5bf08460226a88ce"
     assert manifest["libiio_0_25_archive_sha256"] == "be66825508f1c9b41bad219e2480be9d8b8c86b94d06cd38953b8d53630b8de5"
     workflow = (ROOT / ".github/workflows/firmware-main.yml").read_text()
