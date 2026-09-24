@@ -142,8 +142,14 @@ if [[ -z "$tag_sha" ]]; then
 elif [[ "$tag_sha" == "$fw_pin" ]]; then
     ok "release tag ${rel_tag} == firmware_source ${fw_pin:0:12}"
 else
-    warn "release tag ${rel_tag} -> ${tag_sha:0:12}, but the release was built from ${fw_pin:0:12}"
-    warn "  known and recorded for v3; a NEW release must tag its own build commit"
+    if [[ "$(m release_state)" == "candidate" ||
+          "$(m release_state)" == "hardware-qualified-prerelease" ]]; then
+        bad "candidate release tag ${rel_tag} -> ${tag_sha:0:12}, but firmware_source pins ${fw_pin:0:12}"
+        bad "candidate source locks must identify the exact firmware commit"
+    else
+        warn "release tag ${rel_tag} -> ${tag_sha:0:12}, but the release was built from ${fw_pin:0:12}"
+        warn "  known and recorded for v3; a NEW release must tag its own build commit"
+    fi
 fi
 fi
 
