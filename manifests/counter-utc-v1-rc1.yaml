@@ -1,0 +1,79 @@
+schema: plutosdr-fw.build-manifest
+schema_version: 1
+release_state: candidate
+release_tag: v0.52-plutoplus-spf-counter-utc-v1-rc1
+release_url: https://github.com/misko/plutosdr-fw/releases/tag/v0.52-plutoplus-spf-counter-utc-v1-rc1
+device_fw: v0.52-plutoplus-spf-counter-utc-v1-rc1
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+firmware_source: 2640f9d532736560c78315f0bbe6d6f40d82536e
+firmware_ref: refs/tags/v0.52-plutoplus-spf-counter-utc-v1-rc1
+ci_run_id: 35528969627
+ci_run_attempt: 1
+ci_source_event: workflow_dispatch
+
+libiio_0_25_source: 7aa544742e2718ff2f553dc35cb873510e02fbc4
+libiio_0_25_repo: https://github.com/misko/libiio.git
+libiio_0_25_ref: refs/tags/counter-utc-v1-rc1-source/libiio-v1
+libiio_0_25_archive_sha256: 23b7cb3802f3994a358640e81ca219a6570e65a9d6033912ff980943f0d6f670
+iiod_sha256: 66099bf0e6d968de302cbf412ccfdb3dc484690cd424d493593ca753e517b870
+
+metadata_source: 3294365ff44da26b261be4a2ccb241b7896d23ad
+metadata_repo: https://github.com/misko/plutosdr-fw.git
+metadata_ref: refs/tags/iio-throughput-sampler-wake-v5-source/metadata-v1
+gadget_source: 1bbe9f0ee4a70374964804de09b7503da260b059
+gadget_repo: https://github.com/misko/plutosdr-fw.git
+gadget_ref: refs/tags/libiio-metadata-v6-rc4-source/gadget-v4
+ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
+ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
+ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
+
+submodule_buildroot: 7f0a05e457e1e640c1ce403169844d3e5fbed623
+submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
+submodule_buildroot_ref: refs/tags/counter-utc-v1-rc1-source/buildroot-v1
+submodule_hdl: 145bd47e55d5c5537e0ba49d53cb25a5393f66ba
+submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
+submodule_hdl_ref: refs/tags/ddr-burst-v1-rc4-source/hdl-v1
+submodule_hdl_quantulum: 364b3dc7e770c3971d1f41a75c00e6cae76e2e6d
+submodule_hdl_quantulum_repo: https://github.com/misko/plutosdr-hdl-quantulum
+submodule_hdl_quantulum_ref: refs/tags/ddr-burst-v1-rc5-source/hdl-quantulum-v1
+submodule_linux: eeefe8c6228eede6206197e941aa7024d5ac60d2
+submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
+submodule_linux_ref: refs/tags/adaptive-scan-v1-source/linux-v1
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
+submodule_u_boot_xlnx_ref: refs/tags/gain-series-v4-rc2-source/u-boot-xlnx
+versions_hdl: ddr-burst-v1-rc4-source/hdl-v1
+versions_buildroot: counter-utc-v1-rc1-source/buildroot-v1
+versions_linux: adaptive-scan-v1-source/linux-v1
+versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx
+
+asset_name: plutoplus-spf-counter-utc-v1-rc1-2640f9d53273-pluto.dfu
+image_url: https://github.com/misko/plutosdr-fw/releases/download/v0.52-plutoplus-spf-counter-utc-v1-rc1/plutoplus-spf-counter-utc-v1-rc1-2640f9d53273-pluto.dfu
+image_sha256: a2d29612a0d0a450b90a3f5a58af7ff8e9eeeecc0886404a40b27b5f8ebcaab1
+image_size: 13020883
+fit_body_sha256: a31913380597375bacec3740984bbf59da285e686f4e9c4098e45ea4f8ada65b
+fit_body_size: 13020867
+frm_asset_name: plutoplus-spf-counter-utc-v1-rc1-2640f9d53273-pluto.frm
+frm_sha256: 7fd2bfbc0af8d434d3ccc317c23c8a336d1032732798b859dcf1f3dadb093733
+frm_size: 13020900
+source_manifest_name: counter-utc-v1-source.yaml
+source_manifest_sha256: 47033f25b9c637d8032fedfb4a8945667f32d2ec6200bde6a4d73c13b2e8b971
+rootfs_sha256: bbd492e6b2072c6947c19228983e990a803229a40004b6a68ef174edcc86dbd0
+xsa_asset_name: plutoplus-spf-counter-utc-v1-rc1-2640f9d53273-system_top.xsa
+xsa_sha256: a2125380ad65924b3f983e201f270c8561eefd449256071d0f86884c0e31a3b9
+fpga_bitstream_sha256: 72ffeabb19b18a4ab7b3283de3c02588dc1ab1481e52482ee488db314e916de3
+fpga_bitstream_md5: 828319288f102878e778bc2a883cff6f
+ramdisk_md5: 5f942ce5d23406712cc58e1895f19a13
+fit_description: Configuration to load fpga before Kernel
+integrated_route_verdict: PASS
+integrated_route_verdict_sha256: c55370ac3c4e961e4e04b1b0d5ec17bc63e3d0b4fff8d444078e952852be5b17
+routed_wns_ns: 0.767
+routed_whs_ns: 0.019
+
+hardware_functional_passed: true
+utc_hardware_qualified: false
+hardware_accessed_during_build: false
+intended_boot_mode: locally-tested-persistent-canary
+companion_ppu_source: 60486cf6f318959e1d8f7fd78c5b4289127c7867
+companion_tracker_source: 480f877ae237e2f8ed2880ca6d97a09cbe82bfa8

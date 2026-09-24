@@ -1,6 +1,7 @@
 """Keep the v0.52 adaptive-scan route and source locks consistent."""
 
 from pathlib import Path
+import re
 import subprocess
 
 
@@ -17,6 +18,49 @@ def _manifest() -> dict[str, str]:
     )
 
 
+def _historical_source_commit(manifest: dict[str, str]) -> str:
+    """Return the immutable firmware source commit, fetching its release tag if needed."""
+    source_commit = manifest["firmware_source"]
+    assert re.fullmatch(r"[0-9a-f]{40}", source_commit)
+
+    available = subprocess.run(
+        ["git", "cat-file", "-e", f"{source_commit}^{{commit}}"],
+        cwd=ROOT,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if available.returncode != 0:
+        # CI checkouts may be shallow. Fetch only the manifest's immutable
+        # release tag into FETCH_HEAD, then verify that it resolves to the
+        # separately pinned commit before trusting its tree.
+        tag = manifest["release_tag"]
+        assert re.fullmatch(r"[A-Za-z0-9._/-]+", tag)
+        tag_ref = f"refs/tags/{tag}"
+        subprocess.run(
+            ["git", "fetch", "--no-tags", "origin", tag_ref],
+            cwd=ROOT,
+            check=True,
+            stdout=subprocess.DEVNULL,
+        )
+        fetched_commit = subprocess.check_output(
+            ["git", "rev-parse", "FETCH_HEAD^{commit}"], cwd=ROOT, text=True
+        ).strip()
+        assert fetched_commit == source_commit
+
+    return source_commit
+
+
+def _historical_submodule_pin(source_commit: str, component: str) -> str:
+    entry = subprocess.check_output(
+        ["git", "ls-tree", source_commit, "--", component], cwd=ROOT, text=True
+    ).split()
+    assert len(entry) == 4
+    mode, object_type, object_id, path = entry
+    assert (mode, object_type, path) == ("160000", "commit", component)
+    return object_id
+
+
 def test_adaptive_scan_v1_release_route_and_locks() -> None:
     workflow = (ROOT / ".github/workflows/firmware-main.yml").read_text()
     branch = "refs/heads/codex/feature-103"
@@ -26,10 +70,9 @@ def test_adaptive_scan_v1_release_route_and_locks() -> None:
     assert workflow.count("'plutoplus-spf-adaptive-scan-v1'") == 1
 
     manifest = _manifest()
+    source_commit = _historical_source_commit(manifest)
     for component in ("buildroot", "linux", "hdl", "hdl-quantulum", "u-boot-xlnx"):
-        pin = subprocess.check_output(
-            ["git", "ls-files", "--stage", component], cwd=ROOT, text=True
-        ).split()[1]
+        pin = _historical_submodule_pin(source_commit, component)
         assert manifest["submodule_" + component.replace("-", "_")] == pin
 
     assert manifest["libiio_0_25_source"] == (
