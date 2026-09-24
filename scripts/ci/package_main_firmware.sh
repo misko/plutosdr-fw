@@ -23,6 +23,7 @@ fail() {
 # source locks retain their original package path unless a waiver inventory is
 # explicitly supplied by their trusted workflow.
 case "$(basename "$MANIFEST")" in
+adaptive-runtime-rates-source.yaml | \
 counter-utc-v1-source.yaml | \
 counter-utc-v054-source.yaml | adaptive-scan-v2-source.yaml | adaptive-scan-v1-source.yaml | iq-direct-async-v5-source.yaml | counter-rx-v1-source.yaml | iq-direct-async-v4-source.yaml | iq-direct-async-v3-source.yaml | iq-direct-async-v2-source.yaml | iq-direct-async-ring-v1-rc1-source.yaml | iio-throughput-coverage-window-v6-rc1-source.yaml | \
 ddr-capacity-test-rc1-source.yaml | iio-throughput-sampler-wake-v5-rc1-source.yaml | iio-throughput-refill-sampler-v4-rc1-source.yaml | iio-throughput-sampler-poll-v3-rc1-source.yaml | iio-throughput-rw-affinity-v2-rc1-source.yaml | iio-throughput-affinity-v1-rc1-source.yaml | iio-throughput-timing-v1-rc1-source.yaml | iio-throughput-hold-v2-rc1-source.yaml | iio-throughput-hold-v1-rc1-source.yaml | ddr-ring-prefill-v1-rc1-source.yaml | ddr-ring-v1-rc2-source.yaml | ddr-ring-v1-rc1-source.yaml | ddr-burst-v2-rc3-source.yaml | ddr-burst-v2-rc2-source.yaml | ddr-burst-v2-rc1-source.yaml | ddr-burst-v1-rc5-source.yaml | ddr-burst-v1-rc4-source.yaml | ddr-burst-v1-rc3-source.yaml | \
@@ -159,7 +160,8 @@ if [[ "$(basename "$MANIFEST")" == adaptive-scan-v1-source.yaml ||
     scripts/feature103/apply_rx0_tx2_topology.sh --check "${adaptive_dtbs[@]}"
     printf 'Adaptive-scan RX0/TX2 topology verified in all three FIT slots.\n'
 fi
-if [[ "$(basename "$MANIFEST")" == adaptive-scan-v2-source.yaml ||
+if [[ "$(basename "$MANIFEST")" == adaptive-runtime-rates-source.yaml ||
+      "$(basename "$MANIFEST")" == adaptive-scan-v2-source.yaml ||
       "$(basename "$MANIFEST")" == counter-utc-v054-source.yaml ]]; then
     adaptive_dtbs=()
     for fdt_index in 0 1 2; do
@@ -395,6 +397,9 @@ adaptive-scan-v1-source.yaml:*)
     ;;
 counter-utc-v054-source.yaml:candidate)
     protected_version='v0.54-plutoplus-spf-counter-utc-v1-rc1'
+    ;;
+adaptive-runtime-rates-source.yaml:final-release)
+    protected_version='v0.55-plutoplus-spf-adaptive-runtime-rates'
     ;;
 counter-utc-v1-source.yaml:candidate)
     protected_version='v0.52-plutoplus-spf-counter-utc-v1-rc1'
