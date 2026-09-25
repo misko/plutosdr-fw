@@ -1,5 +1,20 @@
 # Release notes
 
+## v0.58-plutoplus-spf-adaptive-multirate-agc — qualification pending
+
+Restores protocol-v3 runtime selection across 2.5, 5, 7.5, and 10 MS/s after
+v0.57 narrowed the advertised rate set. Adaptive OPENM now also accepts matched
+`slow_attack` RX gain modes. Each completed visit reports a source-counter-bound
+RX1/RX2 gain observation in the previously reserved Visit bytes, so the host can
+verify that both gain chains evolve independently during an autonomous scan.
+
+The source graph pins libiio `7639fc9b6c01336e1451f4f58ccf66e30a22388d`,
+Linux `2adb778b0b722daa1ed1b3bb50836b074c3f9d65`, and Buildroot
+`87c4c0c6de39ff14a8132435b94a35de89ff8e1a`. The matching host utility commit
+is `bf2d109e243aaca319f4301ef025960c8deeab7b` on
+`codex/issues-111-116-next-fw`. Trusted build and exact-byte
+RAM-first hardware qualification are required before publication.
+
 ## v0.56-plutoplus-spf-adaptive-runtime-rates — qualification pending
 
 The integrated main release route includes the v0.52/v0.54 UTC evidence and
