@@ -21,9 +21,9 @@ ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
 ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
 ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
 
-submodule_buildroot: 87c4c0c6de39ff14a8132435b94a35de89ff8e1a
+submodule_buildroot: 9e6ecb06486fe922ab2ee852de64c2f46a2c7bbf
 submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
-submodule_buildroot_ref: refs/tags/adaptive-multirate-agc-v058-source/buildroot-v1
+submodule_buildroot_ref: refs/tags/adaptive-multirate-agc-v058-source/buildroot-v2
 submodule_hdl: 145bd47e55d5c5537e0ba49d53cb25a5393f66ba
 submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
 submodule_hdl_ref: refs/tags/ddr-burst-v1-rc4-source/hdl-v1
@@ -38,6 +38,6 @@ submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
 submodule_u_boot_xlnx_ref: refs/tags/gain-series-v4-rc2-source/u-boot-xlnx
 
 versions_hdl: ddr-burst-v1-rc4-source/hdl-v1
-versions_buildroot: adaptive-multirate-agc-v058-source/buildroot-v1
+versions_buildroot: adaptive-multirate-agc-v058-source/buildroot-v2
 versions_linux: adaptive-multirate-agc-v058-source/linux-v1
 versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx

@@ -10,7 +10,7 @@ verify that both gain chains evolve independently during an autonomous scan.
 
 The source graph pins libiio `7639fc9b6c01336e1451f4f58ccf66e30a22388d`,
 Linux `2adb778b0b722daa1ed1b3bb50836b074c3f9d65`, and Buildroot
-`87c4c0c6de39ff14a8132435b94a35de89ff8e1a`. The matching host utility commit
+`9e6ecb06486fe922ab2ee852de64c2f46a2c7bbf`. The matching host utility commit
 is `bf2d109e243aaca319f4301ef025960c8deeab7b` on
 `codex/issues-111-116-next-fw`. Trusted build and exact-byte
 RAM-first hardware qualification are required before publication.
