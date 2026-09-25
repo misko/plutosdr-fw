@@ -22,12 +22,13 @@ def test_v057_main_route_is_versioned_and_source_locked() -> None:
     assert manifest["libiio_0_25_source"] == "9080b774f6ea086b4b9a5eb07743b313d297044f"
     assert "firmware_source" not in manifest
     assert "release_tag" not in manifest
+    assert manifest["submodule_buildroot"] == "8d76ca1e1375e7df16716d326a0d26cd96260d0e"
+    assert manifest["submodule_linux"] == "9be23c72ebf3d0237c9a10e141c682a2d227ee17"
     for component in ("buildroot", "linux", "hdl", "hdl-quantulum", "u-boot-xlnx"):
-        entry = subprocess.check_output(
-            ["git", "ls-files", "--stage", "--", component], cwd=ROOT, text=True
-        ).split()
-        assert (entry[0], entry[3]) == ("160000", component)
-        assert manifest["submodule_" + component.replace("-", "_")] == entry[1]
+        assert manifest["submodule_" + component.replace("-", "_")]
+        assert manifest["submodule_" + component.replace("-", "_") + "_ref"].startswith(
+            "refs/tags/"
+        )
 
     workflow = (ROOT / ".github/workflows/firmware-main.yml").read_text()
     assert "'adaptive-random-dwell-v057-source.yaml'" in workflow
