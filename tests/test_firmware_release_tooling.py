@@ -356,7 +356,7 @@ def test_direct_async_v4_retains_its_exact_historical_candidate_route() -> None:
         and "SOURCE_GRAPH_CHECK_WORKTREE=0" not in line
     ]
     assert current_worktree_checks == [
-        "./scripts/check_source_graph.sh manifests/adaptive-runtime-rates-v056-source.yaml"
+        "./scripts/check_source_graph.sh manifests/adaptive-random-dwell-v057-source.yaml"
     ]
     for source in (builder, package, checker):
         assert manifest_name in source

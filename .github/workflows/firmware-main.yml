@@ -103,7 +103,7 @@ jobs:
       SPF_GAIN_SERIES_MANIFEST: >-
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/main' &&
-          'adaptive-runtime-rates-v056-source.yaml' ||
+          'adaptive-random-dwell-v057-source.yaml' ||
           github.ref == 'refs/heads/codex/issue-111-runtime-rates' &&
           'adaptive-runtime-rates-source.yaml' ||
           github.ref == 'refs/heads/codex/counter-utc-release' &&
@@ -219,7 +219,7 @@ jobs:
           'libiio-frame-metadata-v6-rc4-source.yaml') }}
       SPF_PACKAGE_STEM_PREFIX: >-
         ${{ github.ref == 'refs/heads/main' &&
-          'plutoplus-spf-adaptive-runtime-rates' ||
+          'plutoplus-spf-adaptive-random-dwell' ||
           github.ref == 'refs/heads/codex/issue-111-runtime-rates' &&
           'plutoplus-spf-adaptive-runtime-rates' ||
           github.ref == 'refs/heads/codex/counter-utc-release' &&
@@ -778,7 +778,7 @@ jobs:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
-            'v0.56-plutoplus-spf-adaptive-runtime-rates'
+            'v0.57-plutoplus-spf-adaptive-random-dwell'
 
       - name: Build, validate, and package
         id: build
