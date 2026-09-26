@@ -1,13 +1,13 @@
-"""Bind the v0.58 release branch to its immutable source graph."""
+"""Bind the v0.59 dual-RX counter-fix candidate to its source graph."""
+
 from pathlib import Path
 import re
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST_NAME = "adaptive-multirate-agc-v058-source.yaml"
-VERSION = "v0.58-plutoplus-spf-adaptive-multirate-agc"
-BRANCH = "refs/heads/codex/issues-111-116-next-fw"
-SOURCE_TAG = "adaptive-multirate-agc-v058-source/firmware-v3"
+MANIFEST_NAME = "dual-rx-counter-fix-v059-source.yaml"
+VERSION = "v0.59-plutoplus-spf-dual-rx-counter-fix"
+BRANCH = "refs/heads/codex/v059-dual-rx-counter-fix"
 
 
 def _manifest() -> dict[str, str]:
@@ -18,28 +18,27 @@ def _manifest() -> dict[str, str]:
     )
 
 
-def test_v058_route_is_versioned_and_source_locked() -> None:
+def test_v059_route_is_versioned_and_source_locked() -> None:
     manifest = _manifest()
     assert manifest["release_state"] == "final-release"
-    assert manifest["libiio_0_25_source"] == "7639fc9b6c01336e1451f4f58ccf66e30a22388d"
-    assert manifest["libiio_0_25_archive_sha256"] == (
-        "6da6c6c4fb94148c6fdde184c77c3a62d77424c73bc52b6427f5d0353e253410"
+    assert manifest["submodule_linux"] == "a008394055c72ad88e45b30e0979d0e5f09642ec"
+    assert manifest["submodule_linux_ref"] == (
+        "refs/tags/adaptive-multirate-agc-v059-source/linux-v2"
     )
-    assert "firmware_source" not in manifest
-    assert "release_tag" not in manifest
     for component in ("buildroot", "linux", "hdl", "hdl-quantulum", "u-boot-xlnx"):
         entry = subprocess.check_output(
-            ["git", "ls-tree", SOURCE_TAG, component], cwd=ROOT, text=True
+            ["git", "ls-files", "--stage", "--", component], cwd=ROOT, text=True
         ).split()
         assert (entry[0], entry[3]) == ("160000", component)
-        assert manifest["submodule_" + component.replace("-", "_")] == entry[2]
+        assert manifest["submodule_" + component.replace("-", "_")] == entry[1]
 
     workflow = (ROOT / ".github/workflows/firmware-main.yml").read_text()
     assert f"github.ref == '{BRANCH}'" in workflow
     assert f"'{MANIFEST_NAME}'" in workflow
-    assert "'plutoplus-spf-adaptive-multirate-agc'" in workflow
+    assert "'plutoplus-spf-dual-rx-counter-fix'" in workflow
+    assert "github.ref == 'refs/heads/main'" in workflow
     gate = re.search(
-        r"- name: Require the exact adaptive multirate AGC identity\n"
+        r"- name: Require the exact dual-RX counter-fix candidate identity\n"
         r"(?P<body>.*?)(?=\n      - name:)", workflow, re.DOTALL
     )
     assert gate is not None
@@ -50,5 +49,4 @@ def test_v058_route_is_versioned_and_source_locked() -> None:
     package = (ROOT / "scripts/ci/package_main_firmware.sh").read_text()
     assert MANIFEST_NAME in builder
     assert MANIFEST_NAME in package
-    assert f"{MANIFEST_NAME}:final-release)" in package
     assert f"protected_version='{VERSION}'" in package

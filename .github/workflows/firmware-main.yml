@@ -38,6 +38,7 @@ jobs:
         github.ref == 'refs/heads/main') ||
        (github.event_name == 'workflow_dispatch' &&
         (github.ref == 'refs/heads/main' ||
+         github.ref == 'refs/heads/codex/v059-dual-rx-counter-fix' ||
          github.ref == 'refs/heads/codex/issues-111-116-next-fw' ||
          github.ref == 'refs/heads/codex/issue-108-manual-dual-rx-fw' ||
          github.ref == 'refs/heads/codex/counter-utc-release' ||
@@ -103,10 +104,12 @@ jobs:
       # usable only for reproducing independently locked candidates.
       SPF_GAIN_SERIES_MANIFEST: >-
         ${{ format('{0}/manifests/{1}', github.workspace,
+          github.ref == 'refs/heads/codex/v059-dual-rx-counter-fix' &&
+          'dual-rx-counter-fix-v059-source.yaml' ||
+          github.ref == 'refs/heads/main' &&
+          'dual-rx-counter-fix-v059-source.yaml' ||
           github.ref == 'refs/heads/codex/issues-111-116-next-fw' &&
           'adaptive-multirate-agc-v058-source.yaml' ||
-          github.ref == 'refs/heads/main' &&
-          'adaptive-random-dwell-v057-source.yaml' ||
           github.ref == 'refs/heads/codex/issue-111-runtime-rates' &&
           'adaptive-runtime-rates-source.yaml' ||
           github.ref == 'refs/heads/codex/counter-utc-release' &&
@@ -221,10 +224,12 @@ jobs:
           'tandem-agc-v2-source.yaml' ||
           'libiio-frame-metadata-v6-rc4-source.yaml') }}
       SPF_PACKAGE_STEM_PREFIX: >-
-        ${{ github.ref == 'refs/heads/codex/issues-111-116-next-fw' &&
-          'plutoplus-spf-adaptive-multirate-agc' ||
+        ${{ github.ref == 'refs/heads/codex/v059-dual-rx-counter-fix' &&
+          'plutoplus-spf-dual-rx-counter-fix' ||
           github.ref == 'refs/heads/main' &&
-          'plutoplus-spf-adaptive-random-dwell' ||
+          'plutoplus-spf-dual-rx-counter-fix' ||
+          github.ref == 'refs/heads/codex/issues-111-116-next-fw' &&
+          'plutoplus-spf-adaptive-multirate-agc' ||
           github.ref == 'refs/heads/codex/issue-111-runtime-rates' &&
           'plutoplus-spf-adaptive-runtime-rates' ||
           github.ref == 'refs/heads/codex/counter-utc-release' &&
@@ -340,6 +345,8 @@ jobs:
           'plutoplus-spf-libiio-metadata-v6-rc4' }}
       SPF_RELEASE_STATE: >-
         ${{ github.ref == 'refs/heads/codex/issues-111-116-next-fw' &&
+          'final-release' ||
+          github.ref == 'refs/heads/codex/v059-dual-rx-counter-fix' &&
           'final-release' ||
           github.ref == 'refs/heads/codex/issue-111-runtime-rates' &&
           'final-release' ||
@@ -536,6 +543,14 @@ jobs:
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
             'v0.58-plutoplus-spf-adaptive-multirate-agc'
+
+      - name: Require the exact dual-RX counter-fix candidate identity
+        if: github.ref == 'refs/heads/codex/v059-dual-rx-counter-fix'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.59-plutoplus-spf-dual-rx-counter-fix'
 
       - name: Require the exact adaptive scan v2 final identity
         if: github.ref == 'refs/heads/codex/issue-108-manual-dual-rx-fw'
@@ -793,7 +808,7 @@ jobs:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
-            'v0.57-plutoplus-spf-adaptive-random-dwell'
+            'v0.59-plutoplus-spf-dual-rx-counter-fix'
 
       - name: Build, validate, and package
         id: build
