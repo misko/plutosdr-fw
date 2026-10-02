@@ -1,0 +1,13 @@
+{
+  "entries": 767,
+  "changed": [
+    "opt/VERSIONS",
+    "usr/lib/libiio.so.0.25",
+    "usr/sbin/iiod"
+  ],
+  "sha256": {
+    "opt/VERSIONS": "bf0d6a3fee989ba148e21dfdcffdd13f142fbe976da251237fc24f06014b3c62",
+    "usr/lib/libiio.so.0.25": "265c12e7b3f90ef4ccfaf0344d2e0fe8f661488f5ed1629f1bb0c717a0b136cb",
+    "usr/sbin/iiod": "fdc70a311fc07b87b62222e2dceecb0bd48c8c1b1c22bcd125aedb82a3a04153"
+  }
+}

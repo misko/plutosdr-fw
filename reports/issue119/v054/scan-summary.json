@@ -1,0 +1,118 @@
+{
+  "ram": {
+    "functional_pass": true,
+    "iq_geometry_passed": true,
+    "counter_continuity_passed": true,
+    "timing_query_pass": true,
+    "timing_anchor_coverage_pass": true,
+    "errors": [],
+    "terminal": {
+      "cancelled": 0,
+      "delivered": 73,
+      "error": 0,
+      "final_counter": 13780511946,
+      "flags": 1,
+      "generation": 8068220867636233012,
+      "invalid": 0,
+      "iq_bytes": 350400000,
+      "planned": 73,
+      "reason": 1,
+      "restore_after": 13780655125,
+      "restore_before": 13780636035,
+      "session": 8425378420914255542,
+      "skipped": 0,
+      "state": 1
+    },
+    "restoration": {
+      "expected": {
+        "bandwidth_hz": 18000000.0,
+        "center_frequency_hz": 2400000000.0,
+        "channels": [
+          0
+        ],
+        "gain_db": [
+          71.0
+        ],
+        "gain_modes": [
+          "slow_attack"
+        ],
+        "sample_rate_hz": 30720000.0
+      },
+      "expected_kernel_buffers": 4,
+      "fastlock_inactive": true,
+      "observed": {
+        "bandwidth_hz": 18000000.0,
+        "center_frequency_hz": 2400000000.0,
+        "channels": [
+          0
+        ],
+        "gain_db": [
+          71.0
+        ],
+        "gain_modes": [
+          "slow_attack"
+        ],
+        "sample_rate_hz": 30720000.0
+      },
+      "observed_kernel_buffers": 4
+    }
+  },
+  "persistent": {
+    "functional_pass": true,
+    "iq_geometry_passed": true,
+    "counter_continuity_passed": true,
+    "timing_query_pass": true,
+    "timing_anchor_coverage_pass": true,
+    "errors": [],
+    "terminal": {
+      "cancelled": 0,
+      "delivered": 74,
+      "error": 0,
+      "final_counter": 4316869933,
+      "flags": 1,
+      "generation": 4608418166050337488,
+      "invalid": 0,
+      "iq_bytes": 355200000,
+      "planned": 74,
+      "reason": 1,
+      "restore_after": 4317060725,
+      "restore_before": 4317042554,
+      "session": 255753082911376895,
+      "skipped": 0,
+      "state": 1
+    },
+    "restoration": {
+      "expected": {
+        "bandwidth_hz": 18000000.0,
+        "center_frequency_hz": 2400000000.0,
+        "channels": [
+          0
+        ],
+        "gain_db": [
+          71.0
+        ],
+        "gain_modes": [
+          "slow_attack"
+        ],
+        "sample_rate_hz": 30720000.0
+      },
+      "expected_kernel_buffers": 4,
+      "fastlock_inactive": true,
+      "observed": {
+        "bandwidth_hz": 18000000.0,
+        "center_frequency_hz": 2400000000.0,
+        "channels": [
+          0
+        ],
+        "gain_db": [
+          71.0
+        ],
+        "gain_modes": [
+          "slow_attack"
+        ],
+        "sample_rate_hz": 30720000.0
+      },
+      "observed_kernel_buffers": 4
+    }
+  }
+}

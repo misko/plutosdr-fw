@@ -1,0 +1,29 @@
+{
+  "base_sha256": "1fa69d2784efbcabaaaed5bc5f5d625deabfd7da725627c9634a694db5bd9df0",
+  "firmware": "v0.59-issue119-fastlock-rc2",
+  "scope": "Fast Lock selection/lock/counter hardening and iiOD final-dwell deadline handling; profile frequency remains derived from SRAM",
+  "sha256": {
+    "zynq-pluto-sdr-revb.dtb": "b1ab5370a427f642039ce2061ff38c341a6a78f9e8f0a8b7e59757b143ada640",
+    "pluto.itb": "f64b866ee63bfc6f6bf9cfa080bb74a78e0db0c38da2cbfde8186d14c2dfff47",
+    "zImage": "ea8d743df796a5bfea2597d9886ce8b4abe0720cdb03f0e82cf52c0a78f6bc81",
+    "pluto.its": "0d37fc7c4a045ebcff14d934f153023e818dcf13e42e2d1bd3be121507a32d15",
+    "zynq-pluto-sdr-revc.dtb": "45055fd15fc200881464a91fbcd8deb3d0756a4e368a8be27cf67d6e5c863646",
+    "baseline-zImage": "b3f17301bc9383f97ca946bfb55211ef8c462b8300c5cbe96407e46578382934",
+    "pluto.frm": "51d32d5d7c17d50537bc52c4351dd5a1b787ab0fc9d12994fb29c5345e1071df",
+    "zynq-pluto-sdr.dtb": "1bd2357dbb7e871a13824dedb6761d74c871083dbfc97c9c36c22bda929dcea8",
+    "rootfs.cpio.gz": "0d776f21889b0268d2752f523ed573cff6a00469b2280f90cf74fa9b652cbb6e",
+    "pluto.dfu": "6c408ef97fa6074131da9d046ef0c53d6152f5af01847a344cc8ba24d87f90fa",
+    "system_top.bit": "c1501a486d1289558db587cbd545c1b99eaf3cadbc9f865a8bf979f84b007956",
+    "baseline.itb": "010cf3d09ed3cbcb7c640514066cccf6409cd0b5168404d0279924507c7f99c5"
+  },
+  "linux_revision": "d3611e575b09fa4e43be99a513423cb1ab3f4d37",
+  "libiio_revision": "345cd699236bce30eb5eed6d0e6adec6e2746360",
+  "buildroot_revision": "2aec6c3064f85ee3d2842fbd950e731732bae312",
+  "baseline_release": "v0.59-plutoplus-spf-dual-rx-counter-fix",
+  "kernel_config_matches_baseline": true,
+  "rootfs_changes": [
+    "opt/VERSIONS",
+    "usr/lib/libiio.so.0.25",
+    "usr/sbin/iiod"
+  ]
+}

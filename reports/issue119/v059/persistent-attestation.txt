@@ -1,0 +1,9 @@
+cd5a3821-b011-4fcf-b352-347b767f1893
+f64b866ee63bfc6f6bf9cfa080bb74a78e0db0c38da2cbfde8186d14c2dfff47  -
+b14aa2ede1151d6ae3e83754bcbd58567148be544ba65be6bc78c17e0b2ae43f  /dev/mtd0
+c367d2dfb0c14bd807efbb83f8bea131a7c4f24b5c5557b6d27c0cfa4e2552fd  /dev/mtd2
+device-fw v0.59-issue119-fastlock-rc2
+hdl ddr-burst-v1-rc4-source/hdl-v1
+buildroot fastlock-attestation-v059-source/buildroot-v1
+linux fastlock-attestation-v059-source/linux-v1
+u-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx

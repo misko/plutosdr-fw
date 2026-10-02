@@ -1,0 +1,18 @@
+{
+  "rc2-ram-hardware": {
+    "recalls": 72,
+    "tone_checks": 8,
+    "minimum_contrast_db": 41.7643521960876,
+    "ticks_min": 6332,
+    "ticks_max": 7512,
+    "restoration_errors": []
+  },
+  "persistent-hardware": {
+    "recalls": 72,
+    "tone_checks": 8,
+    "minimum_contrast_db": 41.37486782334956,
+    "ticks_min": 5721,
+    "ticks_max": 7161,
+    "restoration_errors": []
+  }
+}
