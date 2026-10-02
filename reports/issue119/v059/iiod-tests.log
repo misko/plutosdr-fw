@@ -1,0 +1,17 @@
+test_spf_scan_policy: scan policy: admission, source binding, bounded receipts, 256 activity masks and replay PASS
+
+test_spf_scan_session: PASS: scan session joins scheduler, owner recall, DMA visits, feedback and restore
+
+test_spf_scan_protocol: PASS: scan protocol round trips, strict reserved fields and per-byte CRC rejection
+
+test_spf_scan_radio: PASS: scan UAPI layout, whitelist, wrap receipts and fail-closed recall
+
+test_spf_visit_queue: visit queue: 24000 boundary cases, shared leases, exact gaps, age, cancel and release retry PASS
+
+test_spf_visit_capacity: 10 MS/s 240 ms 55 MB/s: duty 0.972 delivery 1.000 visits 1214/1214 skips 0 high-water 28.8 MB
+10 MS/s 120 ms 55 MB/s: duty 0.945 delivery 1.000 visits 2362/2362 skips 0 high-water 14.4 MB
+15 MS/s 240 ms 55 MB/s: duty 0.922 delivery 0.949 visits 1152/1214 skips 62 high-water 129.6 MB
+15 MS/s 240 ms 60 MB/s: duty 0.972 delivery 1.000 visits 1214/1214 skips 0 high-water 43.2 MB
+20 MS/s 240 ms 60 MB/s: duty 0.759 delivery 0.781 visits 379/485 skips 106 high-water 153.6 MB
+30 MS/s 240 ms 60 MB/s: duty 0.507 delivery 0.522 visits 253/485 skips 232 high-water 172.8 MB
+PASS: real visit queue sustains duty gates and sheds only whole visits

@@ -251,6 +251,9 @@ packed_version="$(awk '$1 == "device-fw" {print $2; exit}' \
 printf 'Packaged device-fw: %s\n' "$packed_version"
 protected_version=''
 case "$(basename "$MANIFEST"):$RELEASE_STATE" in
+fastlock-attestation-v059-source.yaml:candidate | fastlock-attestation-v059-source.yaml:final-release)
+    protected_version='v0.59-issue119-fastlock-rc2'
+    ;;
 dual-rx-counter-fix-v059-source.yaml:final-release)
     protected_version='v0.59-plutoplus-spf-dual-rx-counter-fix'
     ;;

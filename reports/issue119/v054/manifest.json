@@ -1,0 +1,22 @@
+{
+  "base_sha256": "3611adb9d38d5db9e6e94453a195194022dd7c7ba0ca649234f783d1bb016ada",
+  "firmware": "v0.54-issue119-fastlock-rc1",
+  "scope": "kernel-only Fast Lock selection/lock/counter hardening; profile frequency remains derived from SRAM",
+  "sha256": {
+    "zynq-pluto-sdr-revb.dtb": "b1ab5370a427f642039ce2061ff38c341a6a78f9e8f0a8b7e59757b143ada640",
+    "pluto.itb": "06263a1d9dbe0174718eb19e364ce602c4a2f88089acc92d4ed7e51162b41664",
+    "zImage": "019af7a50cb4fca2f404a2b72eb752d6a581a5f057a7f40d14ef6c1701543c49",
+    "pluto.its": "0d37fc7c4a045ebcff14d934f153023e818dcf13e42e2d1bd3be121507a32d15",
+    "zynq-pluto-sdr-revc.dtb": "45055fd15fc200881464a91fbcd8deb3d0756a4e368a8be27cf67d6e5c863646",
+    "baseline-zImage": "efc8e2761fdffb1fe9585a00c41cd83b2ce47a04494ca68bf7d62f8ca8205d90",
+    "pluto.frm": "41be80d260c0a5e4424781dfe1d3bbdd1ba7c8f485c7a74b6aeda711d366f691",
+    "zynq-pluto-sdr.dtb": "1bd2357dbb7e871a13824dedb6761d74c871083dbfc97c9c36c22bda929dcea8",
+    "rootfs.cpio.gz": "314fa4bee443d8521b2fab1338213604bf233bc9c3fd905c84ed472b926730f4",
+    "pluto.dfu": "01d4a308504fd503b865f3f739ccb1ce0d5096cebe549ce47b145c7d86e04c12",
+    "system_top.bit": "af75a9fa9a86055de621d70eae1bf02269983f2fede8cc90493f44fe12dbe3ab",
+    "baseline.itb": "8d5a8ee4e75d34dffb7e55fee084afd5771a4bbcbe4ed54414b04ccb69ff65f6"
+  },
+  "linux_revision": "74973ff563fe6c5f95591da40e3fb89c52657ee7",
+  "kernel_config_sha256": "0914b218b81723de1558b667ebacae09566ee2df36626868eceb0f38d8ea05e0",
+  "kernel_config_matches_baseline": true
+}

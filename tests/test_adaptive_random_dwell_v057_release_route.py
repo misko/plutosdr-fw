@@ -30,7 +30,11 @@ def test_v057_main_route_is_versioned_and_source_locked() -> None:
             "refs/tags/"
         )
 
-    workflow = (ROOT / ".github/workflows/firmware-main.yml").read_text()
+    # The route was superseded by v0.59; validate its immutable source revision.
+    workflow = subprocess.check_output(
+        ["git", "show", "5c8d97ec25d1:.github/workflows/firmware-main.yml"],
+        cwd=ROOT, text=True,
+    )
     assert "'adaptive-random-dwell-v057-source.yaml'" in workflow
     assert "'plutoplus-spf-adaptive-random-dwell'" in workflow
     final_gate = re.search(
