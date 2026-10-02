@@ -27,10 +27,10 @@ def test_v059_route_is_versioned_and_source_locked() -> None:
     )
     for component in ("buildroot", "linux", "hdl", "hdl-quantulum", "u-boot-xlnx"):
         entry = subprocess.check_output(
-            ["git", "ls-files", "--stage", "--", component], cwd=ROOT, text=True
+            ["git", "ls-tree", "v0.59-plutoplus-spf-dual-rx-counter-fix", component], cwd=ROOT, text=True
         ).split()
         assert (entry[0], entry[3]) == ("160000", component)
-        assert manifest["submodule_" + component.replace("-", "_")] == entry[1]
+        assert manifest["submodule_" + component.replace("-", "_")] == entry[2]
 
     workflow = (ROOT / ".github/workflows/firmware-main.yml").read_text()
     assert f"github.ref == '{BRANCH}'" in workflow

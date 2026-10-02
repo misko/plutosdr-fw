@@ -1,0 +1,546 @@
+[
+  {
+    "rate": 2500000,
+    "gain_mode": "manual",
+    "delivered": 38,
+    "gate": {
+      "name": "20-30MSs-integrity-only",
+      "passed": true,
+      "observed": 0.9361524332079875,
+      "threshold": null,
+      "comparison": "informational"
+    },
+    "terminal": {
+      "session": 1790982016712580297,
+      "generation": 1,
+      "final_counter": 3211363564,
+      "restore_before": 3212182445,
+      "restore_after": 3212184926,
+      "planned": 38,
+      "delivered": 38,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 91200000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "rate": 2500000,
+    "gain_mode": "slow_attack",
+    "delivered": 38,
+    "gate": {
+      "name": "20-30MSs-integrity-only",
+      "passed": true,
+      "observed": 0.9359729631894149,
+      "threshold": null,
+      "comparison": "informational"
+    },
+    "terminal": {
+      "session": 1790982025335546118,
+      "generation": 1,
+      "final_counter": 3255216507,
+      "restore_before": 3256033092,
+      "restore_after": 3256037709,
+      "planned": 38,
+      "delivered": 38,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 91200000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "rate": 5000000,
+    "gain_mode": "manual",
+    "delivered": 38,
+    "gate": {
+      "name": "20-30MSs-integrity-only",
+      "passed": true,
+      "observed": 0.917018991664418,
+      "threshold": null,
+      "comparison": "informational"
+    },
+    "terminal": {
+      "session": 1790982033996790089,
+      "generation": 1,
+      "final_counter": 3311399070,
+      "restore_before": 3311528586,
+      "restore_after": 3311533671,
+      "planned": 38,
+      "delivered": 38,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 182400000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "rate": 5000000,
+    "gain_mode": "slow_attack",
+    "delivered": 38,
+    "gate": {
+      "name": "20-30MSs-integrity-only",
+      "passed": true,
+      "observed": 0.9173190562010004,
+      "threshold": null,
+      "comparison": "informational"
+    },
+    "terminal": {
+      "session": 1790982041235035104,
+      "generation": 1,
+      "final_counter": 3367865830,
+      "restore_before": 3368003764,
+      "restore_after": 3368008625,
+      "planned": 38,
+      "delivered": 38,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 182400000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "rate": 7500000,
+    "gain_mode": "manual",
+    "delivered": 37,
+    "gate": {
+      "name": "20-30MSs-integrity-only",
+      "passed": true,
+      "observed": 0.9083340136746003,
+      "threshold": null,
+      "comparison": "informational"
+    },
+    "terminal": {
+      "session": 1790982048445336642,
+      "generation": 1,
+      "final_counter": 3446297451,
+      "restore_before": 3446626412,
+      "restore_after": 3446633774,
+      "planned": 37,
+      "delivered": 37,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 266400000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "rate": 7500000,
+    "gain_mode": "slow_attack",
+    "delivered": 37,
+    "gate": {
+      "name": "20-30MSs-integrity-only",
+      "passed": true,
+      "observed": 0.9091155790577555,
+      "threshold": null,
+      "comparison": "informational"
+    },
+    "terminal": {
+      "session": 1790982056750000284,
+      "generation": 1,
+      "final_counter": 3538656539,
+      "restore_before": 3539017133,
+      "restore_after": 3539024504,
+      "planned": 37,
+      "delivered": 37,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 266400000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "rate": 10000000,
+    "gain_mode": "manual",
+    "delivered": 36,
+    "gate": {
+      "name": "10MSs-120ms-planned-valid-delivery",
+      "passed": true,
+      "observed": 1.0,
+      "threshold": 0.99,
+      "comparison": ">"
+    },
+    "terminal": {
+      "session": 1790982065020472526,
+      "generation": 1,
+      "final_counter": 3644586801,
+      "restore_before": 3644633432,
+      "restore_after": 3644678301,
+      "planned": 36,
+      "delivered": 36,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 345600000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "rate": 10000000,
+    "gain_mode": "slow_attack",
+    "delivered": 36,
+    "gate": {
+      "name": "10MSs-120ms-planned-valid-delivery",
+      "passed": true,
+      "observed": 1.0,
+      "threshold": 0.99,
+      "comparison": ">"
+    },
+    "terminal": {
+      "session": 1790982072909361942,
+      "generation": 1,
+      "final_counter": 3752975010,
+      "restore_before": 3753866203,
+      "restore_after": 3753884160,
+      "planned": 36,
+      "delivered": 36,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 345600000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  }
+]

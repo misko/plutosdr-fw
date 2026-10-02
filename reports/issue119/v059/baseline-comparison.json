@@ -1,0 +1,36 @@
+{
+  "released_baseline_runs": [
+    {
+      "firmware": "v0.59-plutoplus-spf-dual-rx-counter-fix",
+      "cells": 8,
+      "delivered": 312,
+      "errors": 0
+    },
+    {
+      "firmware": "v0.59-plutoplus-spf-dual-rx-counter-fix",
+      "cells": 8,
+      "delivered": 312,
+      "errors": 0
+    },
+    {
+      "firmware": "v0.59-plutoplus-spf-dual-rx-counter-fix",
+      "cells": 8,
+      "delivered": 312,
+      "errors": 0
+    },
+    {
+      "firmware": "v0.59-plutoplus-spf-dual-rx-counter-fix",
+      "cells": 8,
+      "delivered": 312,
+      "errors": 0
+    },
+    {
+      "firmware": "v0.59-plutoplus-spf-dual-rx-counter-fix",
+      "cells": 8,
+      "delivered": 312,
+      "errors": 0
+    }
+  ],
+  "kernel_only_rc1_failure": "2.5 MS/s slow_attack: reason=6 error=-62 planned=39 delivered=37 cancelled=2",
+  "deterministic_baseline_test": "Fails the late-final-recall regression; RC2 passes."
+}

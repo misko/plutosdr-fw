@@ -13,7 +13,7 @@ out=Path(sys.argv[1]);out.mkdir(parents=True,exist_ok=True)
 ssh=os.environ['SSH_WRAPPER']
 c=iio.Context('ip:192.168.1.18');c.set_timeout(5000)
 assert c.attrs['hw_serial']=='1040007c4a94000211000b009186843ef2'
-assert c.attrs['fw_version']=='v0.54-issue119-fastlock-rc1'
+assert c.attrs['fw_version']=='v0.59-issue119-fastlock-rc2'
 p=c.find_device('ad9361-phy');tx=c.find_device('cf-ad9361-dds-core-lpc');rx=c.find_device('cf-ad9361-lpc')
 lo=p.find_channel('altvoltage0',True);tlo=p.find_channel('altvoltage1',True)
 dds=[tx.find_channel('altvoltage'+str(i),True) for i in range(8)]
@@ -83,7 +83,7 @@ try:
     buf=iio.Buffer(rx,n,False)
     try:
      buf.refill();data=np.frombuffer(buf.read(),dtype='<i2').reshape(-1,4).astype(float)
-     # Baseline FPGA counter prefixes occur every 8192 dual-RX samples.
+     # v0.59 counter prefixes occur every 16384 dual-RX samples.
      # Analyze an interior 4096-sample IQ-only window away from both prefixes.
      data=data[1024:5120]
     finally:del buf
