@@ -1,0 +1,1321 @@
+[
+  {
+    "status": "failed",
+    "error": "AdaptiveScanQualificationError('qualification session did not complete: state=FAILED reason=3 error=-110 planned=40 delivered=38 skipped=0 invalid=0 cancelled=2')",
+    "elapsed_seconds": 8.290312174940482,
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "d5b7425d5e4fdfed1e37375a38f7fc047217a6d9677c6ed13c207bd49f2e2ae7"
+    },
+    "terminal": {
+      "session": 1790984165089771441,
+      "generation": 1790984165089771442,
+      "final_counter": 2532414037,
+      "restore_before": 2532565632,
+      "restore_after": 2532565662,
+      "planned": 40,
+      "delivered": 38,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 2,
+      "iq_bytes": 364800000,
+      "state": 3,
+      "reason": 3,
+      "error": -110,
+      "flags": 1
+    },
+    "daemon_attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.15's  \n3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802  /usr/sbin/iiod\ndevice-fw v0.60-plutoplus-spf-adaptive-native-fastlock\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot adaptive-multirate-agc-v058-source/buildroot-v2\nlinux fastlock-attestation-v059-source/linux-v1\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 0b7718af9eed0a42eec448d03248c8497b13a779\n",
+    "gain_mode": "manual",
+    "samples_per_block": 1000000,
+    "name": "post-10000000-manual",
+    "report_sha256": "bc85a23e0101598ef5f2f8f9556932767ff472abfafbda3e5f5952d15c10713a",
+    "rate": 10000000,
+    "protocol": 3,
+    "records": 40
+  },
+  {
+    "status": "completed",
+    "elapsed_seconds": 12.915652811992913,
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "e39ebbac539bac462b686e4b2520543aa2c9c213b9bddb42f0e96e3433499a9b"
+    },
+    "terminal": {
+      "session": 1790984281316219290,
+      "generation": 1790984281316219291,
+      "final_counter": 5766049857,
+      "restore_before": 5766357270,
+      "restore_after": 5766383093,
+      "planned": 73,
+      "delivered": 73,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 700800000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "daemon_attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.15's  \n3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802  /usr/sbin/iiod\ndevice-fw v0.60-plutoplus-spf-adaptive-native-fastlock\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot adaptive-multirate-agc-v058-source/buildroot-v2\nlinux fastlock-attestation-v059-source/linux-v1\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 0b7718af9eed0a42eec448d03248c8497b13a779\n",
+    "gain_mode": "manual",
+    "samples_per_block": 1000000,
+    "name": "post-10000000-manual-repeat",
+    "report_sha256": "10bbab44f7a5e2b5b33468e0a8ee74c0e108ed18e64771996abe3050041185c6",
+    "rate": 10000000,
+    "protocol": 3,
+    "records": 73,
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "status": "completed",
+    "elapsed_seconds": 12.937638170085847,
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "a7ae1031151d5c10a0678c00ab65767fab5034fbcdabb4dd02b955eabb3c59d4"
+    },
+    "terminal": {
+      "session": 1790984267589971361,
+      "generation": 1790984267589971362,
+      "final_counter": 5584250300,
+      "restore_before": 5584865986,
+      "restore_after": 5584884152,
+      "planned": 73,
+      "delivered": 73,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 700800000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "daemon_attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.15's  \n3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802  /usr/sbin/iiod\ndevice-fw v0.60-plutoplus-spf-adaptive-native-fastlock\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot adaptive-multirate-agc-v058-source/buildroot-v2\nlinux fastlock-attestation-v059-source/linux-v1\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 0b7718af9eed0a42eec448d03248c8497b13a779\n",
+    "gain_mode": "slow_attack",
+    "samples_per_block": 1000000,
+    "name": "post-10000000-slow_attack",
+    "report_sha256": "d03bfe2d26949bf3a5d50cc6a58173da3d47b79da248613cb61ee6299158bf94",
+    "rate": 10000000,
+    "protocol": 3,
+    "records": 73,
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "status": "completed",
+    "elapsed_seconds": 13.008645374095067,
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "09a0bcb6a11119f6bc6ea43a876c3bdcf1fe320c7bfe331da117d3fd4c533535"
+    },
+    "terminal": {
+      "session": 1790984391985105392,
+      "generation": 1790984391985105393,
+      "final_counter": 8375294390,
+      "restore_before": 8375452651,
+      "restore_after": 8375509073,
+      "planned": 74,
+      "delivered": 74,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 710400000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "daemon_attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.15's  \n3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802  /usr/sbin/iiod\ndevice-fw v0.60-plutoplus-spf-adaptive-native-fastlock\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot adaptive-multirate-agc-v058-source/buildroot-v2\nlinux fastlock-attestation-v059-source/linux-v1\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 0b7718af9eed0a42eec448d03248c8497b13a779\n",
+    "gain_mode": "manual",
+    "samples_per_block": 1000000,
+    "name": "post-10m-followup-0",
+    "report_sha256": "51eb34960c36e2246b356f1505cec4c7aef48c66d7b15234674b883664ddf97e",
+    "rate": 10000000,
+    "protocol": 3,
+    "records": 74,
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "status": "completed",
+    "elapsed_seconds": 12.944641089066863,
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "8ae5d0ccee7ba60d5e36278cc5aba2ca458473fc0c3479149ad9f3287b524b74"
+    },
+    "terminal": {
+      "session": 1790984405713872749,
+      "generation": 1790984405713872750,
+      "final_counter": 8555483652,
+      "restore_before": 8556384240,
+      "restore_after": 8556403005,
+      "planned": 73,
+      "delivered": 73,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 700800000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "daemon_attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.15's  \n3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802  /usr/sbin/iiod\ndevice-fw v0.60-plutoplus-spf-adaptive-native-fastlock\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot adaptive-multirate-agc-v058-source/buildroot-v2\nlinux fastlock-attestation-v059-source/linux-v1\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 0b7718af9eed0a42eec448d03248c8497b13a779\n",
+    "gain_mode": "manual",
+    "samples_per_block": 1000000,
+    "name": "post-10m-followup-1",
+    "report_sha256": "ceb3ff215b2ca58a333231419158ba48d14d86503cb97e759bf7a0b81530dfac",
+    "rate": 10000000,
+    "protocol": 3,
+    "records": 73,
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "status": "completed",
+    "elapsed_seconds": 12.95364728802815,
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "9caeade027d29bf4571763584258fdf21ba397fb20ed38e7cf5f5577ac4a4f14"
+    },
+    "terminal": {
+      "session": 1790984419421608219,
+      "generation": 1790984419421608220,
+      "final_counter": 8738014702,
+      "restore_before": 8738176854,
+      "restore_after": 8738223319,
+      "planned": 73,
+      "delivered": 73,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 700800000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "daemon_attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.15's  \n3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802  /usr/sbin/iiod\ndevice-fw v0.60-plutoplus-spf-adaptive-native-fastlock\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot adaptive-multirate-agc-v058-source/buildroot-v2\nlinux fastlock-attestation-v059-source/linux-v1\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 0b7718af9eed0a42eec448d03248c8497b13a779\n",
+    "gain_mode": "manual",
+    "samples_per_block": 1000000,
+    "name": "post-10m-followup-2",
+    "report_sha256": "f05c11ce94924096d6c4d27948d0a5adce7fb9bd4abd5bd4012d7f078151385c",
+    "rate": 10000000,
+    "protocol": 3,
+    "records": 73,
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "status": "completed",
+    "elapsed_seconds": 14.718382407911122,
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "80c5b2d9ba062cc4b97f32f2301229ba2c8b8a8025405aeadc4da512d53d727e"
+    },
+    "terminal": {
+      "session": 1790984050002591210,
+      "generation": 1790984050002591211,
+      "final_counter": 1642313444,
+      "restore_before": 1642480468,
+      "restore_after": 1642482764,
+      "planned": 74,
+      "delivered": 74,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 88800000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "daemon_attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.15's  \n3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802  /usr/sbin/iiod\ndevice-fw v0.60-plutoplus-spf-adaptive-native-fastlock\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot adaptive-multirate-agc-v058-source/buildroot-v2\nlinux fastlock-attestation-v059-source/linux-v1\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 0b7718af9eed0a42eec448d03248c8497b13a779\n",
+    "gain_mode": "manual",
+    "samples_per_block": 500000,
+    "name": "post-1250000-manual",
+    "report_sha256": "9930b8198e242163a5a02921ccc3dced714f67b35b26f089c6e0889d790c68ef",
+    "rate": 1250000,
+    "protocol": 3,
+    "records": 74,
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "status": "completed",
+    "elapsed_seconds": 14.894197003915906,
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "574a7ce43de9c6e08be3013bed07acb09bb7df5a9c32044dcb94de55c13fb890"
+    },
+    "terminal": {
+      "session": 1790984065506365448,
+      "generation": 1790984065506365449,
+      "final_counter": 1721387812,
+      "restore_before": 1721458963,
+      "restore_after": 1721460223,
+      "planned": 74,
+      "delivered": 74,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 88800000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "daemon_attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.15's  \n3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802  /usr/sbin/iiod\ndevice-fw v0.60-plutoplus-spf-adaptive-native-fastlock\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot adaptive-multirate-agc-v058-source/buildroot-v2\nlinux fastlock-attestation-v059-source/linux-v1\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 0b7718af9eed0a42eec448d03248c8497b13a779\n",
+    "gain_mode": "slow_attack",
+    "samples_per_block": 500000,
+    "name": "post-1250000-slow_attack",
+    "report_sha256": "85d63360903df1fabd06f33aa9c7e0ac55b1a1c31b3ab55d7e951c46e5c07064",
+    "rate": 1250000,
+    "protocol": 3,
+    "records": 74,
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "status": "completed",
+    "elapsed_seconds": 13.528588966932148,
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "3a950cbe4ea1b08a44047d68219d7ebeede36bbf5471b197b5de7af2eee71d0e"
+    },
+    "terminal": {
+      "session": 1790984081181440595,
+      "generation": 1790984081181440596,
+      "final_counter": 1802478845,
+      "restore_before": 1802762638,
+      "restore_after": 1802767067,
+      "planned": 74,
+      "delivered": 74,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 177600000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "daemon_attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.15's  \n3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802  /usr/sbin/iiod\ndevice-fw v0.60-plutoplus-spf-adaptive-native-fastlock\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot adaptive-multirate-agc-v058-source/buildroot-v2\nlinux fastlock-attestation-v059-source/linux-v1\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 0b7718af9eed0a42eec448d03248c8497b13a779\n",
+    "gain_mode": "manual",
+    "samples_per_block": 1000000,
+    "name": "post-2500000-manual",
+    "report_sha256": "f9fb698a27dabb5962def98a533badaa5b5706cb513e7a68033c46162e3414b6",
+    "rate": 2500000,
+    "protocol": 3,
+    "records": 74,
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "status": "completed",
+    "elapsed_seconds": 13.494634006172419,
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "c27e092d38dae972f2046ffc6d7fca018967e08015c30985278ff4c358d36017"
+    },
+    "terminal": {
+      "session": 1790984095480153441,
+      "generation": 1790984095480153442,
+      "final_counter": 1881796110,
+      "restore_before": 1881832845,
+      "restore_after": 1881837222,
+      "planned": 75,
+      "delivered": 75,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 180000000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "daemon_attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.15's  \n3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802  /usr/sbin/iiod\ndevice-fw v0.60-plutoplus-spf-adaptive-native-fastlock\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot adaptive-multirate-agc-v058-source/buildroot-v2\nlinux fastlock-attestation-v059-source/linux-v1\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 0b7718af9eed0a42eec448d03248c8497b13a779\n",
+    "gain_mode": "slow_attack",
+    "samples_per_block": 1000000,
+    "name": "post-2500000-slow_attack",
+    "report_sha256": "0a0282002a5e5bf128957a7fccecc81bff88b2dab6a5b95df290315a17bff1a8",
+    "rate": 2500000,
+    "protocol": 3,
+    "records": 75,
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "status": "completed",
+    "elapsed_seconds": 13.372609946178272,
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "9f3248b7842dce247172fe0031b0d5410938d7fb31c3e01e88b33c2396949f1b"
+    },
+    "terminal": {
+      "session": 1790984109710918287,
+      "generation": 1790984109710918288,
+      "final_counter": 1996484712,
+      "restore_before": 1997052282,
+      "restore_after": 1997057392,
+      "planned": 74,
+      "delivered": 74,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 355200000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "daemon_attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.15's  \n3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802  /usr/sbin/iiod\ndevice-fw v0.60-plutoplus-spf-adaptive-native-fastlock\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot adaptive-multirate-agc-v058-source/buildroot-v2\nlinux fastlock-attestation-v059-source/linux-v1\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 0b7718af9eed0a42eec448d03248c8497b13a779\n",
+    "gain_mode": "manual",
+    "samples_per_block": 1000000,
+    "name": "post-5000000-manual",
+    "report_sha256": "22950f529d7c461de5973a36db9291810349d56460094ecbdc0128dbc21c2078",
+    "rate": 5000000,
+    "protocol": 3,
+    "records": 74,
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "status": "completed",
+    "elapsed_seconds": 12.159566952148452,
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "125fe85016949e4d3cce820c1eca356068a13f67e1fccfcc1c97ceb25e6be1b8"
+    },
+    "terminal": {
+      "session": 1790984123866601112,
+      "generation": 1790984123866601113,
+      "final_counter": 2100734939,
+      "restore_before": 2101095012,
+      "restore_after": 2101100090,
+      "planned": 74,
+      "delivered": 74,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 355200000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "daemon_attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.15's  \n3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802  /usr/sbin/iiod\ndevice-fw v0.60-plutoplus-spf-adaptive-native-fastlock\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot adaptive-multirate-agc-v058-source/buildroot-v2\nlinux fastlock-attestation-v059-source/linux-v1\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 0b7718af9eed0a42eec448d03248c8497b13a779\n",
+    "gain_mode": "slow_attack",
+    "samples_per_block": 1000000,
+    "name": "post-5000000-slow_attack",
+    "report_sha256": "cd42d7f93a35dee8161bc8e58a36b773b8a3cda1b7ad6862c7909a5520e7bf91",
+    "rate": 5000000,
+    "protocol": 3,
+    "records": 74,
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "status": "completed",
+    "elapsed_seconds": 13.373417985858396,
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "0b50d3d6e6716184e1d5b1d31970ac00b06a219979f680bfaa75485a4ddade21"
+    },
+    "terminal": {
+      "session": 1790984136808088967,
+      "generation": 1790984136808088968,
+      "final_counter": 2240357706,
+      "restore_before": 2241195971,
+      "restore_after": 2241209348,
+      "planned": 73,
+      "delivered": 73,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 525600000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "daemon_attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.15's  \n3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802  /usr/sbin/iiod\ndevice-fw v0.60-plutoplus-spf-adaptive-native-fastlock\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot adaptive-multirate-agc-v058-source/buildroot-v2\nlinux fastlock-attestation-v059-source/linux-v1\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 0b7718af9eed0a42eec448d03248c8497b13a779\n",
+    "gain_mode": "manual",
+    "samples_per_block": 1000000,
+    "name": "post-7500000-manual",
+    "report_sha256": "688a808fb531c06ca6320c0d6fdb1b545c7588106503dcbb07c0985e2b2de89c",
+    "rate": 7500000,
+    "protocol": 3,
+    "records": 73,
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "status": "completed",
+    "elapsed_seconds": 13.352937072049826,
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "56a664890cb489a5e272a9a678346c6b095524b104a38b935aadbc3f07687469"
+    },
+    "terminal": {
+      "session": 1790984150970711170,
+      "generation": 1790984150970711171,
+      "final_counter": 2394326564,
+      "restore_before": 2394694344,
+      "restore_after": 2394708098,
+      "planned": 74,
+      "delivered": 74,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 532800000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "daemon_attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.15's  \n3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802  /usr/sbin/iiod\ndevice-fw v0.60-plutoplus-spf-adaptive-native-fastlock\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot adaptive-multirate-agc-v058-source/buildroot-v2\nlinux fastlock-attestation-v059-source/linux-v1\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 0b7718af9eed0a42eec448d03248c8497b13a779\n",
+    "gain_mode": "slow_attack",
+    "samples_per_block": 1000000,
+    "name": "post-7500000-slow_attack",
+    "report_sha256": "2bb8d500c2d59e75eb5a260e766e5ca16ea660b382f8e03c6dcf3eff11db437a",
+    "rate": 7500000,
+    "protocol": 3,
+    "records": 74,
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "status": "completed",
+    "elapsed_seconds": 14.735478536924347,
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "9f61509943fe58ee411f968ff0d1bc42df48b8d9b8535ba868e794531b4cacb0"
+    },
+    "terminal": {
+      "session": 1790984367287708014,
+      "generation": 1790984367287708015,
+      "final_counter": 8076961443,
+      "restore_before": 8076980559,
+      "restore_after": 8076981747,
+      "planned": 74,
+      "delivered": 74,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 88800000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "daemon_attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.15's  \n3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802  /usr/sbin/iiod\ndevice-fw v0.60-plutoplus-spf-adaptive-native-fastlock\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot adaptive-multirate-agc-v058-source/buildroot-v2\nlinux fastlock-attestation-v059-source/linux-v1\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 0b7718af9eed0a42eec448d03248c8497b13a779\n",
+    "gain_mode": "manual",
+    "samples_per_block": 500000,
+    "name": "post-v2-1p25",
+    "report_sha256": "679d2ec0d247e3f6169e4ca26276b479d75eb57f7d695f37c80755ec9dcdf6b3",
+    "rate": 1250000,
+    "protocol": 2,
+    "records": 74,
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "status": "failed",
+    "error": "RuntimeError('intentional client cancellation after three visits')",
+    "elapsed_seconds": 4.379123935941607,
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "638ff798a8e711fc6d7ae4f90472bc9447fbba878e8290de48e1329348608d3a"
+    },
+    "terminal": null,
+    "daemon_attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.15's  \n3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802  /usr/sbin/iiod\ndevice-fw v0.60-plutoplus-spf-adaptive-native-fastlock\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot adaptive-multirate-agc-v058-source/buildroot-v2\nlinux fastlock-attestation-v059-source/linux-v1\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 0b7718af9eed0a42eec448d03248c8497b13a779\n",
+    "gain_mode": "manual",
+    "samples_per_block": 500000,
+    "name": "post-v3-cancel",
+    "report_sha256": "833d736e5b3af0eda50783d71a92b5c819959a9a8dc54fdd05b40e7f7b1bb728",
+    "rate": 1250000,
+    "protocol": 3,
+    "records": 3
+  },
+  {
+    "status": "failed",
+    "error": "AdaptiveScanQualificationError('qualification session did not complete: state=FAILED reason=3 error=-5 planned=0 delivered=0 skipped=0 invalid=0 cancelled=0')",
+    "elapsed_seconds": 3.32474951306358,
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "51c63ba092c8d4b5532488f52b37ed3dd7abb0aaf285b244625a00561187e063"
+    },
+    "terminal": {
+      "session": 1790984382797558058,
+      "generation": 1790984382797558059,
+      "final_counter": 3848426692,
+      "restore_before": 3848964024,
+      "restore_after": 3848964031,
+      "planned": 0,
+      "delivered": 0,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 0,
+      "state": 3,
+      "reason": 3,
+      "error": -5,
+      "flags": 1
+    },
+    "daemon_attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.15's  \n3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802  /usr/sbin/iiod\ndevice-fw v0.60-plutoplus-spf-adaptive-native-fastlock\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot adaptive-multirate-agc-v058-source/buildroot-v2\nlinux fastlock-attestation-v059-source/linux-v1\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 0b7718af9eed0a42eec448d03248c8497b13a779\n",
+    "gain_mode": "manual",
+    "samples_per_block": 500000,
+    "name": "post-v3-dma-fault",
+    "report_sha256": "0f1f8e081f8f1a9682ec2b212a7d49cbeb3cf4b484dab0f49a280ee8d110e2fe",
+    "rate": 1250000,
+    "protocol": 3,
+    "records": 0
+  },
+  {
+    "status": "failed",
+    "error": "TypeError(\"run_adaptive_scan_campaign() got an unexpected keyword argument 'gain_control_mode'\")",
+    "elapsed_seconds": 0.00012015108950436115,
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "418cfb7a6b61cee704e9f213454a651e9cd4dfd577542268387fee72ad3652c6"
+    },
+    "daemon_attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.15's  \n3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802  /usr/sbin/iiod\ndevice-fw v0.60-plutoplus-spf-adaptive-native-1p25-rc1\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot adaptive-multirate-agc-v058-source/buildroot-v2\nlinux adaptive-multirate-agc-v059-source/linux-v2\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 581155fd57f3d3be4a3304c61cc904c7ff30a0bf\n",
+    "name": "pre-v3-1p25",
+    "report_sha256": "ca4f6954c2d030cc4c88fac6fa24f8cf44716045e002ce42a8c34438cd3a4180",
+    "rate": 1250000,
+    "protocol": 3,
+    "records": 0
+  },
+  {
+    "status": "completed",
+    "elapsed_seconds": 14.735776603920385,
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "4b0abf69a42ff4762c75c494dc6ae8ca08d6a738763bf58b35917100a84d0d87"
+    },
+    "terminal": {
+      "session": 1790983735687236501,
+      "generation": 1790983735687236502,
+      "final_counter": 114090107786,
+      "restore_before": 114090134495,
+      "restore_after": 114090136664,
+      "planned": 74,
+      "delivered": 74,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 88800000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "daemon_attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.15's  \n3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802  /usr/sbin/iiod\ndevice-fw v0.60-plutoplus-spf-adaptive-native-1p25-rc1\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot adaptive-multirate-agc-v058-source/buildroot-v2\nlinux adaptive-multirate-agc-v059-source/linux-v2\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 581155fd57f3d3be4a3304c61cc904c7ff30a0bf\n",
+    "name": "pre-v3-1p25-retry",
+    "report_sha256": "cf5c4bb0cd26e8f7ef02cab7c6be4d2af9d991cc6a235e9c58cc7681bec604c9",
+    "rate": 1250000,
+    "protocol": 3,
+    "records": 74,
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "status": "completed",
+    "elapsed_seconds": 13.521518812980503,
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "b4b5e7dcf90651b77b3010dcb4d73870cccbf8ea00b1a56621301d73362200b2"
+    },
+    "terminal": {
+      "session": 1790983754700655843,
+      "generation": 1790983754700655844,
+      "final_counter": 114284948920,
+      "restore_before": 114285188320,
+      "restore_after": 114285191671,
+      "planned": 73,
+      "delivered": 73,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 175200000,
+      "state": 1,
+      "reason": 1,
+      "error": 0,
+      "flags": 1
+    },
+    "daemon_attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.15's  \n3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802  /usr/sbin/iiod\ndevice-fw v0.60-plutoplus-spf-adaptive-native-1p25-rc1\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot adaptive-multirate-agc-v058-source/buildroot-v2\nlinux adaptive-multirate-agc-v059-source/linux-v2\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 581155fd57f3d3be4a3304c61cc904c7ff30a0bf\n",
+    "name": "pre-v3-2p5",
+    "report_sha256": "19fadc5e313d8006cdc3f40d00097453376653d781f3a7adaa6cf0578a819033",
+    "rate": 2500000,
+    "protocol": 3,
+    "records": 73,
+    "restoration": {
+      "expected": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "observed": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 30720000.0,
+        "bandwidth_hz": 18000000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "slow_attack",
+          "slow_attack"
+        ],
+        "gain_db": [
+          71.0,
+          71.0
+        ]
+      },
+      "expected_kernel_buffers": 4,
+      "observed_kernel_buffers": 4,
+      "fastlock_inactive": true
+    }
+  },
+  {
+    "status": "failed",
+    "error": "RuntimeError('intentional client cancellation after three visits')",
+    "elapsed_seconds": 4.440307611133903,
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "b4300db1acd85b7278aa3fb84d4b9351ab361f25ad3f6bf0a6ea14ee1bef5b94"
+    },
+    "terminal": null,
+    "daemon_attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.15's  \n3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802  /usr/sbin/iiod\ndevice-fw v0.60-plutoplus-spf-adaptive-native-1p25-rc1\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot adaptive-multirate-agc-v058-source/buildroot-v2\nlinux adaptive-multirate-agc-v059-source/linux-v2\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 581155fd57f3d3be4a3304c61cc904c7ff30a0bf\n",
+    "name": "pre-v3-cancel",
+    "report_sha256": "b3838269436997316ed43eae00e79d3189ac7fe95fb510dca336ae1ebb888d55",
+    "rate": 1250000,
+    "protocol": 3,
+    "records": 3
+  },
+  {
+    "status": "failed",
+    "error": "AdaptiveScanQualificationError('qualification session did not complete: state=FAILED reason=3 error=-5 planned=0 delivered=0 skipped=0 invalid=0 cancelled=0')",
+    "elapsed_seconds": 3.4117534898687154,
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "020ab88e9ae108c43093d5bb5947396d10af95f4d2569ee2dcfbc26ea7fc9ad6"
+    },
+    "terminal": {
+      "session": 1790983768965049592,
+      "generation": 1790983768965049593,
+      "final_counter": 2675193468,
+      "restore_before": 2675728988,
+      "restore_after": 2675728994,
+      "planned": 0,
+      "delivered": 0,
+      "skipped": 0,
+      "invalid": 0,
+      "cancelled": 0,
+      "iq_bytes": 0,
+      "state": 3,
+      "reason": 3,
+      "error": -5,
+      "flags": 1
+    },
+    "daemon_attestation": "** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\nroot@192.168.1.15's  \n3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802  /usr/sbin/iiod\ndevice-fw v0.60-plutoplus-spf-adaptive-native-1p25-rc1\nhdl ddr-burst-v1-rc4-source/hdl-v1\nbuildroot adaptive-multirate-agc-v058-source/buildroot-v2\nlinux adaptive-multirate-agc-v059-source/linux-v2\nu-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\nlibiio 581155fd57f3d3be4a3304c61cc904c7ff30a0bf\n",
+    "name": "pre-v3-dma-fault",
+    "report_sha256": "6394c24db2525b3fb2d832334952d563b2b8eeb81d422d4cba5a989efdbb8c3b",
+    "rate": 1250000,
+    "protocol": 3,
+    "records": 0
+  }
+]

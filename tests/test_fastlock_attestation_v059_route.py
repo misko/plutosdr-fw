@@ -5,7 +5,7 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 
 def test_main_source_graph_preserves_v059_and_routes_fixed_kernel():
-    name = 'fastlock-attestation-v059-source.yaml'
+    name = 'adaptive-native-fastlock-v060-source.yaml'
     manifest = dict(line.split(': ',1) for line in (ROOT/'manifests'/name).read_text().splitlines() if ': ' in line and not line.startswith('#'))
     baseline = dict(line.split(': ',1) for line in (ROOT/'manifests/dual-rx-counter-fix-v059-source.yaml').read_text().splitlines() if ': ' in line and not line.startswith('#'))
     for component in ('buildroot','linux','hdl','hdl-quantulum','u-boot-xlnx'):
@@ -17,7 +17,7 @@ def test_main_source_graph_preserves_v059_and_routes_fixed_kernel():
     assert manifest['libiio_0_25_source'] != baseline['libiio_0_25_source']
     assert manifest['submodule_linux'] != baseline['submodule_linux']
     workflow = (ROOT/'.github/workflows/firmware-main.yml').read_text()
-    assert "(github.ref == 'refs/heads/main' || github.ref == 'refs/heads/codex/issue-119') &&\n          '"+name+"'" in workflow
-    assert "'v0.59-issue119-fastlock-rc2'" in workflow
+    assert "github.ref == 'refs/heads/main' &&\n          '"+name+"'" in workflow
+    assert "'v0.60-plutoplus-spf-adaptive-native-fastlock'" in workflow
     for script in ('scripts/build_gain_series_candidate.sh','scripts/ci/package_main_firmware.sh'):
         assert name in (ROOT/script).read_text()

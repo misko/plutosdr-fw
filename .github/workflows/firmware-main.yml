@@ -107,7 +107,9 @@ jobs:
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/codex/v059-dual-rx-counter-fix' &&
           'dual-rx-counter-fix-v059-source.yaml' ||
-          (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/codex/issue-119') &&
+          github.ref == 'refs/heads/main' &&
+          'adaptive-native-fastlock-v060-source.yaml' ||
+          github.ref == 'refs/heads/codex/issue-119' &&
           'fastlock-attestation-v059-source.yaml' ||
           github.ref == 'refs/heads/codex/issues-111-116-next-fw' &&
           'adaptive-multirate-agc-v058-source.yaml' ||
@@ -227,7 +229,9 @@ jobs:
       SPF_PACKAGE_STEM_PREFIX: >-
         ${{ github.ref == 'refs/heads/codex/v059-dual-rx-counter-fix' &&
           'plutoplus-spf-dual-rx-counter-fix' ||
-          (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/codex/issue-119') &&
+          github.ref == 'refs/heads/main' &&
+          'plutoplus-spf-adaptive-native-fastlock-v060' ||
+          github.ref == 'refs/heads/codex/issue-119' &&
           'plutoplus-spf-fastlock-attestation-v059' ||
           github.ref == 'refs/heads/codex/issues-111-116-next-fw' &&
           'plutoplus-spf-adaptive-multirate-agc' ||
@@ -817,7 +821,7 @@ jobs:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
-            'v0.59-plutoplus-spf-dual-rx-counter-fix'
+            'v0.60-plutoplus-spf-adaptive-native-fastlock'
 
       - name: Build, validate, and package
         id: build
