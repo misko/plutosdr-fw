@@ -1,0 +1,614 @@
+{
+  "schema": "plutosdr-fw.issue120-qualification/v1",
+  "serial": "104000b29905000e17000800065934759d",
+  "host": "192.168.1.15",
+  "firmware": "v0.60-plutoplus-spf-adaptive-native-1p25-rc1",
+  "libiio_source": "581155fd57f3d3be4a3304c61cc904c7ff30a0bf",
+  "ppu_source": "a491b1c",
+  "cells": {
+    "baseline-v2-1p25": {
+      "status": "failed",
+      "error": "TimeoutError('timed out')",
+      "elapsed_seconds": 9.367582393810153,
+      "settings_restored": true,
+      "source_rate_hz": 1250000,
+      "protocol": 2,
+      "visits_seen": 0,
+      "evidence_sha256": "0dbc336fa2b11a2770891f7d843434190ee7888b633b0c5362b630fb68531d73"
+    },
+    "baseline-v2-2p5": {
+      "status": "failed",
+      "error": "TimeoutError('timed out')",
+      "elapsed_seconds": 8.078352917917073,
+      "settings_restored": true,
+      "source_rate_hz": 2500000,
+      "protocol": 2,
+      "visits_seen": 0,
+      "evidence_sha256": "a049cdc26d29ce5bee8ee4a8ad76acd7b44d862fd52ab625b6b90861371e5a0a"
+    },
+    "baseline-v3-2p5": {
+      "status": "completed",
+      "elapsed_seconds": 13.544585333904251,
+      "settings_restored": true,
+      "source_rate_hz": 2500000,
+      "protocol": 3,
+      "visits_seen": 74,
+      "evidence_sha256": "98bb99b35b56ad4a15c088f9592263853cbe76251243a983cca1567a49847f73",
+      "terminal": {
+        "planned": 74,
+        "delivered": 74,
+        "skipped": 0,
+        "invalid": 0,
+        "cancelled": 0,
+        "iq_bytes": 177600000,
+        "state": 1,
+        "error": 0,
+        "flags": 1
+      },
+      "configured": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 2500000.0,
+        "bandwidth_hz": 2500000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "manual",
+          "manual"
+        ],
+        "gain_db": [
+          40.0,
+          40.0
+        ]
+      },
+      "feedback_acknowledgements": 48,
+      "maximum_revisit_ms": 2705.3764,
+      "maximum_recall_ms": 0.4316,
+      "counter_time_anchors": 2
+    },
+    "candidate-v2-1p25": {
+      "status": "completed",
+      "elapsed_seconds": 14.93386855488643,
+      "settings_restored": true,
+      "source_rate_hz": 1250000,
+      "protocol": 2,
+      "visits_seen": 74,
+      "evidence_sha256": "64a56c09c5e32dcf32f774c97b2189b13fe761ed0fbf7ac751d0598f10cb8c60",
+      "terminal": {
+        "planned": 74,
+        "delivered": 73,
+        "skipped": 1,
+        "invalid": 0,
+        "cancelled": 0,
+        "iq_bytes": 87600000,
+        "state": 1,
+        "error": 0,
+        "flags": 1
+      },
+      "configured": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 1250000.0,
+        "bandwidth_hz": 1250000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "manual",
+          "manual"
+        ],
+        "gain_db": [
+          40.0,
+          40.0
+        ]
+      },
+      "feedback_acknowledgements": 34,
+      "maximum_revisit_ms": 2986.612,
+      "maximum_recall_ms": 0.3712,
+      "counter_time_anchors": 2
+    },
+    "candidate-v2-2p5": {
+      "status": "completed",
+      "elapsed_seconds": 13.565069864038378,
+      "settings_restored": true,
+      "ordinary_capture_after": {
+        "bytes": 32768,
+        "sha256": "e9173e0280831c662360d88c047faa6f68d3d7edca6264e2ccfdbb721f3d2ac3"
+      },
+      "source_rate_hz": 2500000,
+      "protocol": 2,
+      "visits_seen": 75,
+      "evidence_sha256": "03a84a5238127b3eb0a7024d328f5e5af01686b111d61820edb54da42533526c",
+      "terminal": {
+        "planned": 75,
+        "delivered": 75,
+        "skipped": 0,
+        "invalid": 0,
+        "cancelled": 0,
+        "iq_bytes": 180000000,
+        "state": 1,
+        "error": 0,
+        "flags": 1
+      },
+      "configured": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 2500000.0,
+        "bandwidth_hz": 2500000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "manual",
+          "manual"
+        ],
+        "gain_db": [
+          40.0,
+          40.0
+        ]
+      },
+      "feedback_acknowledgements": 40,
+      "maximum_revisit_ms": 2905.7736,
+      "maximum_recall_ms": 0.346,
+      "counter_time_anchors": 2
+    },
+    "candidate-v3-1p25": {
+      "status": "completed",
+      "elapsed_seconds": 14.834544182987884,
+      "settings_restored": true,
+      "source_rate_hz": 1250000,
+      "protocol": 3,
+      "visits_seen": 74,
+      "evidence_sha256": "0e22f2f572d4b55ed53e3935b5b666907c017eb589cddbab81a290ed4b139c7e",
+      "terminal": {
+        "planned": 74,
+        "delivered": 74,
+        "skipped": 0,
+        "invalid": 0,
+        "cancelled": 0,
+        "iq_bytes": 88800000,
+        "state": 1,
+        "error": 0,
+        "flags": 1
+      },
+      "configured": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 1250000.0,
+        "bandwidth_hz": 1250000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "manual",
+          "manual"
+        ],
+        "gain_db": [
+          40.0,
+          40.0
+        ]
+      },
+      "feedback_acknowledgements": 37,
+      "maximum_revisit_ms": 2947.6968,
+      "maximum_recall_ms": 0.3544,
+      "counter_time_anchors": 2
+    },
+    "candidate-v3-2p5": {
+      "status": "completed",
+      "elapsed_seconds": 13.553803308168426,
+      "settings_restored": true,
+      "source_rate_hz": 2500000,
+      "protocol": 3,
+      "visits_seen": 74,
+      "evidence_sha256": "e56156bd37d23fc3d2e935cde9aafa13cf5ff45870b5664c58629612cd95c07d",
+      "terminal": {
+        "planned": 74,
+        "delivered": 74,
+        "skipped": 0,
+        "invalid": 0,
+        "cancelled": 0,
+        "iq_bytes": 177600000,
+        "state": 1,
+        "error": 0,
+        "flags": 1
+      },
+      "configured": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 2500000.0,
+        "bandwidth_hz": 2500000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "manual",
+          "manual"
+        ],
+        "gain_db": [
+          40.0,
+          40.0
+        ]
+      },
+      "feedback_acknowledgements": 33,
+      "maximum_revisit_ms": 2948.5428,
+      "maximum_recall_ms": 0.3608,
+      "counter_time_anchors": 2
+    },
+    "candidate-v3-cancel": {
+      "status": "failed",
+      "error": "RuntimeError('intentional client cancellation after three visits')",
+      "elapsed_seconds": 6.454723078990355,
+      "settings_restored": true,
+      "ordinary_capture_after": {
+        "bytes": 32768,
+        "sha256": "c2dfac16e655256c87c1cde885b8e2c58e256522682158963f2cdfc4bd20e2e7"
+      },
+      "source_rate_hz": 1250000,
+      "protocol": 3,
+      "visits_seen": 3,
+      "evidence_sha256": "0a28b8c720d5ab3d989fa8b0aa3984a79ca0628df6c6f1c9380a3f75f09488f0"
+    },
+    "candidate-v3-dma-fault": {
+      "status": "failed",
+      "error": "AdaptiveScanQualificationError('qualification session did not complete: state=FAILED reason=3 error=-5 planned=0 delivered=0 skipped=0 invalid=0 cancelled=0')",
+      "elapsed_seconds": 3.6251209839247167,
+      "settings_restored": true,
+      "ordinary_capture_after": {
+        "bytes": 32768,
+        "sha256": "1e36a255539564f13bc5e6c88ef26faed094f5cd4049b3bc5da52f02c14cfa74"
+      },
+      "source_rate_hz": 1250000,
+      "protocol": 3,
+      "visits_seen": 0,
+      "evidence_sha256": "b2a269f93f93eeb762d327cda78778ee1c6808a2d45784aebc76e4f3578f32a4",
+      "terminal": {
+        "planned": 0,
+        "delivered": 0,
+        "skipped": 0,
+        "invalid": 0,
+        "cancelled": 0,
+        "iq_bytes": 0,
+        "state": 3,
+        "error": -5,
+        "flags": 1
+      }
+    },
+    "deployed-v3-1p25": {
+      "status": "completed",
+      "elapsed_seconds": 15.833683441858739,
+      "settings_restored": true,
+      "ordinary_capture_after": {
+        "bytes": 32768,
+        "sha256": "cb896276227e0d8c5034f05425810d1d54617703814ed55c471d0babddb50c66"
+      },
+      "source_rate_hz": 1250000,
+      "protocol": 3,
+      "visits_seen": 74,
+      "evidence_sha256": "f6a431773c30be205afb3e21083b67170d21caa938669a94abc4078222a2b69c",
+      "terminal": {
+        "planned": 74,
+        "delivered": 72,
+        "skipped": 2,
+        "invalid": 0,
+        "cancelled": 0,
+        "iq_bytes": 86400000,
+        "state": 1,
+        "error": 0,
+        "flags": 1
+      },
+      "configured": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 1250000.0,
+        "bandwidth_hz": 1250000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "manual",
+          "manual"
+        ],
+        "gain_db": [
+          40.0,
+          40.0
+        ]
+      },
+      "feedback_acknowledgements": 32,
+      "maximum_revisit_ms": 2843.792,
+      "maximum_recall_ms": 0.34,
+      "counter_time_anchors": 2
+    },
+    "deployed-v3-1p25-500k": {
+      "status": "completed",
+      "elapsed_seconds": 13.776391123887151,
+      "settings_restored": true,
+      "ordinary_capture_after": {
+        "bytes": 32768,
+        "sha256": "bacdcce0978861259c6353c6c48e6db1cae03e80bfb8f280cedc142217069658"
+      },
+      "source_rate_hz": 1250000,
+      "protocol": 3,
+      "visits_seen": 75,
+      "evidence_sha256": "4ce4b36ccf6bed192848dd71be0d691bf8d19d6a7c87409aeaa149e7ce02a2d1",
+      "terminal": {
+        "planned": 75,
+        "delivered": 75,
+        "skipped": 0,
+        "invalid": 0,
+        "cancelled": 0,
+        "iq_bytes": 90000000,
+        "state": 1,
+        "error": 0,
+        "flags": 1
+      },
+      "configured": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 1250000.0,
+        "bandwidth_hz": 1250000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "manual",
+          "manual"
+        ],
+        "gain_db": [
+          40.0,
+          40.0
+        ]
+      },
+      "feedback_acknowledgements": 55,
+      "maximum_revisit_ms": 2965.524,
+      "maximum_recall_ms": 0.3544,
+      "counter_time_anchors": 2
+    },
+    "deployed-v3-2p5": {
+      "status": "completed",
+      "elapsed_seconds": 13.546110096853226,
+      "settings_restored": true,
+      "ordinary_capture_after": {
+        "bytes": 32768,
+        "sha256": "0c8c61ff9cd53985cacac6aa534a69e86ec50a8801401ed6d22a9ea1b8a10cdc"
+      },
+      "source_rate_hz": 2500000,
+      "protocol": 3,
+      "visits_seen": 74,
+      "evidence_sha256": "728b30d7d2c986b19bc4a9af6d7fbfc1110262f8d59765df757a4d4c84bea9ba",
+      "terminal": {
+        "planned": 74,
+        "delivered": 74,
+        "skipped": 0,
+        "invalid": 0,
+        "cancelled": 0,
+        "iq_bytes": 177600000,
+        "state": 1,
+        "error": 0,
+        "flags": 1
+      },
+      "configured": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 2500000.0,
+        "bandwidth_hz": 2500000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "manual",
+          "manual"
+        ],
+        "gain_db": [
+          40.0,
+          40.0
+        ]
+      },
+      "feedback_acknowledgements": 31,
+      "maximum_revisit_ms": 2303.4316,
+      "maximum_recall_ms": 0.3696,
+      "counter_time_anchors": 2
+    },
+    "deployed-v3-cancel": {
+      "status": "failed",
+      "error": "RuntimeError('intentional client cancellation after three visits')",
+      "elapsed_seconds": 6.225107689155266,
+      "settings_restored": true,
+      "ordinary_capture_after": {
+        "bytes": 32768,
+        "sha256": "b2d79abf6a94a26d781f25673294c9955132b9237ffa85af4f47bf011ee1ff21"
+      },
+      "source_rate_hz": 1250000,
+      "protocol": 3,
+      "visits_seen": 3,
+      "evidence_sha256": "8b679dd35205c5eb1a48db4c70711a91a5d102e63bf7b10aeeaa0e02aa7b5e49"
+    },
+    "deployed-v3-dma-fault": {
+      "status": "failed",
+      "error": "AdaptiveScanQualificationError('qualification session did not complete: state=FAILED reason=3 error=-5 planned=0 delivered=0 skipped=0 invalid=0 cancelled=0')",
+      "elapsed_seconds": 4.578596621984616,
+      "settings_restored": true,
+      "ordinary_capture_after": {
+        "bytes": 32768,
+        "sha256": "0b601a95cb5640b7509298057328c1718552a2f9f31c49afcd0432bdcddde1e6"
+      },
+      "source_rate_hz": 1250000,
+      "protocol": 3,
+      "visits_seen": 0,
+      "evidence_sha256": "b2194527f0104c29820524046fc7d7db5194cfd36e4209e215e3620ce1ee32d6",
+      "terminal": {
+        "planned": 0,
+        "delivered": 0,
+        "skipped": 0,
+        "invalid": 0,
+        "cancelled": 0,
+        "iq_bytes": 0,
+        "state": 3,
+        "error": -5,
+        "flags": 1
+      }
+    },
+    "qualified-v3-1p25": {
+      "status": "completed",
+      "elapsed_seconds": 16.0722530761268,
+      "settings_restored": true,
+      "ordinary_capture_after": {
+        "bytes": 32768,
+        "sha256": "0087ea186dc460493af2bd6c647bb39489e14b48ab40007e7c2986d014328d19"
+      },
+      "source_rate_hz": 1250000,
+      "protocol": 3,
+      "visits_seen": 75,
+      "evidence_sha256": "e501d901eaa90479aec2ef75831755f7ed10a96940432a429131e103d3804680",
+      "terminal": {
+        "planned": 75,
+        "delivered": 73,
+        "skipped": 2,
+        "invalid": 0,
+        "cancelled": 0,
+        "iq_bytes": 87600000,
+        "state": 1,
+        "error": 0,
+        "flags": 1
+      },
+      "configured": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 1250000.0,
+        "bandwidth_hz": 1250000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "manual",
+          "manual"
+        ],
+        "gain_db": [
+          40.0,
+          40.0
+        ]
+      },
+      "feedback_acknowledgements": 32,
+      "maximum_revisit_ms": 2906.6904,
+      "maximum_recall_ms": 0.3544,
+      "counter_time_anchors": 2
+    },
+    "qualified-v3-2p5": {
+      "status": "completed",
+      "elapsed_seconds": 13.689843569183722,
+      "settings_restored": true,
+      "ordinary_capture_after": {
+        "bytes": 32768,
+        "sha256": "7503f85ce2998a52500c9c208926e18a788f68985d0ca9e8b763a57675b34fe3"
+      },
+      "source_rate_hz": 2500000,
+      "protocol": 3,
+      "visits_seen": 74,
+      "evidence_sha256": "24f5c06a5a0e33661a211a0160eca8667a7aba44a466bcd1e7072703e05f86df",
+      "terminal": {
+        "planned": 74,
+        "delivered": 74,
+        "skipped": 0,
+        "invalid": 0,
+        "cancelled": 0,
+        "iq_bytes": 177600000,
+        "state": 1,
+        "error": 0,
+        "flags": 1
+      },
+      "configured": {
+        "center_frequency_hz": 2400000000.0,
+        "sample_rate_hz": 2500000.0,
+        "bandwidth_hz": 2500000.0,
+        "channels": [
+          0,
+          1
+        ],
+        "gain_modes": [
+          "manual",
+          "manual"
+        ],
+        "gain_db": [
+          40.0,
+          40.0
+        ]
+      },
+      "feedback_acknowledgements": 49,
+      "maximum_revisit_ms": 2511.9024,
+      "maximum_recall_ms": 0.5208,
+      "counter_time_anchors": 2
+    },
+    "qualified-v3-cancel": {
+      "status": "failed",
+      "error": "RuntimeError('intentional client cancellation after three visits')",
+      "elapsed_seconds": 6.327711910009384,
+      "settings_restored": true,
+      "ordinary_capture_after": {
+        "bytes": 32768,
+        "sha256": "0bf5416e649d671358b24d04cd35506a1d72c18589ec4d95ab4d104e18cd8931"
+      },
+      "source_rate_hz": 1250000,
+      "protocol": 3,
+      "visits_seen": 3,
+      "evidence_sha256": "f192e52452a82a9e3a1b3fcd4451ce27280bcfbc2b0bcd84623a12d376857ffd"
+    },
+    "qualified-v3-dma-fault": {
+      "status": "failed",
+      "error": "AdaptiveScanQualificationError('qualification session did not complete: state=FAILED reason=3 error=-5 planned=0 delivered=0 skipped=0 invalid=0 cancelled=0')",
+      "elapsed_seconds": 4.619285282213241,
+      "settings_restored": true,
+      "ordinary_capture_after": {
+        "bytes": 32768,
+        "sha256": "bcd4d59d847aef6de6a81b29ef952e1061a3b97676bc2015a97a1c033392b68c"
+      },
+      "source_rate_hz": 1250000,
+      "protocol": 3,
+      "visits_seen": 0,
+      "evidence_sha256": "1ff52f58f19b4126f9051b6449580cbe7716b582da711be448561f31cd396ceb",
+      "terminal": {
+        "planned": 0,
+        "delivered": 0,
+        "skipped": 0,
+        "invalid": 0,
+        "cancelled": 0,
+        "iq_bytes": 0,
+        "state": 3,
+        "error": -5,
+        "flags": 1
+      }
+    }
+  },
+  "rejections": {
+    "readscan_without_open": {
+      "errno": 9,
+      "elapsed_seconds": 0.001345587894320488
+    },
+    "unsupported_v3_8m": {
+      "errno": 74,
+      "elapsed_seconds": 0.001086933072656393
+    },
+    "settings_restored": true,
+    "ordinary_capture_after": {
+      "bytes": 32768,
+      "sha256": "51adf2e0531056c6c0218151e7e3c7db3b9571700abd3a0b667eaea729c5b8cf"
+    }
+  },
+  "iq_readback": {
+    "file": "visit-0060.ci16",
+    "sha256": "bf67a1a15ec6e14cbf358bcc071630944b69312f67b39d913395206a014932f5",
+    "samples_per_receiver": 150000,
+    "iq_bytes": 1200000,
+    "rx1_iq_rms": 0.7070808534625537,
+    "rx2_iq_rms": 0.7277407963462449,
+    "format": "little-endian interleaved I0,Q0,I1,Q1 ci16",
+    "samples_per_transport_block": 500000
+  },
+  "reserved_capture_budget_seconds": 1140,
+  "limits": [
+    "RX-only; 10-second capture cells; 30-minute cumulative attempt budget",
+    "Existing 1,000,000-sample low-rate blocks can report conservative queue capacity skips; 500,000-sample blocks delivered all 75 visits",
+    "Kernel snapshot age is explicitly unknown; timing uncertainty must remain fail-closed",
+    "Leo import/API contracts and production 25/75 policy are unchanged",
+    "Persistent firmware verified after software reboot; physical cold boot not performed"
+  ]
+}

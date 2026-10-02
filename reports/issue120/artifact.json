@@ -1,0 +1,28 @@
+{
+  "schema": "plutosdr-fw.issue120-artifact/v1",
+  "firmware": "v0.60-plutoplus-spf-adaptive-native-1p25-rc1",
+  "parent_dfu_sha256": "1fa69d2784efbcabaaaed5bc5f5d625deabfd7da725627c9634a694db5bd9df0",
+  "libiio_source": "581155fd57f3d3be4a3304c61cc904c7ff30a0bf",
+  "iiod_sha256": "eb20e1a504f8b6d684efd51d1354c4bd1909479d3576905efcc9366f27953cca",
+  "changed_rootfs_files": {
+    "opt/VERSIONS": {
+      "before": "0ee753b1b3c3fb0249c3385b50ef6dc89031a75278e0687485c4dd1ddb538915",
+      "after": "4eded72a27fd742641c780339f932e78a3b94ffe76f03cbe959e15d867c4083c"
+    },
+    "usr/sbin/iiod": {
+      "before": "ff7e5066a31787dfbf1a6e3ea3785e56c9cfd88a3fd2e9e4a4415212366277cc",
+      "after": "eb20e1a504f8b6d684efd51d1354c4bd1909479d3576905efcc9366f27953cca"
+    }
+  },
+  "fit_sha256": "b18b3dbb09738cb218f2c478bd5a0e43fc378bbb0b414d0c9748797aab9539d9",
+  "fit_bytes": 12794623,
+  "dfu_sha256": "e4c24a6457348e83661fdfb059ab8d6b1f4b77bc3cdf27fd8a882660e61be96c",
+  "dfu_bytes": 12794639,
+  "unchanged_components": {
+    "fdt@1": "1bd2357dbb7e871a13824dedb6761d74c871083dbfc97c9c36c22bda929dcea8",
+    "fdt@2": "b1ab5370a427f642039ce2061ff38c341a6a78f9e8f0a8b7e59757b143ada640",
+    "fdt@3": "45055fd15fc200881464a91fbcd8deb3d0756a4e368a8be27cf67d6e5c863646",
+    "fpga@1": "c1501a486d1289558db587cbd545c1b99eaf3cadbc9f865a8bf979f84b007956",
+    "linux_kernel@1": "b3f17301bc9383f97ca946bfb55211ef8c462b8300c5cbe96407e46578382934"
+  }
+}
