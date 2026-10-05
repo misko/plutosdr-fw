@@ -46,6 +46,7 @@ run_oracles() {
         tests/test_counter_rx_release_route.py \
         tests/test_release_oracles.py \
         tests/test_firmware_release_tooling.py \
+        tests/test_fastlock_attestation_v059_route.py \
         tests/test_tandem_rc5_release_route.py \
         tests/test_tandem_rc6_release_route.py \
         tests/test_tandem_rc7_release_route.py \
@@ -81,6 +82,8 @@ run_oracles() {
         tests/radio_hardware \
         -m 'not radio_hardware'
 
+    "$PYTHON" linux/tools/testing/selftests/ad9361-fastlock/test_deadline.py
+    "$PYTHON" linux/tools/testing/selftests/ad9361-fastlock/run.py
     ./hdl-tandem/run_tests.sh
     git diff --check
 }
