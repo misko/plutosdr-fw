@@ -108,7 +108,7 @@ jobs:
           github.ref == 'refs/heads/codex/v059-dual-rx-counter-fix' &&
           'dual-rx-counter-fix-v059-source.yaml' ||
           github.ref == 'refs/heads/main' &&
-          'adaptive-native-fastlock-v060-source.yaml' ||
+          'fastlock-diagnostics-v061-source.yaml' ||
           github.ref == 'refs/heads/codex/issue-119' &&
           'fastlock-attestation-v059-source.yaml' ||
           github.ref == 'refs/heads/codex/issues-111-116-next-fw' &&
@@ -230,7 +230,7 @@ jobs:
         ${{ github.ref == 'refs/heads/codex/v059-dual-rx-counter-fix' &&
           'plutoplus-spf-dual-rx-counter-fix' ||
           github.ref == 'refs/heads/main' &&
-          'plutoplus-spf-adaptive-native-fastlock-v060' ||
+          'plutoplus-spf-fastlock-timeout-fix-v061' ||
           github.ref == 'refs/heads/codex/issue-119' &&
           'plutoplus-spf-fastlock-attestation-v059' ||
           github.ref == 'refs/heads/codex/issues-111-116-next-fw' &&
@@ -821,7 +821,7 @@ jobs:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
-            'v0.60-plutoplus-spf-adaptive-native-fastlock'
+            'v0.61-plutoplus-spf-fastlock-timeout-fix'
 
       - name: Build, validate, and package
         id: build

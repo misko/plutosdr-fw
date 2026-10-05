@@ -1,0 +1,29 @@
+{
+  "schema": "plutosdr-fw.issue123-artifact/v1",
+  "firmware": "v0.61-plutoplus-spf-fastlock-timeout-fix",
+  "parent_dfu_sha256": "521ab9d36ade7ff4f278e699be6c080a7e7af1b7353de7d62189300caea7fb20",
+  "libiio_source": "461722230e9d645d368eeb623dd7e80709c7ada9",
+  "linux_source": "ad4a6a1d9acab85a697d7e2e36270558f4dd53e8",
+  "kernel_sha256": "88b19b3c1ee479910627da9db4de88d5aa00b59985542a84bafcdc76c12c4dc7",
+  "iiod_sha256": "8a242f50c914c1ef55578c888d485e94e7a0a9fbad6f1f26794d3ec637264608",
+  "changed_rootfs_files": {
+    "opt/VERSIONS": {
+      "before": "8c6f40af437671c5c327dd7c120b5e31007ebc9ac4e68eda9e5e4f75a7ef427c",
+      "after": "06699e9539c83ea26b9958e6513cee7f54a55e11f3315ecf0c56fbeb1a4a834f"
+    },
+    "usr/sbin/iiod": {
+      "before": "3d3ccc7c38f5e93e3e066b6c86d7156f2838a39014285b07b2500ad237f6b802",
+      "after": "8a242f50c914c1ef55578c888d485e94e7a0a9fbad6f1f26794d3ec637264608"
+    }
+  },
+  "fit_sha256": "8e0e82279db3c14ec865c213b13017cefc5f29d5fac8208bbf8f7812ab849c3a",
+  "fit_bytes": 12798463,
+  "dfu_sha256": "ad5e6a350f65e11d4cd68013a3de4b2a62d7a6bec15bba210b5ccad65b727362",
+  "dfu_bytes": 12798479,
+  "unchanged_components": {
+    "fdt@1": "1bd2357dbb7e871a13824dedb6761d74c871083dbfc97c9c36c22bda929dcea8",
+    "fdt@2": "b1ab5370a427f642039ce2061ff38c341a6a78f9e8f0a8b7e59757b143ada640",
+    "fdt@3": "45055fd15fc200881464a91fbcd8deb3d0756a4e368a8be27cf67d6e5c863646",
+    "fpga@1": "c1501a486d1289558db587cbd545c1b99eaf3cadbc9f865a8bf979f84b007956"
+  }
+}

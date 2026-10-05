@@ -1,0 +1,33 @@
+{
+  "receipt_id": "1c17be21-a184-46c1-9496-ac9323abbcf5",
+  "outcome": "success",
+  "phases": [
+    "preflight_revalidated",
+    "remote_preflight_attested",
+    "source_tx_quiesced",
+    "remote_tx_safe_read_only_attested",
+    "physical_flash_guard_passed",
+    "pluto_frm_staged",
+    "staged_hash_verified",
+    "updater_reported_done",
+    "protected_regions_verified",
+    "mtd3_fit_verified",
+    "remote_stage_removed",
+    "reboot_dispatched",
+    "lan_iio_disappeared",
+    "lan_iio_reappeared",
+    "return_attested",
+    "tx_safe_attested",
+    "lan_ssh_host_key_rotated",
+    "remote_return_tx_safe_read_only_attested"
+  ],
+  "receipt_path": "/home/mouse9911/release-evidence/issue-123/fixed-lan/receipts/1c17be21-a184-46c1-9496-ac9323abbcf5.json",
+  "returned_serial": "1040005e0b100007100010000bf33a5d4d",
+  "returned_firmware": "v0.61-plutoplus-spf-fastlock-timeout-fix",
+  "returned_phy": "ad9361",
+  "error": null,
+  "failure_phase": null,
+  "failure_classification": null,
+  "retryable": null,
+  "remediation": null
+}
