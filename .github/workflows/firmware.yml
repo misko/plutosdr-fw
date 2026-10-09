@@ -14,6 +14,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  continuous-scanner-package:
+    name: continuous scanner package integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install FIT tooling
+        run: sudo apt-get update && sudo apt-get install -y device-tree-compiler
+      - name: Check rootfs metadata and protected FIT components
+        run: python3 -m unittest discover -s scripts/v062 -v
+
   radio-hardware-oracles:
     name: radio hardware offline oracles
     runs-on: ubuntu-latest
@@ -136,3 +148,36 @@ jobs:
         run: |
           cd hdl-quantulum-final/util_upack2_timestamp/test
           ./run_timestamp_check_pipeline.sh
+
+  continuous-scanner-native:
+    name: continuous scanner native tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the immutable continuous scanner release source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: misko/libiio
+          ref: e2ea69c284f0f1c64efb05c0251bca2ee59932b1
+          path: scanner
+          persist-credentials: false
+      - name: Install native scanner test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake libxml2-dev
+      - name: Build and run scanner protocol, scheduling and lifecycle suites
+        shell: bash
+        run: |
+          cmake -S scanner -B scanner/build-tests \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DWITH_IIOD=OFF -DWITH_TESTS=ON -DWITH_USB_BACKEND=OFF \
+            -DWITH_ZSTD=OFF -DWITH_DOC=OFF -DHAVE_DNS_SD=OFF
+          suites=(test_spf_scan_policy test_spf_scan_protocol \
+            test_spf_scan_session test_spf_scan_radio \
+            test_spf_visit_queue test_spf_visit_capacity)
+          cmake --build scanner/build-tests --target "${suites[@]}" -j2
+          # These owned executables are not registered with CTest.
+          for suite in "${suites[@]}"; do
+            "scanner/build-tests/tests/$suite"
+          done
