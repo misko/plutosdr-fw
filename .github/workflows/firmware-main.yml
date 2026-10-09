@@ -108,7 +108,7 @@ jobs:
           github.ref == 'refs/heads/codex/v059-dual-rx-counter-fix' &&
           'dual-rx-counter-fix-v059-source.yaml' ||
           github.ref == 'refs/heads/main' &&
-          'fastlock-diagnostics-v061-source.yaml' ||
+          'continuous-fast-scan-v062-source.yaml' ||
           github.ref == 'refs/heads/codex/issue-119' &&
           'fastlock-attestation-v059-source.yaml' ||
           github.ref == 'refs/heads/codex/issues-111-116-next-fw' &&

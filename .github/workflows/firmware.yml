@@ -14,6 +14,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  continuous-scanner-package:
+    name: continuous scanner package integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install FIT tooling
+        run: sudo apt-get update && sudo apt-get install -y device-tree-compiler
+      - name: Check rootfs metadata and protected FIT components
+        run: python3 -m unittest discover -s scripts/v062 -v
+
   radio-hardware-oracles:
     name: radio hardware offline oracles
     runs-on: ubuntu-latest
