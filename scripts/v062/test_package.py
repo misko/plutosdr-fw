@@ -38,15 +38,18 @@ class PackagingTests(unittest.TestCase):
         self.assertIn(b"linux preserved", result["opt/VERSIONS"][1])
         self.assertEqual(data, pack.rootfs(base, {"usr/sbin/iiod": b"new-daemon", "usr/lib/libiio.so.0.25": b"new-lib"}, "a" * 40)[0])
 
-    def fixture(self):
+    def fixture(self, signed=False):
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp)
-            (p / "test.dts").write_text('''/dts-v1/;
+            source = '''/dts-v1/;
             / { timestamp = <123>; images {
                 ramdisk@1 { data = [01 02]; compression = "gzip";
                     hash@1 { algo = "md5"; value = [00]; }; };
                 fpga@1 { data = [03 04]; hash@1 { algo = "sha256"; value = [00]; }; };
-            }; configurations { default = "config@0"; config@0 { ramdisk = "ramdisk@1"; fpga = "fpga@1"; }; }; };''')
+            }; configurations { default = "config@0"; config@0 { ramdisk = "ramdisk@1"; fpga = "fpga@1"; }; }; };'''
+            if signed:
+                source = source.replace('fpga = "fpga@1";', 'fpga = "fpga@1"; signature@1 { algo = "sha256,rsa2048"; };')
+            (p / "test.dts").write_text(source)
             subprocess.run(["dtc", "-q", "-I", "dts", "-O", "dtb", "-o", str(p / "test.dtb"), str(p / "test.dts")], check=True)
             fit = Fit((p / "test.dtb").read_bytes())
             fit.replace("/images/ramdisk@1/hash@1", "value", hashlib.md5(b"\x01\x02").digest())
@@ -70,8 +73,11 @@ class PackagingTests(unittest.TestCase):
             pack.replace_ramdisk(fit.packed(), b"new")
 
     def test_reject_signed_fit(self):
+        with self.assertRaisesRegex(ValueError, "signed FIT"):
+            pack.replace_ramdisk(self.fixture(signed=True), b"new")
+
+    def test_reject_unsupported_hash(self):
         fit = Fit(self.fixture())
-        # The signed-property policy is intentionally conservative.
         fit.replace("/images/ramdisk@1/hash@1", "algo", b"rsa2048\0")
         with self.assertRaisesRegex(ValueError, "unsupported FIT hash"):
             pack.replace_ramdisk(fit.packed(), b"new")
