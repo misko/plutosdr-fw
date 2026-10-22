@@ -48,7 +48,9 @@ radio20 IF plan was then exercised after persistent installation:
 1709687500 and 1940312500 Hz. These are eight explicit IF targets; no RF
 identity or LNB polarization is inferred from them.
 
-Eight native scanner suites and eight ASan/UBSan scanner suites passed,
+The complete firmware offline gate passed 1,526 tests (five hardware tests
+deselected), both kernel Fast Lock regression harnesses and all tandem HDL
+testbenches. Eight native scanner suites and eight ASan/UBSan scanner suites passed,
 including 20,000 simulated ordered visits at each of five rates across counter
 wrap and bounded-history reuse. ARM build/install, seven package-integrity
 tests, repeat byte-identical DFU/FRM packaging, 25 firmware routing/tooling

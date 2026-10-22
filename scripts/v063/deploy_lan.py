@@ -61,7 +61,8 @@ def main():
         base, policy=policy, persistent_allowed=True, metadata_abi=3,
         source_iio_layout=ppu.PAIRED_RX_TX_CAPABLE_LAYOUT,
         return_iio_layout=ppu.PAIRED_RX_TX_CAPABLE_LAYOUT,
-        allowed_before_firmwares=('v0.60-plutoplus-spf-adaptive-native-fastlock',
+        allowed_before_firmwares=('v0.59-issue119-fastlock-rc2',
+            'v0.60-plutoplus-spf-adaptive-native-fastlock',
             'v0.62-plutoplus-spf-continuous-fast-scan'),
     )
     args.evidence.mkdir(parents=True, exist_ok=False, mode=0o700)
