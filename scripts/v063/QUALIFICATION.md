@@ -2,11 +2,12 @@
 
 On 2026-10-22 the exact image was RAM-qualified on development radio
 `104000b29905000e17000800065934759d`, then persistently installed and
-reboot-checked on `192.168.1.15` and `192.168.1.20` (serial
-`1040005e0b100007100010000bf33a5d4d`). Both returned
+reboot-checked on `192.168.1.15`, `192.168.1.18` (serial
+`1040007c4a94000211000b009186843ef2`) and `192.168.1.20` (serial
+`1040005e0b100007100010000bf33a5d4d`). All three returned
 `v0.63-plutoplus-spf-continuous-fast-scan` with the exact installed binary
 hashes below and muted, powered-down TX. The guarded updater verified the FIT
-readback and protected flash regions on both boards.
+readback and protected flash regions on all three boards.
 
 | Artifact | SHA-256 |
 | --- | --- |
@@ -30,10 +31,11 @@ scanner source. The new code changes daemon scan handling, not library APIs.
 | Persistent .15, dual RX, all five rates | 406 |
 | Persistent .15, existing eight-target IF plan, 5/10 MS/s | 129 + 129 |
 | Persistent .20, existing eight-target IF plan, all five rates | 645 |
+| Persistent .18, existing eight-target IF plan, all five rates | 645 |
 | Original v0.62 host on persistent .15, 2.5 MS/s | 33 |
 | Legacy finite v3 followed by ordinary RX | 14 + 32,768 ordinary IQ bytes |
 
-Independent readback of **2,871 saved continuous windows (2,842,400,000
+Independent readback of **3,516 saved continuous windows (3,384,200,000
 bytes)** verified sample counts, hashes, visit/target order, no missing support,
 minimum post-recall guards, terminal accounting and settings restoration.
 Every retained COMPLETE window covered exactly 20 ms, with a guard of at
@@ -70,11 +72,13 @@ corrected before the final run. A local Linux clone hit host disk pressure;
 only this task's build/clone artifacts were moved to bulk storage.
 
 This qualification covers native 1.25, 2.5, 5, 7.5 and 10 MS/s continuous
-scans, bounded receive sessions and software-reboot persistence on these two
-radios. It does not establish every RF transition, physical settling minima,
+scans, bounded receive sessions and software-reboot persistence on these three
+radios. The previously documented .17 endpoint was unreachable and was not
+updated. It does not establish every RF transition, physical settling minima,
 Starlink detection sensitivity, multi-day reliability, physical cold boot,
 or rates above 10 MS/s. The inherited finite scheduled 10 MS/s timeout
-limitation is not claimed fixed. No RF transmitter was enabled for this work.
+limitation is not claimed fixed. No RF transmitter was enabled for this work. Ordinary RX also returned 32,768 bytes on each radio after the
+final scan checks.
 
 Detailed evidence is under `/srv/bulk/leo/continuous-scan-v063` on the build
 host and is packaged explicitly for release; credentials and SSH trust files
