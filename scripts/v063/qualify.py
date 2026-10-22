@@ -17,6 +17,8 @@ def main():
     p.add_argument('--windows', type=int, default=80)
     p.add_argument('--rx-mask', type=int, default=3)
     p.add_argument('--block-samples', type=int)
+    p.add_argument('--frequencies', default='959687498,1190312500,1209687498,1440312500,1459687498,1690312496,1709687500,1940312500',
+        help='Eight explicitly selected IF targets; default is the existing radio20 fast-scan plan')
     args = p.parse_args()
     from pluto_plus.hardware.preflight import verify_metadata_runtime
     from pluto_plus.continuous_scan import build_continuous_setup, ContinuousClient
@@ -35,7 +37,7 @@ def main():
             setup = build_continuous_setup(session=secrets.randbits(63) or 1,
                 generation=secrets.randbits(63) or 1, seed=secrets.randbits(63) or 1,
                 source_rate_hz=rate, rx_mask=args.rx_mask,
-                frequencies_hz=tuple(1_800_000_000 + i*10_000_000 for i in range(8)),
+                frequencies_hz=tuple(map(int,args.frequencies.split(','))),
                 analysis_digest=hashlib.sha256(b'v063-multirate-rx-qualification').digest())
             directory = args.output / str(rate)
             directory.mkdir()
