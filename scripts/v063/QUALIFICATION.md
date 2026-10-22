@@ -27,7 +27,7 @@ scanner source. The new code changes daemon scan handling, not library APIs.
 | Development RAM, dual RX, all five rates | 406 |
 | Extended dual RX, 5/10 MS/s, 100,000-sample DMA blocks | 513 + 513 |
 | Single RX, 5/10 MS/s | 65 + 65 |
-| Persistent .15, dual RX, all five rates | 405 |
+| Persistent .15, dual RX, all five rates | 406 |
 | Persistent .15, existing eight-target IF plan, 5/10 MS/s | 129 + 129 |
 | Persistent .20, existing eight-target IF plan, all five rates | 645 |
 | Original v0.62 host on persistent .15, 2.5 MS/s | 33 |

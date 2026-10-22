@@ -160,7 +160,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: misko/libiio
-          ref: e2ea69c284f0f1c64efb05c0251bca2ee59932b1
+          ref: 6162275af8ec4622dc42a53307d6f5a65ed8840f
           path: scanner
           persist-credentials: false
       - name: Install native scanner test dependencies
