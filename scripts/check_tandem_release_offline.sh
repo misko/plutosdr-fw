@@ -149,7 +149,8 @@ run_source_graph() {
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/dual-rx-counter-fix-v059-source.yaml
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/adaptive-native-fastlock-v060-source.yaml
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/fastlock-diagnostics-v061-source.yaml
-    ./scripts/check_source_graph.sh manifests/continuous-fast-scan-v062-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/continuous-fast-scan-v062-source.yaml
+    ./scripts/check_source_graph.sh manifests/continuous-fast-scan-v063-source.yaml
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/fastlock-attestation-v059-source.yaml
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/iio-throughput-coverage-window-v6-rc1-source.yaml
     ./buildroot/board/pluto/test_iiod_supervisor.sh

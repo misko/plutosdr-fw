@@ -24,7 +24,9 @@ jobs:
       - name: Install FIT tooling
         run: sudo apt-get update && sudo apt-get install -y device-tree-compiler
       - name: Check rootfs metadata and protected FIT components
-        run: python3 -m unittest discover -s scripts/v062 -v
+        run: |
+          python3 -m unittest discover -s scripts/v062 -v
+          python3 -m unittest discover -s scripts/v063 -v
 
   radio-hardware-oracles:
     name: radio hardware offline oracles
