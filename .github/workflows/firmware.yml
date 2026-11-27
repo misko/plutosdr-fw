@@ -27,6 +27,7 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts/v062 -v
           python3 -m unittest discover -s scripts/v063 -v
+          python3 -m unittest discover -s scripts/v064 -v
 
   radio-hardware-oracles:
     name: radio hardware offline oracles
@@ -156,30 +157,53 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Check out the immutable continuous scanner release source
+      - name: Check out the immutable position scanner source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: misko/libiio
-          ref: 6162275af8ec4622dc42a53307d6f5a65ed8840f
+          ref: 43580988b7cf26141309b02d55dcb68b470e2181
           path: scanner
           persist-credentials: false
       - name: Install native scanner test dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential cmake libxml2-dev
+            build-essential cmake libxml2-dev libaio-dev bison flex
       - name: Build and run scanner protocol, scheduling and lifecycle suites
         shell: bash
         run: |
           cmake -S scanner -B scanner/build-tests \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-            -DWITH_IIOD=OFF -DWITH_TESTS=ON -DWITH_USB_BACKEND=OFF \
+            -DWITH_IIOD=ON -DWITH_IIOD_USBD=OFF -DWITH_IIOD_SERIAL=OFF \
+            -DWITH_TESTS=ON -DWITH_USB_BACKEND=OFF \
             -DWITH_ZSTD=OFF -DWITH_DOC=OFF -DHAVE_DNS_SD=OFF
           suites=(test_spf_scan_policy test_spf_scan_protocol \
             test_spf_scan_session test_spf_scan_radio \
-            test_spf_visit_queue test_spf_visit_capacity)
+            test_spf_visit_queue test_spf_visit_capacity test_spf_position_scan)
           cmake --build scanner/build-tests --target "${suites[@]}" -j2
           # These owned executables are not registered with CTest.
           for suite in "${suites[@]}"; do
             "scanner/build-tests/tests/$suite"
           done
+          cmake --build scanner/build-tests --target test_metadata_drain_server -j2
+          scanner/build-tests/iiod/test_metadata_drain_server
+      - name: Check scanner and public command parsing under sanitizers
+        shell: bash
+        run: |
+          cmake -S scanner -B scanner/build-sanitize \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer' \
+            -DCMAKE_EXE_LINKER_FLAGS='-fsanitize=address,undefined -no-pie' \
+            -DWITH_IIOD=ON -DWITH_IIOD_USBD=OFF -DWITH_IIOD_SERIAL=OFF \
+            -DWITH_TESTS=ON -DWITH_USB_BACKEND=OFF \
+            -DWITH_ZSTD=OFF -DWITH_DOC=OFF -DHAVE_DNS_SD=OFF
+          suites=(test_spf_scan_policy test_spf_scan_protocol \
+            test_spf_scan_session test_spf_scan_radio \
+            test_spf_visit_queue test_spf_visit_capacity test_spf_position_scan)
+          cmake --build scanner/build-sanitize --target "${suites[@]}" test_metadata_drain_server -j2
+          export ASAN_OPTIONS=detect_leaks=1:abort_on_error=1
+          export UBSAN_OPTIONS=halt_on_error=1
+          for suite in "${suites[@]}"; do
+            "scanner/build-sanitize/tests/$suite"
+          done
+          scanner/build-sanitize/iiod/test_metadata_drain_server
