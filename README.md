@@ -5,6 +5,11 @@ For release discovery and safe persistent or RAM-only installation on Pluto
 and Pluto+, see **[Flashing firmware](flashing.md)**. Pluto+ users should read
 its bootloader safety warning before copying any image to a radio.
 
+The v0.64 continuous position scanner adds 24 counter-timed IF targets at
+10 MS/s using eight resident Fast Lock slots, with verified profile replacement
+and dual-RX IQ receipts. See [capture and qualification](scripts/v064/README.md)
+for the host recorder, independent checker, source pins and deployment gates.
+
 The current direct-async/RAM-extension stack is
 `v0.49-plutoplus-spf-iq-direct-async-v4`. It makes DMA admission authoritative,
 provides a real 50-buffer/200,000,000-byte DMA queue from 216 MiB CMA, and

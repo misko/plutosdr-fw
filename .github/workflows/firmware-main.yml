@@ -38,6 +38,7 @@ jobs:
         github.ref == 'refs/heads/main') ||
        (github.event_name == 'workflow_dispatch' &&
         (github.ref == 'refs/heads/main' ||
+         github.ref == 'refs/heads/codex/position-scan-v064' ||
          github.ref == 'refs/heads/codex/issue-119' ||
          github.ref == 'refs/heads/codex/v059-dual-rx-counter-fix' ||
          github.ref == 'refs/heads/codex/issues-111-116-next-fw' ||
@@ -108,7 +109,9 @@ jobs:
           github.ref == 'refs/heads/codex/v059-dual-rx-counter-fix' &&
           'dual-rx-counter-fix-v059-source.yaml' ||
           github.ref == 'refs/heads/main' &&
-          'continuous-fast-scan-v063-source.yaml' ||
+          'position-scan-v064-source.yaml' ||
+          github.ref == 'refs/heads/codex/position-scan-v064' &&
+          'position-scan-v064-source.yaml' ||
           github.ref == 'refs/heads/codex/issue-119' &&
           'fastlock-attestation-v059-source.yaml' ||
           github.ref == 'refs/heads/codex/issues-111-116-next-fw' &&
@@ -230,7 +233,9 @@ jobs:
         ${{ github.ref == 'refs/heads/codex/v059-dual-rx-counter-fix' &&
           'plutoplus-spf-dual-rx-counter-fix' ||
           github.ref == 'refs/heads/main' &&
-          'plutoplus-spf-continuous-fast-scan-v063' ||
+          'plutoplus-spf-position-scan-v064' ||
+          github.ref == 'refs/heads/codex/position-scan-v064' &&
+          'plutoplus-spf-position-scan-v064' ||
           github.ref == 'refs/heads/codex/issue-119' &&
           'plutoplus-spf-fastlock-attestation-v059' ||
           github.ref == 'refs/heads/codex/issues-111-116-next-fw' &&
@@ -813,6 +818,16 @@ jobs:
           test "$REQUESTED_RELEASE_VERSION" = \
             'v0.41-plutoplus-spf-tandem-agc-v8-rc5'
 
+      - name: Require the exact position scan candidate identity
+        if: >-
+          github.event_name == 'workflow_dispatch' &&
+          github.ref == 'refs/heads/codex/position-scan-v064'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.64-plutoplus-spf-position-scan'
+
       - name: Require the exact final release identity
         if: >-
           github.event_name == 'workflow_dispatch' &&
@@ -821,7 +836,7 @@ jobs:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
-            'v0.63-plutoplus-spf-continuous-fast-scan'
+            'v0.64-plutoplus-spf-position-scan'
 
       - name: Build, validate, and package
         id: build

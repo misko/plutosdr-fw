@@ -47,6 +47,7 @@ run_oracles() {
         tests/test_release_oracles.py \
         tests/test_firmware_release_tooling.py \
         tests/test_fastlock_attestation_v059_route.py \
+        tests/test_position_scan_v064_release_route.py \
         tests/test_tandem_rc5_release_route.py \
         tests/test_tandem_rc6_release_route.py \
         tests/test_tandem_rc7_release_route.py \
@@ -150,7 +151,8 @@ run_source_graph() {
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/adaptive-native-fastlock-v060-source.yaml
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/fastlock-diagnostics-v061-source.yaml
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/continuous-fast-scan-v062-source.yaml
-    ./scripts/check_source_graph.sh manifests/continuous-fast-scan-v063-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/continuous-fast-scan-v063-source.yaml
+    ./scripts/check_source_graph.sh manifests/position-scan-v064-source.yaml
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/fastlock-attestation-v059-source.yaml
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/iio-throughput-coverage-window-v6-rc1-source.yaml
     ./buildroot/board/pluto/test_iiod_supervisor.sh

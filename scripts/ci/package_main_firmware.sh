@@ -23,6 +23,7 @@ fail() {
 # source locks retain their original package path unless a waiver inventory is
 # explicitly supplied by their trusted workflow.
 case "$(basename "$MANIFEST")" in
+position-scan-v064-source.yaml | \
 continuous-fast-scan-v063-source.yaml | continuous-fast-scan-v062-source.yaml | fastlock-diagnostics-v061-source.yaml | adaptive-native-fastlock-v060-source.yaml | fastlock-attestation-v059-source.yaml | dual-rx-counter-fix-v059-source.yaml | adaptive-multirate-agc-v058-source.yaml | adaptive-random-dwell-v057-source.yaml | adaptive-runtime-rates-v056-source.yaml | adaptive-runtime-rates-source.yaml | \
 counter-utc-v1-source.yaml | \
 counter-utc-v054-source.yaml | adaptive-scan-v2-source.yaml | adaptive-scan-v1-source.yaml | iq-direct-async-v5-source.yaml | counter-rx-v1-source.yaml | iq-direct-async-v4-source.yaml | iq-direct-async-v3-source.yaml | iq-direct-async-v2-source.yaml | iq-direct-async-ring-v1-rc1-source.yaml | iio-throughput-coverage-window-v6-rc1-source.yaml | \
@@ -251,6 +252,9 @@ packed_version="$(awk '$1 == "device-fw" {print $2; exit}' \
 printf 'Packaged device-fw: %s\n' "$packed_version"
 protected_version=''
 case "$(basename "$MANIFEST"):$RELEASE_STATE" in
+position-scan-v064-source.yaml:candidate | position-scan-v064-source.yaml:final-release)
+    protected_version='v0.64-plutoplus-spf-position-scan'
+    ;;
 continuous-fast-scan-v063-source.yaml:candidate | continuous-fast-scan-v063-source.yaml:final-release)
     protected_version='v0.63-plutoplus-spf-continuous-fast-scan'
     ;;

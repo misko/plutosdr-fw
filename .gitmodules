@@ -16,12 +16,12 @@
 [submodule "buildroot"]
 	path = buildroot
 	url = https://github.com/misko/plutosdr-fw.git
-	branch = codex/issue-107-buildroot
+	branch = codex/position-scan-v064-buildroot
 
 [submodule "linux"]
 	path = linux
 	url = https://github.com/misko/plutosdr-linux.git
-	branch = v0.38_plutoplus
+	branch = codex/position-scan-v064
 
 [submodule "hdl"]
 	path = hdl
