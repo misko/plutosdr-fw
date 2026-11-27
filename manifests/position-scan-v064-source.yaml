@@ -4,6 +4,15 @@ schema_version: 1
 release_state: candidate
 firmware_repo: https://github.com/misko/plutosdr-fw.git
 
+host_companion_repo: https://github.com/misko/pluto-plus-utils.git
+host_companion_source: 00604a788dd74ed1944582b6f7a05bdcc64aeedf
+host_companion_ref: refs/tags/position-scan-v064-source/host-v2
+tracker_repo: https://github.com/misko/leo-tracker-reduxredux.git
+tracker_source: 8e5ca6a96afc84aedd713b30a1dbc3e3e696b72d
+tracker_ref: refs/tags/position-scan-v064-source/tracker-v2
+kernel_config_sha256: 0914b218b81723de1558b667ebacae09566ee2df36626868eceb0f38d8ea05e0
+kernel_zimage_sha256: d4704bf2e99f60c88dc40cdbd743662052cdb88704f0cdfb6e00267b483c033c
+
 libiio_0_25_source: 43580988b7cf26141309b02d55dcb68b470e2181
 libiio_0_25_repo: https://github.com/misko/libiio.git
 libiio_0_25_ref: refs/tags/position-scan-v064-source/libiio-v2
