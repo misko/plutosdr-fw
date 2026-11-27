@@ -124,6 +124,8 @@ def main():
         raise ValueError("targets must be distinct integers in 0..23")
     if not -80 <= args.tx_gain_db <= -30 or not 0 < args.duration <= 60:
         raise ValueError("fixture output or duration outside bounds")
+    from pluto_plus.hardware.preflight import verify_metadata_runtime
+    verify_metadata_runtime(3)
     import adi
     import numpy as np
     from pluto_plus.hardware.iio import _mute_transmit

@@ -185,6 +185,7 @@ class FixtureTests(unittest.TestCase):
                 kwargs["after_close_hook"]()
 
         dependencies = {
+            "pluto_plus.hardware.preflight": types.SimpleNamespace(verify_metadata_runtime=lambda abi: None),
             "adi": types.SimpleNamespace(ad9361=lambda **kwargs: radio),
             "numpy": types.SimpleNamespace(),
             "pluto_plus.hardware.iio": types.SimpleNamespace(_mute_transmit=mute),
