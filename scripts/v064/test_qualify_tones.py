@@ -42,6 +42,8 @@ class Radio:
 
     def __getattr__(self, name):
         if name in self._values:
+            if name == "tx_lo" and self._values[name] == 2_011_328_125:
+                return self._values[name] - self.__dict__.get("frequency_rounding", 0)
             return self._values[name]
         raise AttributeError(name)
 
@@ -87,6 +89,20 @@ class FixtureTests(unittest.TestCase):
         self.assertEqual(fixture.receipt["tx1_gain_db"], -80)
         self.assertEqual(fixture.receipt["external_attenuation_db"], 30)
         fixture.close()
+
+    def test_cached_lo_quantization_is_bounded(self):
+        for offset, accepted in ((3, True), (5, False)):
+            with self.subTest(offset=offset):
+                radio = Radio()
+                radio.frequency_rounding = offset
+                fixture = self.fixture(radio)
+                if accepted:
+                    fixture.enable(None)
+                else:
+                    with self.assertRaisesRegex(ValueError, "LO readback mismatch"):
+                        fixture.enable(None)
+                fixture.close()
+                self.assertEqual(radio.tx_lo, 900_000_000)
 
     def test_close_restores_both_powerdown_states_and_mutes_dds(self):
         for initial in ("0", "1"):

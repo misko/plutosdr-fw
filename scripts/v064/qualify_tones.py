@@ -42,7 +42,9 @@ class ToneFixture:
             raise ValueError("fixture TX LO did not power up")
         source.tx_rf_bandwidth = 8_000_000
         source.tx_lo = self.frequency_hz
-        if abs(int(source.tx_lo) - self.frequency_hz) > 2:
+        # The clock-framework getter rounds in half-rate units. The RX receipt
+        # separately carries the frequency decoded from the selected PLL image.
+        if abs(int(source.tx_lo) - self.frequency_hz) > 4:
             raise ValueError("fixture TX LO readback mismatch")
         source._ctrl.attrs["calib_mode"].value = "tx_quad"
         # Configure the waveform at minimum gain, then enable only physical TX2.
