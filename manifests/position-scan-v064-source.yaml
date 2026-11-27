@@ -1,7 +1,7 @@
 # Full-build source graph for v0.64; shipped component replacement is bound separately.
 schema: plutosdr-fw.source-manifest
 schema_version: 1
-release_state: candidate
+release_state: final-release
 firmware_repo: https://github.com/misko/plutosdr-fw.git
 
 host_companion_repo: https://github.com/misko/pluto-plus-utils.git

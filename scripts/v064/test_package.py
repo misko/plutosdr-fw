@@ -11,6 +11,18 @@ import package as pack
 
 
 class PackagingTests(unittest.TestCase):
+    def test_source_manifest_rejects_wrong_kernel_config_or_component_commit(self):
+        manifest = {"submodule_linux": "a" * 40, "libiio_0_25_source": "b" * 40,
+                    "kernel_zimage_sha256": pack.sha(b"kernel"),
+                    "kernel_config_sha256": pack.sha(b"config")}
+        pack.checked_manifest(manifest, "a" * 40, "b" * 40, b"kernel", b"config")
+        for args in (("c" * 40, "b" * 40, b"kernel", b"config"),
+                     ("a" * 40, "c" * 40, b"kernel", b"config"),
+                     ("a" * 40, "b" * 40, b"wrong kernel", b"config"),
+                     ("a" * 40, "b" * 40, b"kernel", b"wrong config")):
+            with self.subTest(args=args), self.assertRaisesRegex(ValueError, "manifest mismatch"):
+                pack.checked_manifest(manifest, *args)
+
     def fixture(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)

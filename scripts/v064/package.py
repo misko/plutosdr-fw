@@ -88,6 +88,17 @@ def checked_source(path, expected):
             "dirty tracked source " + str(path))
 
 
+def checked_manifest(manifest, linux_source, libiio_source, kernel, config):
+    expected = {
+        "submodule_linux": linux_source,
+        "libiio_0_25_source": libiio_source,
+        "kernel_zimage_sha256": sha(kernel),
+        "kernel_config_sha256": sha(config),
+    }
+    for field, value in expected.items():
+        require(manifest.get(field) == value, "source manifest mismatch: " + field)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("parent", "linux", "source", "kernel", "kernel-config", "iiod", "libiio", "output"):
@@ -102,6 +113,10 @@ def main():
     kernel, daemon, library = args.kernel.read_bytes(), args.iiod.read_bytes(), args.libiio.read_bytes()
     require(sha(kernel) == args.kernel_sha256 and sha(daemon) == args.iiod_sha256
             and sha(library) == args.libiio_sha256, "component hash mismatch")
+    manifest = dict(line.split(": ", 1) for line in
+        (ROOT / "manifests/position-scan-v064-source.yaml").read_text().splitlines()
+        if ": " in line and not line.startswith("#"))
+    checked_manifest(manifest, args.linux_commit, args.source_commit, kernel, args.kernel_config.read_bytes())
     require(len(kernel) >= 48 and struct.unpack_from("<I", kernel, 36)[0] == 0x016F2818, "expected ARM zImage")
     dependencies = {"iiod": legacy.check_elf(args.iiod), "libiio": legacy.check_elf(args.libiio, library=True)}
     original = legacy.cpio.fit_body(parent)
